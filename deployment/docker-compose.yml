@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  # OpenClaw Agent服务
+  opclaw-agent:
+    image: node:22-alpine
+    container_name: opclaw-agent
+    working_dir: /app
+    volumes:
+      - ../config:/app/config
+      - ../knowledge:/app/knowledge
+      - ./logs:/app/logs
+    environment:
+      - NODE_ENV=production
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_API_BASE=${DEEPSEEK_API_BASE:-https://api.deepseek.com}
+      - FEISHU_APP_ID=${FEISHU_APP_ID}
+      - FEISHU_APP_SECRET=${FEISHU_APP_SECRET}
+    ports:
+      - "3000:3000"
+    command: sh -c "npm install && npm start"
+    restart: unless-stopped
+    networks:
+      - opclaw-network
+
+  # PostgreSQL数据库
+  postgres:
+    image: postgres:14-alpine
+    container_name: opclaw-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB:-opclaw}
+      - POSTGRES_USER=${POSTGRES_USER:-opclaw}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    networks:
+      - opclaw-network
+
+  # Redis缓存
+  redis:
+    image: redis:7-alpine
+    container_name: opclaw-redis
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    volumes:
+      - redis-data:/data
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    networks:
+      - opclaw-network
+
+  # Nginx反向代理
+  nginx:
+    image: nginx:alpine
+    container_name: opclaw-nginx
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - opclaw-agent
+    restart: unless-stopped
+    networks:
+      - opclaw-network
+
+volumes:
+  postgres-data:
+  redis-data:
+
+networks:
+  opclaw-network:
+    driver: bridge
