@@ -9,6 +9,15 @@ import { logger } from './config/logger';
 import { AppDataSource } from './config/database';
 import { redis } from './config/redis';
 import { OAuthController } from './controllers/OAuthController';
+import { errorHandler, notFoundHandler } from './middleware/errorHandler';
+import { sanitizeInput, preventSQLInjection } from './middleware/validate';
+import {
+  requestId,
+  requestLogger,
+  errorLogger,
+  authenticate,
+  rateLimit,
+} from './middleware';
 
 class Application {
   public app: express.Application;
@@ -42,20 +51,36 @@ class Application {
   }
 
   private initializeMiddlewares() {
+    // Request ID (must be first)
+    this.app.use(requestId);
+
+    // Rate limiting
+    this.app.use(
+      rateLimit({
+        windowMs: 60000, // 1 minute
+        maxRequests: 100, // 100 requests per minute
+      })
+    );
+
+    // Security
     this.app.use(helmet());
     this.app.use(cors());
+
+    // Body parsing
     this.app.use(compression());
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
 
-    // Request logging
-    this.app.use((req, _res, next) => {
-      logger.info(`${req.method} ${req.path}`, {
-        query: req.query,
-        body: req.body,
-      });
-      next();
-    });
+    // Security validation
+    this.app.use(sanitizeInput);
+    this.app.use(preventSQLInjection);
+
+    // Logging
+    this.app.use(requestLogger);
+
+    // Error handling middleware (must be after routes)
+    this.app.use(notFoundHandler);
+    this.app.use(errorHandler);
   }
 
   private initializeRoutes() {
