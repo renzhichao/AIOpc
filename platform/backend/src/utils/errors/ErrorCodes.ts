@@ -245,6 +245,59 @@ export const ErrorCodes = {
     code: 'OAUTH_CALLBACK_FAILED',
     message: 'OAuth callback failed',
     userMessage: '授权回调失败，请重试'
+  },
+
+  // ==================== User Errors ====================
+
+  USER_NOT_FOUND: {
+    statusCode: 404,
+    code: 'USER_NOT_FOUND',
+    message: 'User not found',
+    userMessage: '用户不存在，请先登录'
+  },
+
+  // ==================== Message Router Errors ====================
+
+  MESSAGE_FORWARD_FAILED: {
+    statusCode: 500,
+    code: 'MESSAGE_FORWARD_FAILED',
+    message: 'Failed to forward message to instance',
+    userMessage: '消息转发失败，请稍后重试'
+  },
+
+  INSTANCE_NOT_RUNNING: {
+    statusCode: 503,
+    code: 'INSTANCE_NOT_RUNNING',
+    message: 'Instance is not running',
+    userMessage: '实例正在启动中，请稍后再试'
+  },
+
+  INSTANCE_UNREACHABLE: {
+    statusCode: 503,
+    code: 'INSTANCE_UNREACHABLE',
+    message: 'Instance is unreachable',
+    userMessage: '实例暂时无法访问，请稍后重试'
+  },
+
+  INSTANCE_TIMEOUT: {
+    statusCode: 504,
+    code: 'INSTANCE_TIMEOUT',
+    message: 'Instance response timeout',
+    userMessage: '处理超时，请稍后再试或简化您的问题'
+  },
+
+  CONTAINER_NO_IP: {
+    statusCode: 500,
+    code: 'CONTAINER_NO_IP',
+    message: 'Container has no IP address',
+    userMessage: '实例网络配置错误，请联系管理员'
+  },
+
+  FEISHU_MESSAGE_SEND_FAILED: {
+    statusCode: 502,
+    code: 'FEISHU_MESSAGE_SEND_FAILED',
+    message: 'Failed to send message to Feishu',
+    userMessage: '回复发送失败，请稍后重试'
   }
 } as const;
 

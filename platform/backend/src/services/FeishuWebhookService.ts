@@ -10,6 +10,8 @@ import {
   EventProcessResult,
   MessageContent,
 } from '../types/feishu-webhook.types';
+import { MessageRouter } from './MessageRouter';
+import { MessageRouteRequest } from '../types/message-router.types';
 
 /**
  * 飞书 Webhook 服务
@@ -19,6 +21,8 @@ import {
 export class FeishuWebhookService {
   private readonly EVENT_DUPLICATE_KEY_PREFIX = 'feishu:event:';
   private readonly EVENT_DUPLICATE_TTL = 3600; // 1 hour
+
+  constructor(private readonly messageRouter: MessageRouter) {}
 
   /**
    * 处理 Webhook 请求
@@ -235,8 +239,30 @@ export class FeishuWebhookService {
       // 解析消息内容
       const content = this.parseMessageContent(messageEvent.content, messageEvent.msg_type);
 
-      // TODO: 实现消息路由功能 (TASK-022)
-      // 目前只记录日志，不进行实际处理
+      // 路由消息到实例 (TASK-022: 消息路由器)
+      const routeRequest: MessageRouteRequest = {
+        feishuUserId: messageEvent.sender.sender_id.open_id,
+        messageId: messageEvent.message_id,
+        content: content.text || JSON.stringify(content.raw),
+        msgType: messageEvent.msg_type,
+        chatId: messageEvent.chat?.chat_id,
+        timestamp: messageEvent.create_time,
+      };
+
+      // 异步路由消息，不阻塞飞书 webhook 响应
+      this.messageRouter
+        .routeMessage(routeRequest)
+        .then(() => {
+          logger.info('Message routed successfully', {
+            messageId: messageEvent.message_id,
+          });
+        })
+        .catch((error) => {
+          logger.error('Failed to route message', {
+            messageId: messageEvent.message_id,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        });
 
       logger.info('Message event handled', {
         message_id: messageEvent.message_id,

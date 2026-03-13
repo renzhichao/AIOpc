@@ -2,6 +2,7 @@ import 'reflect-metadata';
 import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
 import { Container } from 'typedi';
 import { FeishuWebhookService } from '../FeishuWebhookService';
+import { MessageRouter } from '../MessageRouter';
 import { redis } from '../../config/redis';
 import {
   FeishuWebhookRequest,
@@ -30,8 +31,12 @@ jest.mock('../../config/logger', () => ({
   },
 }));
 
+// Mock MessageRouter
+jest.mock('../MessageRouter');
+
 describe('FeishuWebhookService', () => {
   let service: FeishuWebhookService;
+  let mockMessageRouter: jest.Mocked<MessageRouter>;
 
   beforeEach(() => {
     // Clear all mocks before each test
@@ -40,6 +45,18 @@ describe('FeishuWebhookService', () => {
     // Set environment variables
     process.env.FEISHU_VERIFY_TOKEN = 'test_verify_token';
     process.env.FEISHU_ENCRYPT_KEY = 'test_encrypt_key';
+
+    // Create mock MessageRouter
+    mockMessageRouter = {
+      routeMessage: jest.fn().mockResolvedValue({
+        success: true,
+        content: 'Test response',
+        msgType: 'text',
+      }),
+    } as any;
+
+    // Register mock in container
+    Container.set(MessageRouter, mockMessageRouter);
 
     // Get service from container
     service = Container.get(FeishuWebhookService);
@@ -212,7 +229,7 @@ describe('FeishuWebhookService', () => {
   });
 
   describe('parseMessageContent', () => {
-    it('should parse text message correctly', async () => {
+    it('should parse text message correctly and route to MessageRouter', async () => {
       const request: FeishuWebhookRequest = {
         type: 'event_callback',
         event: {
@@ -242,10 +259,19 @@ describe('FeishuWebhookService', () => {
       };
 
       (redis.exists as any).mockResolvedValue(0);
+      (redis.set as any).mockResolvedValue('OK');
 
       const response = await service.handleWebhook(request);
 
       expect(response.code).toBe(0);
+      expect(mockMessageRouter.routeMessage).toHaveBeenCalledWith(
+        expect.objectContaining({
+          feishuUserId: 'test_open_id',
+          messageId: 'test_message_id',
+          content: 'Hello, World!',
+          msgType: 'text',
+        })
+      );
     });
 
     it('should parse non-text message correctly', async () => {
