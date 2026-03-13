@@ -44,6 +44,9 @@ importers:
       typeorm:
         specifier: ^0.3.28
         version: 0.3.28(ioredis@5.10.0)(pg@8.20.0)(ts-node@10.9.2(@types/node@20.19.37)(typescript@5.9.3))
+      typeorm-typedi-extensions:
+        specifier: ^0.4.1
+        version: 0.4.1(typedi@0.10.0)(typeorm@0.3.28(ioredis@5.10.0)(pg@8.20.0)(ts-node@10.9.2(@types/node@20.19.37)(typescript@5.9.3)))
       uuid:
         specifier: ^13.0.0
         version: 13.0.0
@@ -2318,6 +2321,12 @@ packages:
 
   typedi@0.10.0:
     resolution: {integrity: sha512-v3UJF8xm68BBj6AF4oQML3ikrfK2c9EmZUyLOfShpJuItAqVBHWP/KtpGinkSsIiP6EZyyb6Z3NXyW9dgS9X1w==}
+
+  typeorm-typedi-extensions@0.4.1:
+    resolution: {integrity: sha512-05hWktQ4zuXzTTUO3ao56yOezlvUuZhH2NRS//m0SOGCAJoVlfPTMHcmDaMSQy/lMfAwPWoIyn+sfK7ONzTdXQ==}
+    peerDependencies:
+      typedi: '>=0.10.0'
+      typeorm: '>=0.2.30'
 
   typeorm@0.3.28:
     resolution: {integrity: sha512-6GH7wXhtfq2D33ZuRXYwIsl/qM5685WZcODZb7noOOcRMteM9KF2x2ap3H0EBjnSV0VO4gNAfJT5Ukp0PkOlvg==}
@@ -5075,6 +5084,11 @@ snapshots:
       is-typed-array: 1.1.15
 
   typedi@0.10.0: {}
+
+  typeorm-typedi-extensions@0.4.1(typedi@0.10.0)(typeorm@0.3.28(ioredis@5.10.0)(pg@8.20.0)(ts-node@10.9.2(@types/node@20.19.37)(typescript@5.9.3))):
+    dependencies:
+      typedi: 0.10.0
+      typeorm: 0.3.28(ioredis@5.10.0)(pg@8.20.0)(ts-node@10.9.2(@types/node@20.19.37)(typescript@5.9.3))
 
   typeorm@0.3.28(ioredis@5.10.0)(pg@8.20.0)(ts-node@10.9.2(@types/node@20.19.37)(typescript@5.9.3)):
     dependencies:
