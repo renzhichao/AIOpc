@@ -3,9 +3,12 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
+import { useContainer, useExpressServer } from 'routing-controllers';
+import { Container } from 'typedi';
 import { logger } from './config/logger';
 import { AppDataSource } from './config/database';
 import { redis } from './config/redis';
+import { OAuthController } from './controllers/OAuthController';
 
 class Application {
   public app: express.Application;
@@ -15,6 +18,7 @@ class Application {
     this.initializeDatabase();
     this.initializeRedis();
     this.initializeMiddlewares();
+    this.initializeControllers();
     this.initializeRoutes();
   }
 
@@ -74,6 +78,22 @@ class Application {
         version: '1.0.0',
       });
     });
+  }
+
+  private initializeControllers() {
+    // Set TypeDI container for routing-controllers
+    useContainer(Container);
+
+    // Configure routing-controllers
+    useExpressServer(this.app, {
+      routePrefix: '/api',
+      controllers: [OAuthController],
+      middlewares: [],
+      defaultErrorHandler: true,
+      validation: true,
+    });
+
+    logger.info('OAuth controllers initialized');
   }
 
   public listen() {

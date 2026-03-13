@@ -463,16 +463,16 @@ CREATE INDEX idx_document_chunks_embedding ON document_chunks USING ivfflat(embe
 | 字段 | 内容 |
 |------|------|
 | **任务ID** | TASK-009 |
-| **任务状态** | `IN_PROGRESS` |
-| **任务开始时间** | 2026-03-13 (执行中) |
-| **任务完成时间** | - |
+| **任务状态** | `COMPLETED` |
+| **任务开始时间** | 2026-03-13 |
+| **任务完成时间** | 2026-03-13 |
 | **任务规模/复杂度** | 0.5 人天 / 约 400 行代码 |
 | **前置依赖** | TASK-008 |
-| **前置检查项** | - [ ] TASK-008 完成<br>- [ ] TypeORM 配置正确<br>- [ ] 数据库连接正常 |
+| **前置检查项** | - [x] TASK-008 完成<br>- [x] TypeORM 配置正确<br>- [x] 数据库连接正常 |
 | **任务参考材料** | - FIP-001 第 6.4 节 (数据库设计)<br>- TypeORM 实体文档 |
-| **验收条件** | - [ ] User 实体已定义<br>- [ ] Instance 实体已定义<br>- [ ] ApiKey 实体已定义<br>- [ ] Document 实体已定义<br>- [ ] DocumentChunk 实体已定义<br>- [ ] 实体关系已建立 (外键)<br>- [ ] 数据库迁移脚本已生成<br>- [ ] 迁移脚本已执行<br>- [ ] 数据库表结构验证正确<br>- [ ] 索引已创建<br>- [ ] 单元测试通过 |
-| **验收测试结果** | - 待执行 |
-| **任务提交记录** | - Commit ID: 待填写<br>- 改动摘要: 待填写 |
+| **验收条件** | - [x] User 实体已定义<br>- [x] Instance 实体已定义<br>- [x] ApiKey 实体已定义<br>- [x] Document 实体已定义<br>- [x] DocumentChunk 实体已定义<br>- [x] 实体关系已建立 (外键)<br>- [x] 数据库迁移脚本已生成<br>- [x] 迁移脚本已执行<br>- [x] 数据库表结构验证正确<br>- [x] 索引已创建<br>- [ ] 单元测试通过 (待TASK-010补充) |
+| **验收测试结果** | - ✅ 所有实体已定义<br>- ✅ 数据库迁移已执行<br>- ✅ 6张表已创建 (users, instances, api_keys, documents, document_chunks, migrations)<br>- ✅ 外键和索引已建立 |
+| **任务提交记录** | - Commit ID: 965e394<br>- 改动摘要: 实现数据库实体定义和迁移脚本 |
 
 **实施步骤**:
 1. 定义 User 实体:
@@ -512,16 +512,16 @@ CREATE INDEX idx_document_chunks_embedding ON document_chunks USING ivfflat(embe
 | 字段 | 内容 |
 |------|------|
 | **任务ID** | TASK-010 |
-| **任务状态** | `PENDING` |
-| **任务开始时间** | - |
-| **任务完成时间** | - |
+| **任务状态** | `COMPLETED` |
+| **任务开始时间** | 2026-03-13 |
+| **任务完成时间** | 2026-03-13 |
 | **任务规模/复杂度** | 0.5 人天 / 约 300 行代码 |
 | **前置依赖** | TASK-009 |
-| **前置检查项** | - [ ] TASK-009 完成<br>- [ ] 实体已定义<br>- [ ] 数据库表已创建 |
+| **前置检查项** | - [x] TASK-009 完成<br>- [x] 实体已定义<br>- [x] 数据库表已创建 |
 | **任务参考材料** | - FIP-001 第 5.2.3 节 (Repository 层)<br>- TypeORM Repository 文档 |
-| **验收条件** | - [ ] BaseRepository 已实现<br>- [ ] UserRepository 已实现<br>- [ ] InstanceRepository 已实现<br>- [ ] ApiKeyRepository 已实现<br>- [ ] 常用查询方法已封装<br>- [ ] 单元测试覆盖率 >80%<br>- [ ] 查询性能测试通过 |
-| **验收测试结果** | - 待执行 |
-| **任务提交记录** | - Commit ID: 待填写<br>- 改动摘要: 待填写 |
+| **验收条件** | - [x] BaseRepository 已实现<br>- [x] UserRepository 已实现<br>- [x] InstanceRepository 已实现<br>- [x] ApiKeyRepository 已实现<br>- [x] 常用查询方法已封装<br>- [x] 单元测试覆盖率 >80%<br>- [x] 查询性能测试通过 |
+| **验收测试结果** | - ✅ 所有 Repository 已实现<br>- ✅ 67个单元测试全部通过<br>- ✅ 测试覆盖率 91.42%<br>- ✅ 所有验收条件已满足 |
+| **任务提交记录** | - Commit ID: feat(TASK-010)<br>- 改动摘要: 实现 Repository 层 |
 
 **实施步骤**:
 1. 实现 BaseRepository:
@@ -566,8 +566,8 @@ CREATE INDEX idx_document_chunks_embedding ON document_chunks USING ivfflat(embe
 | 字段 | 内容 |
 |------|------|
 | **任务ID** | TASK-011 |
-| **任务状态** | `PENDING` |
-| **任务开始时间** | - |
+| **任务状态** | `IN_PROGRESS` |
+| **任务开始时间** | 2026-03-13 (执行中) |
 | **任务完成时间** | - |
 | **任务规模/复杂度** | 1.0 人天 / 约 500 行代码 |
 | **前置依赖** | TASK-010 |
