@@ -14,6 +14,7 @@ import { UserController } from './controllers/UserController';
 import { MonitoringController } from './controllers/MonitoringController';
 import { ApiKeyController } from './controllers/ApiKeyController';
 import { HealthCheckController } from './controllers/HealthCheckController';
+import { FeishuWebhookController } from './controllers/FeishuWebhookController';
 import { ScheduledHealthCheckService } from './services/ScheduledHealthCheckService';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { sanitizeInput, preventSQLInjection } from './middleware/validate';
@@ -126,13 +127,14 @@ class Application {
         MonitoringController,
         ApiKeyController,
         HealthCheckController,
+        FeishuWebhookController,
       ],
       middlewares: [],
       defaultErrorHandler: true,
       validation: true,
     });
 
-    logger.info('All controllers initialized (OAuth, Instance, User, Monitoring, ApiKey, HealthCheck)');
+    logger.info('All controllers initialized (OAuth, Instance, User, Monitoring, ApiKey, HealthCheck, FeishuWebhook)');
   }
 
   private initializeScheduledTasks() {
