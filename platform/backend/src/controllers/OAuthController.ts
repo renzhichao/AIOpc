@@ -1,4 +1,4 @@
-import { Controller, Post, Get, Body, Query, Req, Res } from 'routing-controllers';
+import { Controller, Post, Get, Body, QueryParam, Req, Res } from 'routing-controllers';
 import { Service } from 'typedi';
 import { OAuthService } from '../services/OAuthService';
 import { logger } from '../config/logger';
@@ -18,7 +18,7 @@ export class OAuthController {
    * GET /api/oauth/authorize
    */
   @Get('/authorize')
-  async getAuthorizationUrl(@Query('redirect_uri') redirectUri?: string) {
+  async getAuthorizationUrl(@QueryParam('redirect_uri') redirectUri?: string) {
     try {
       const url = this.oauthService.getAuthorizationUrl({ redirect_uri: redirectUri });
       return { url };
@@ -33,7 +33,9 @@ export class OAuthController {
    * POST /api/oauth/callback
    */
   @Post('/callback')
-  async handleCallback(@Body('code') authCode: string) {
+  async handleCallback(@Body() body: any) {
+    const authCode = body.code;
+
     if (!authCode) {
       return { error: 'Authorization code is required' };
     }
@@ -52,7 +54,9 @@ export class OAuthController {
    * POST /api/oauth/refresh
    */
   @Post('/refresh')
-  async refreshToken(@Body('refresh_token') refreshToken: string) {
+  async refreshToken(@Body() body: any) {
+    const refreshToken = body.refresh_token;
+
     if (!refreshToken) {
       return { error: 'Refresh token is required' };
     }
@@ -71,7 +75,9 @@ export class OAuthController {
    * POST /api/oauth/verify
    */
   @Post('/verify')
-  async verifyToken(@Body('token') token: string) {
+  async verifyToken(@Body() body: any) {
+    const token = body.token;
+
     if (!token) {
       return { error: 'Token is required' };
     }

@@ -196,6 +196,16 @@ export class ApiKeyRepository extends BaseRepository<ApiKey> {
   }
 
   /**
+   * 统计已绑定的 API Key 数量
+   */
+  async countAssignedKeys(): Promise<number> {
+    return this.repository
+      .createQueryBuilder('key')
+      .where('key.current_instance_id IS NOT NULL')
+      .getCount();
+  }
+
+  /**
    * 更新元数据
    */
   async updateMetadata(id: number, metadata: Record<string, any>): Promise<void> {

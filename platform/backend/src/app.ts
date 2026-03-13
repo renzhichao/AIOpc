@@ -9,6 +9,10 @@ import { logger } from './config/logger';
 import { AppDataSource } from './config/database';
 import { redis } from './config/redis';
 import { OAuthController } from './controllers/OAuthController';
+import { InstanceController } from './controllers/InstanceController';
+import { UserController } from './controllers/UserController';
+import { MonitoringController } from './controllers/MonitoringController';
+import { ApiKeyController } from './controllers/ApiKeyController';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { sanitizeInput, preventSQLInjection } from './middleware/validate';
 import {
@@ -112,13 +116,19 @@ class Application {
     // Configure routing-controllers
     useExpressServer(this.app, {
       routePrefix: '/api',
-      controllers: [OAuthController],
+      controllers: [
+        OAuthController,
+        InstanceController,
+        UserController,
+        MonitoringController,
+        ApiKeyController,
+      ],
       middlewares: [],
       defaultErrorHandler: true,
       validation: true,
     });
 
-    logger.info('OAuth controllers initialized');
+    logger.info('All controllers initialized (OAuth, Instance, User, Monitoring, ApiKey)');
   }
 
   public listen() {
@@ -134,4 +144,6 @@ class Application {
 const app = new Application();
 app.listen();
 
+// Export the express app for testing
+export const expressApp = app.app;
 export default app;
