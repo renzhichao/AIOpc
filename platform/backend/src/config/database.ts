@@ -1,5 +1,6 @@
 import { DataSource } from 'typeorm';
 import { join } from 'path';
+import { User, Instance, ApiKey, Document, DocumentChunk } from '../entities';
 
 export const AppDataSource = new DataSource({
   type: 'postgres',
@@ -10,7 +11,7 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'opclaw',
   synchronize: process.env.NODE_ENV !== 'production',
   logging: process.env.NODE_ENV === 'development' ? true : false,
-  entities: [join(__dirname, '..', 'entities', '**', '*.entity{.ts,.js}')],
+  entities: [User, Instance, ApiKey, Document, DocumentChunk],
   migrations: [join(__dirname, '..', 'migrations', '**', '*{.ts,.js}')],
   subscribers: [],
 });
