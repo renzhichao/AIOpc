@@ -19,6 +19,9 @@ build/
 coverage/
 *.log
 
+# Logs
+logs/
+
 # IDE
 .vscode/
 .idea/
