@@ -13,6 +13,8 @@ import { InstanceController } from './controllers/InstanceController';
 import { UserController } from './controllers/UserController';
 import { MonitoringController } from './controllers/MonitoringController';
 import { ApiKeyController } from './controllers/ApiKeyController';
+import { HealthCheckController } from './controllers/HealthCheckController';
+import { ScheduledHealthCheckService } from './services/ScheduledHealthCheckService';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { sanitizeInput, preventSQLInjection } from './middleware/validate';
 import {
@@ -33,6 +35,7 @@ class Application {
     this.initializeMiddlewares();
     this.initializeControllers();
     this.initializeRoutes();
+    this.initializeScheduledTasks();
   }
 
   private async initializeDatabase() {
@@ -122,13 +125,42 @@ class Application {
         UserController,
         MonitoringController,
         ApiKeyController,
+        HealthCheckController,
       ],
       middlewares: [],
       defaultErrorHandler: true,
       validation: true,
     });
 
-    logger.info('All controllers initialized (OAuth, Instance, User, Monitoring, ApiKey)');
+    logger.info('All controllers initialized (OAuth, Instance, User, Monitoring, ApiKey, HealthCheck)');
+  }
+
+  private initializeScheduledTasks() {
+    try {
+      const scheduledHealthCheckService = Container.get(ScheduledHealthCheckService);
+
+      // Start scheduled health checks
+      const interval = parseInt(process.env.HEALTH_CHECK_INTERVAL || '60000');
+      const enabled = process.env.HEALTH_CHECK_ENABLED !== 'false';
+
+      scheduledHealthCheckService.start({
+        enabled,
+        interval,
+        recovery: {
+          maxRestartAttempts: 3,
+          restartDelay: 5000,
+          enabled: true,
+          httpCheckEnabled: process.env.HTTP_HEALTH_CHECK_ENABLED !== 'false',
+        },
+      });
+
+      logger.info('Scheduled health check service initialized', {
+        interval: `${interval / 1000}s`,
+        enabled,
+      });
+    } catch (error) {
+      logger.error('Failed to initialize scheduled health check service', error);
+    }
   }
 
   public listen() {
