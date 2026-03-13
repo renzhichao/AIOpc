@@ -1268,8 +1268,8 @@ CREATE INDEX idx_document_chunks_embedding ON document_chunks USING ivfflat(embe
 | 字段 | 内容 |
 |------|------|
 | **任务ID** | TASK-024 |
-| **任务状态** | `PENDING` |
-| **任务开始时间** | - |
+| **任务状态** | `IN_PROGRESS` |
+| **任务开始时间** | 2026-03-13 |
 | **任务完成时间** | - |
 | **任务规模/复杂度** | 1.0 人天 / 约 500 行代码 |
 | **前置依赖** | TASK-023, TASK-011 |

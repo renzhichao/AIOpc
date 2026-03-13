@@ -1,0 +1,168 @@
+/**
+ * OAuth 回调页面 - 处理飞书 OAuth 回调
+ */
+
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { authService } from '../services/auth';
+import { useAuth } from '../contexts/AuthContext';
+import { storage } from '../utils/storage';
+
+type CallbackStatus = 'loading' | 'success' | 'error';
+
+export default function OAuthCallbackPage() {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { login } = useAuth();
+  const [status, setStatus] = useState<CallbackStatus>('loading');
+  const [errorMessage, setErrorMessage] = useState<string>('');
+
+  useEffect(() => {
+    const handleCallback = async () => {
+      const code = searchParams.get('code');
+      const state = searchParams.get('state');
+      const error = searchParams.get('error');
+
+      // 处理错误情况
+      if (error) {
+        console.error('OAuth 错误:', error);
+        setStatus('error');
+        setErrorMessage(
+          error === 'access_denied'
+            ? '您取消了授权'
+            : '授权过程中发生错误'
+        );
+        return;
+      }
+
+      // 检查是否有授权码
+      if (!code || !state) {
+        setStatus('error');
+        setErrorMessage('无效的回调参数');
+        return;
+      }
+
+      try {
+        setStatus('loading');
+
+        // 调用后端 API 处理回调
+        const response = await authService.handleCallback(code, state);
+
+        // 保存 Token 和用户信息
+        storage.setToken(response.access_token, response.expires_in);
+        if (response.refresh_token) {
+          storage.setRefreshToken(response.refresh_token);
+        }
+        storage.setUser(response.user);
+
+        // 更新认证状态
+        login(response.access_token, response.user);
+
+        setStatus('success');
+
+        // 跳转到主页
+        setTimeout(() => {
+          navigate('/dashboard', { replace: true });
+        }, 500);
+      } catch (err) {
+        console.error('处理回调失败:', err);
+        setStatus('error');
+        setErrorMessage(
+          err instanceof Error ? err.message : '登录失败，请稍后重试'
+        );
+      }
+    };
+
+    handleCallback();
+  }, [searchParams, navigate, login]);
+
+  // 返回登录页
+  const handleBackToLogin = () => {
+    navigate('/login', { replace: true });
+  };
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+        <div className="text-center">
+          {/* Logo */}
+          <div className="text-6xl mb-4">🦞</div>
+          <h1 className="text-2xl font-bold text-gray-900 mb-6">OpenClaw</h1>
+
+          {/* 加载状态 */}
+          {status === 'loading' && (
+            <div className="space-y-4">
+              <div className="flex justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+              </div>
+              <div>
+                <p className="text-gray-700 font-medium">正在处理登录...</p>
+                <p className="text-sm text-gray-500 mt-1">请稍候</p>
+              </div>
+            </div>
+          )}
+
+          {/* 成功状态 */}
+          {status === 'success' && (
+            <div className="space-y-4">
+              <div className="flex justify-center">
+                <div className="rounded-full bg-green-100 p-3">
+                  <svg
+                    className="w-12 h-12 text-green-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M5 13l4 4L19 7"
+                    />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p className="text-gray-700 font-medium">登录成功！</p>
+                <p className="text-sm text-gray-500 mt-1">正在跳转...</p>
+              </div>
+            </div>
+          )}
+
+          {/* 错误状态 */}
+          {status === 'error' && (
+            <div className="space-y-4">
+              <div className="flex justify-center">
+                <div className="rounded-full bg-red-100 p-3">
+                  <svg
+                    className="w-12 h-12 text-red-600"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M6 18L18 6M6 6l12 12"
+                    />
+                  </svg>
+                </div>
+              </div>
+              <div>
+                <p className="text-gray-700 font-medium">登录失败</p>
+                <p className="text-sm text-red-600 mt-1">{errorMessage}</p>
+              </div>
+              <button
+                onClick={handleBackToLogin}
+                className="w-full py-2 px-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg transition-colors duration-200 font-medium"
+              >
+                返回登录页
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
