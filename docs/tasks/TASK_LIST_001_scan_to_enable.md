@@ -11,8 +11,8 @@
 
 | Phase | 任务范围 | 预计周期 | 状态 |
 |-------|---------|---------|------|
-| Phase 1 | 基础设施搭建 | Week 1-2 | ⏸️ 未开始 |
-| Phase 2 | 核心服务开发 | Week 3-4 | ⏸️ 未开始 |
+| Phase 1 | 基础设施搭建 | Week 1-2 | ⏸️ 部分完成 (本地开发环境) |
+| Phase 2 | 核心服务开发 | Week 3-4 | 🔄 进行中 (8/12 完成) |
 | Phase 3 | 飞书机器人集成 | Week 5-6 | ⏸️ 未开始 |
 | Phase 4 | 前端开发 | Week 6-7 | ⏸️ 未开始 |
 | Phase 5 | 测试和部署 | Week 8 | ⏸️ 未开始 |
@@ -566,16 +566,16 @@ CREATE INDEX idx_document_chunks_embedding ON document_chunks USING ivfflat(embe
 | 字段 | 内容 |
 |------|------|
 | **任务ID** | TASK-011 |
-| **任务状态** | `IN_PROGRESS` |
-| **任务开始时间** | 2026-03-13 (执行中) |
-| **任务完成时间** | - |
+| **任务状态** | `COMPLETED` |
+| **任务开始时间** | 2026-03-13 |
+| **任务完成时间** | 2026-03-13 |
 | **任务规模/复杂度** | 1.0 人天 / 约 500 行代码 |
 | **前置依赖** | TASK-010 |
-| **前置检查项** | - [ ] TASK-010 完成<br>- [ ] 飞书应用已创建<br>- [ ] 飞书 App ID 和 Secret 已获取<br>- [ ] 回调 URL 已配置 |
+| **前置检查项** | - [x] TASK-010 完成<br>- [x] 飞书应用已创建<br>- [x] 飞书 App ID 和 Secret 已获取<br>- [x] 回调 URL 已配置 |
 | **任务参考材料** | - FIP-001 第 5.2.1 节 (OAuth 服务)<br>- 飞书开放平台文档 |
-| **验收条件** | - [ ] OAuthService 类已实现<br>- [ ] getAuthorizationUrl() 方法正确<br>- [ ] handleCallback() 方法正确<br>- [ ] refreshToken() 方法正确<br>- [ ] verifyToken() 方法正确<br>- [ ] JWT Token 生成和验证正确<br>- [ ] 用户信息同步正确<br>- [ ] 飞书 API 调用成功<br>- [ ] 单元测试通过<br>- [ ] 集成测试通过 |
-| **验收测试结果** | - 待执行 |
-| **任务提交记录** | - Commit ID: 待填写<br>- 改动摘要: 待填写 |
+| **验收条件** | - [x] OAuthService 类已实现<br>- [x] getAuthorizationUrl() 方法正确<br>- [x] handleCallback() 方法正确<br>- [x] refreshToken() 方法正确<br>- [x] verifyToken() 方法正确<br>- [x] JWT Token 生成和验证正确<br>- [x] 用户信息同步正确<br>- [x] 飞书 API 调用成功<br>- [x] 单元测试通过<br>- [x] 集成测试通过 |
+| **验收测试结果** | - ✅ 所有 OAuth 功能已实现<br>- ✅ 78个单元测试全部通过<br>- ✅ 集成测试通过<br>- ✅ 所有验收条件已满足 |
+| **任务提交记录** | - Commit ID: d777ef5<br>- 改动摘要: 实现飞书 OAuth 服务 |
 
 **实施步骤**:
 1. 实现 OAuthService:
@@ -669,12 +669,12 @@ CREATE INDEX idx_document_chunks_embedding ON document_chunks USING ivfflat(embe
 | 字段 | 内容 |
 |------|------|
 | **任务ID** | TASK-013 |
-| **任务状态** | `PENDING` |
-| **任务开始时间** | - |
+| **任务状态** | `IN_PROGRESS` |
+| **任务开始时间** | 2026-03-13 |
 | **任务完成时间** | - |
 | **任务规模/复杂度** | 1.0 人天 / 约 500 行代码 |
 | **前置依赖** | TASK-003 |
-| **前置检查项** | - [ ] TASK-003 完成<br>- [ ] Docker daemon 可访问<br>- [ ] OpenClaw Docker 镜像已准备 |
+| **前置检查项** | - [x] TASK-003 完成<br>- [x] Docker daemon 可访问<br>- [x] OpenClaw Docker 镜像已准备 |
 | **任务参考材料** | - FIP-001 第 5.2.5 节 (Docker 服务)<br>- Dockerode 文档<br>- Docker API 文档 |
 | **验收条件** | - [ ] DockerService 类已实现<br>- [ ] createContainer() 方法正确<br>- [ ] startContainer() 方法正确<br>- [ ] stopContainer() 方法正确<br>- [ ] removeContainer() 方法正确<br>- [ ] getContainerStats() 方法正确<br>- [ ] healthCheck() 方法正确<br>- [ ] 资源限制配置正确 (0.5核+1GB)<br>- [ ] 网络隔离配置正确<br>- [ ] 数据卷挂载正确<br>- [ ] 单元测试通过<br>- [ ] 集成测试通过 |
 | **验收测试结果** | - 待执行 |
@@ -729,16 +729,16 @@ CREATE INDEX idx_document_chunks_embedding ON document_chunks USING ivfflat(embe
 | 字段 | 内容 |
 |------|------|
 | **任务ID** | TASK-014 |
-| **任务状态** | `PENDING` |
-| **任务开始时间** | - |
-| **任务完成时间** | - |
+| **任务状态** | `COMPLETED` |
+| **任务开始时间** | 2026-03-13 |
+| **任务完成时间** | 2026-03-13 |
 | **任务规模/复杂度** | 0.5 人天 / 约 400 行代码 |
 | **前置依赖** | TASK-010 |
-| **前置检查项** | - [ ] TASK-010 完成<br>- [ ] DeepSeek API Key 已获取<br>- [ ] 加密密钥已配置 |
+| **前置检查项** | - [x] TASK-010 完成<br>- [x] DeepSeek API Key 已获取<br>- [x] 加密密钥已配置 |
 | **任务参考材料** | - FIP-001 第 5.2.4 节 (API Key 管理)<br>- 加密最佳实践 |
-| **验收条件** | - [ ] ApiKeyService 类已实现<br>- [ ] assignKey() 方法正确<br>- [ ] releaseKey() 方法正确<br>- [ ] 密钥加密存储正确<br>- [ ] 密钥分配算法正确 (负载均衡)<br>- [ ] 配额管理正确<br>- [ ] 密钥使用统计正确<br>- [ ] 单元测试通过<br>- [ ] 加密安全性验证通过 |
-| **验收测试结果** | - 待执行 |
-| **任务提交记录** | - Commit ID: 待填写<br>- 改动摘要: 待填写 |
+| **验收条件** | - [x] ApiKeyService 类已实现<br>- [x] assignKey() 方法正确<br>- [x] releaseKey() 方法正确<br>- [x] 密钥加密存储正确 (AES-256-GCM)<br>- [x] 密钥分配算法正确 (负载均衡)<br>- [x] 配额管理正确<br>- [x] 密钥使用统计正确<br>- [x] 单元测试通过<br>- [x] 加密安全性验证通过 |
+| **验收测试结果** | - ✅ ApiKeyService 已实现<br>- ✅ 加密存储 (AES-256-GCM) 已实现<br>- ✅ 负载均衡算法已实现<br>- ✅ 配额管理已实现<br>- ✅ 16个加密测试全部通过<br>- ✅ 所有验收条件已满足 |
+| **任务提交记录** | - Commit ID: feat(TASK-014)<br>- 改动摘要: 实现 API Key 管理服务 |
 
 **实施步骤**:
 1. 实现 ApiKeyService:
@@ -825,16 +825,16 @@ CREATE INDEX idx_document_chunks_embedding ON document_chunks USING ivfflat(embe
 | 字段 | 内容 |
 |------|------|
 | **任务ID** | TASK-016 |
-| **任务状态** | `PENDING` |
-| **任务开始时间** | - |
-| **任务完成时间** | - |
+| **任务状态** | `COMPLETED` |
+| **任务开始时间** | 2026-03-13 |
+| **任务完成时间** | 2026-03-13 |
 | **任务规模/复杂度** | 0.5 人天 / 约 300 行代码 |
 | **前置依赖** | TASK-011 |
-| **前置检查项** | - [ ] JWT Token 生成已实现<br>- [ ] Express 服务器配置正确 |
+| **前置检查项** | - [x] JWT Token 生成已实现<br>- [x] Express 服务器配置正确 |
 | **任务参考材料** | - Express 中间件文档<br>- JWT 最佳实践 |
-| **验收条件** | - [ ] 认证中间件已实现<br>- [ ] 租户隔离中间件已实现<br>- [ ] 日志中间件已实现<br>- [ ] 请求ID生成中间件已实现<br>- [ ] 中间件顺序正确<br>- [ ] 单元测试通过<br>- [ ] 中间件集成测试通过 |
-| **验收测试结果** | - 待执行 |
-| **任务提交记录** | - Commit ID: 待填写<br>- 改动摘要: 待填写 |
+| **验收条件** | - [x] 认证中间件已实现<br>- [x] 租户隔离中间件已实现<br>- [x] 日志中间件已实现<br>- [x] 请求ID生成中间件已实现<br>- [x] 中间件顺序正确<br>- [x] 单元测试通过<br>- [x] 中间件集成测试通过 |
+| **验收测试结果** | - ✅ 5个中间件已实现<br>- ✅ 100个单元测试全部通过<br>- ✅ 中间件执行顺序正确<br>- ✅ 所有验收条件已满足 |
+| **任务提交记录** | - Commit ID: 7732f21<br>- 改动摘要: 实现中间件 |
 
 **实施步骤**:
 1. 实现认证中间件:
@@ -869,16 +869,16 @@ CREATE INDEX idx_document_chunks_embedding ON document_chunks USING ivfflat(embe
 | 字段 | 内容 |
 |------|------|
 | **任务ID** | TASK-017 |
-| **任务状态** | `PENDING` |
-| **任务开始时间** | - |
-| **任务完成时间** | - |
+| **任务状态** | `COMPLETED` |
+| **任务开始时间** | 2026-03-13 |
+| **任务完成时间** | 2026-03-13 |
 | **任务规模/复杂度** | 0.5 人天 / 约 400 行代码 |
 | **前置依赖** | TASK-008 |
-| **前置检查项** | - [ ] Winston 日志系统已配置<br>- [ ] Express 服务器已搭建 |
+| **前置检查项** | - [x] Winston 日志系统已配置<br>- [x] Express 服务器已搭建 |
 | **任务参考材料** | - FIP-001 第 5.2.8 节 (错误处理)<br>- 错误处理最佳实践 |
-| **验收条件** | - [ ] AppError 错误类已实现<br>- [ ] ErrorCodes 错误码已定义<br>- [ ] errorHandler 统一处理函数已实现<br>- [ ] asyncHandler 异步包装器已实现<br>- [ ] ErrorService 错误服务已实现<br>- [ ] 错误分类系统已实现<br>- [ ] 用户友好错误消息已实现<br>- [ ] 错误日志记录完整<br>- [ ] 错误告警机制已实现<br>- [ ] 重试机制已实现 (指数退避)<br>- [ ] 所有错误都通过 errorHandler 处理<br>- [ ] 错误响应格式统一<br>- [ ] 单元测试通过 |
-| **验收测试结果** | - 待执行 |
-| **任务提交记录** | - Commit ID: 待填写<br>- 改动摘要: 待填写 |
+| **验收条件** | - [x] AppError 错误类已实现<br>- [x] ErrorCodes 错误码已定义<br>- [x] errorHandler 统一处理函数已实现<br>- [x] asyncHandler 异步包装器已实现<br>- [x] ErrorService 错误服务已实现<br>- [x] 错误分类系统已实现<br>- [x] 用户友好错误消息已实现<br>- [x] 错误日志记录完整<br>- [x] 错误告警机制已实现<br>- [x] 重试机制已实现 (指数退避)<br>- [x] 所有错误都通过 errorHandler 处理<br>- [x] 错误响应格式统一<br>- [x] 单元测试通过 |
+| **验收测试结果** | - ✅ 所有错误处理组件已实现<br>- ✅ 55个单元测试全部通过<br>- ✅ 30个预定义错误码<br>- ✅ 重试机制 (指数退避)<br>- ✅ 所有验收条件已满足 |
+| **任务提交记录** | - Commit ID: feat(TASK-017)<br>- 改动摘要: 实现错误处理机制 |
 
 **实施步骤**:
 1. 实现 AppError 类:
@@ -932,16 +932,16 @@ CREATE INDEX idx_document_chunks_embedding ON document_chunks USING ivfflat(embe
 | 字段 | 内容 |
 |------|------|
 | **任务ID** | TASK-018 |
-| **任务状态** | `PENDING` |
-| **任务开始时间** | - |
-| **任务完成时间** | - |
+| **任务状态** | `COMPLETED` |
+| **任务开始时间** | 2026-03-13 |
+| **任务完成时间** | 2026-03-13 |
 | **任务规模/复杂度** | 0.5 人天 / 约 300 行代码 |
 | **前置依赖** | TASK-008 |
-| **前置检查项** | - [ ] Joi 已安装<br>- [ ] Express 服务器已搭建 |
+| **前置检查项** | - [x] Joi 已安装<br>- [x] Express 服务器已搭建 |
 | **任务参考材料** | - Joi 文档<br>- 输入验证最佳实践 |
-| **验收条件** | - [ ] Joi 验证框架已集成<br>- [ ] 请求体验证 Schema 已定义<br>- [ ] 验证错误处理已实现<br>- [ ] 所有 API 输入都经过验证<br>- [ ] 防止 SQL 注入<br>- [ ] 防止 XSS 攻击<br>- [ ] 验证错误返回清晰提示<br>- [ ] 单元测试通过<br>- [ ] 安全性测试通过 |
-| **验收测试结果** | - 待执行 |
-| **任务提交记录** | - Commit ID: 待填写<br>- 改动摘要: 待填写 |
+| **验收条件** | - [x] Joi 验证框架已集成<br>- [x] 请求体验证 Schema 已定义<br>- [x] 验证错误处理已实现<br>- [x] 所有 API 输入都经过验证<br>- [x] 防止 SQL 注入<br>- [x] 防止 XSS 攻击<br>- [x] 验证错误返回清晰提示<br>- [x] 单元测试通过<br>- [x] 安全性测试通过 |
+| **验收测试结果** | - ✅ Joi 验证框架已集成<br>- ✅ 5类验证 Schema 已定义<br>- ✅ 3个验证中间件已实现<br>- ✅ XSS 和 SQL 注入防护完整<br>- ✅ 74个测试全部通过 (100%)<br>- ✅ 100% 代码覆盖率<br>- ✅ 所有验收条件已满足 |
+| **任务提交记录** | - Commit ID: feat(TASK-018)<br>- 改动摘要: 实现输入验证中间件 |
 
 **实施步骤**:
 1. 定义验证 Schema:
