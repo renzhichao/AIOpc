@@ -1,0 +1,48 @@
+{
+  "name": "aiopcn-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AIOpc Platform - Scan-to-Enable OpenClaw Cloud Service",
+  "scripts": {
+    "install:all": "pnpm install && cd platform/backend && pnpm install && cd ../frontend && pnpm install",
+    "dev:backend": "cd platform/backend && pnpm run dev",
+    "dev:frontend": "cd platform/frontend && pnpm run dev",
+    "test:backend": "cd platform/backend && pnpm run test",
+    "test:coverage:backend": "cd platform/backend && pnpm run test:coverage",
+    "build:backend": "cd platform/backend && pnpm run build",
+    "build:frontend": "cd platform/frontend && pnpm run build",
+    "lint": "pnpm run lint:backend && pnpm run lint:frontend",
+    "lint:backend": "cd platform/backend && pnpm run lint",
+    "lint:frontend": "cd platform/frontend && pnpm run lint",
+    "format": "pnpm run format:backend && pnpm run format:frontend",
+    "format:backend": "cd platform/backend && pnpm run format",
+    "format:frontend": "cd platform/frontend && pnpm run format"
+  },
+  "keywords": [
+    "opclaw",
+    "ai",
+    "agent",
+    "platform",
+    "scan-to-enable"
+  ],
+  "author": "",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "devDependencies": {
+    "@types/babel__core": "^7.20.5",
+    "@types/dockerode": "^4.0.1",
+    "@typescript-eslint/eslint-plugin": "^6.17.0",
+    "@typescript-eslint/parser": "^6.17.0",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "prettier": "^3.1.1",
+    "ts-jest": "^29.4.6",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "dockerode": "^4.0.9"
+  }
+}

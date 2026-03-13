@@ -1,0 +1,631 @@
+/**
+ * Instance Management Service
+ *
+ * Manages OpenClaw instance lifecycle including:
+ * - Instance creation and initialization
+ * - Instance lifecycle (start, stop, delete)
+ * - Instance health monitoring
+ * - Instance state management
+ * - Integration with Docker and API Key services
+ */
+
+import { Service } from 'typedi';
+import { InstanceRepository } from '../repositories/InstanceRepository';
+import { DockerService } from './DockerService';
+import { ApiKeyService } from './ApiKeyService';
+import { Instance } from '../entities/Instance.entity';
+import { User } from '../entities/User.entity';
+import { AppError } from '../utils/errors/AppError';
+import { ErrorService } from './ErrorService';
+import { logger } from '../config/logger';
+import { InstanceConfig } from '../types/docker';
+
+/**
+ * Instance status for state machine
+ */
+export type InstanceStatus = 'pending' | 'active' | 'stopped' | 'error' | 'recovering';
+
+/**
+ * Instance creation options
+ */
+export interface CreateInstanceOptions {
+  /** Instance template (personal, team, enterprise) */
+  template: 'personal' | 'team' | 'enterprise';
+  /** Custom configuration */
+  config?: Partial<InstanceConfig>;
+  /** Instance expiration (optional, default: 30 days) */
+  expiresAt?: Date;
+}
+
+/**
+ * Instance state information
+ */
+export interface InstanceState {
+  /** Instance ID */
+  instanceId: string;
+  /** Current status */
+  status: InstanceStatus;
+  /** Docker container ID */
+  containerId?: string;
+  /** Owner ID */
+  ownerId?: number;
+  /** Created at */
+  createdAt: Date;
+  /** Expires at */
+  expiresAt?: Date;
+  /** Health status */
+  healthStatus?: Record<string, any>;
+  /** Restart attempts */
+  restartAttempts: number;
+}
+
+/**
+ * Instance statistics
+ */
+export interface InstanceStats {
+  /** Total instances */
+  total: number;
+  /** Active instances */
+  active: number;
+  /** Stopped instances */
+  stopped: number;
+  /** Pending instances */
+  pending: number;
+  /** Error instances */
+  error: number;
+  /** Recovering instances */
+  recovering: number;
+}
+
+@Service()
+export class InstanceService {
+  constructor(
+    private readonly instanceRepository: InstanceRepository,
+    private readonly dockerService: DockerService,
+    private readonly apiKeyService: ApiKeyService,
+    private readonly errorService: ErrorService
+  ) {}
+
+  /**
+   * Create a new OpenClaw instance
+   *
+   * @param user - User who owns the instance
+   * @param options - Instance creation options
+   * @returns Created instance
+   * @throws AppError if creation fails
+   */
+  async createInstance(user: User, options: CreateInstanceOptions): Promise<Instance> {
+    try {
+      logger.info('Creating instance', {
+        userId: user.id,
+        template: options.template
+      });
+
+      // 1. Generate unique instance ID
+      const instanceId = this.generateInstanceId();
+
+      // 2. Set expiration date (default: 30 days)
+      const expiresAt = options.expiresAt || this.getDefaultExpiration();
+
+      // 3. Create instance record with pending status
+      const instance = await this.instanceRepository.create({
+        instance_id: instanceId,
+        owner_id: user.id,
+        status: 'pending',
+        template: options.template,
+        config: options.config || {},
+        expires_at: expiresAt,
+        restart_attempts: 0,
+        health_status: {}
+      });
+
+      logger.info('Instance record created', {
+        instanceId,
+        userId: user.id,
+        status: 'pending'
+      });
+
+      // 4. Get API key for the instance
+      const apiKey = await this.apiKeyService.assignKey(instanceId);
+
+      // 5. Prepare instance configuration
+      const instanceConfig: InstanceConfig = {
+        apiKey,
+        feishuAppId: process.env.FEISHU_APP_ID || '',
+        feishuAppSecret: process.env.FEISHU_APP_SECRET,
+        skills: this.getDefaultSkills(options.template),
+        systemPrompt: this.getDefaultPrompt(options.template),
+        temperature: 0.7,
+        maxTokens: 4000,
+        template: options.template
+      };
+
+      // 6. Create Docker container
+      const containerId = await this.dockerService.createContainer(instanceId, instanceConfig);
+
+      logger.info('Docker container created', {
+        instanceId,
+        containerId
+      });
+
+      // 7. Update instance with container ID and active status
+      await this.instanceRepository.update(instanceId, {
+        docker_container_id: containerId,
+        status: 'active',
+        config: instanceConfig
+      });
+
+      // 8. Fetch updated instance
+      const updatedInstance = await this.instanceRepository.findByInstanceId(instanceId);
+
+      logger.info('Instance created successfully', {
+        instanceId,
+        containerId,
+        status: 'active'
+      });
+
+      return updatedInstance!;
+    } catch (error) {
+      logger.error('Failed to create instance', {
+        userId: user.id,
+        template: options.template,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      // Clean up on failure
+      throw this.errorService.createError('INSTANCE_CREATE_FAILED', {
+        userId: user.id,
+        template: options.template,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Start a stopped instance
+   *
+   * @param instanceId - Instance ID
+   * @returns Updated instance
+   * @throws AppError if start fails
+   */
+  async startInstance(instanceId: string): Promise<Instance> {
+    try {
+      logger.info('Starting instance', { instanceId });
+
+      // 1. Get instance
+      const instance = await this.getInstanceById(instanceId);
+
+      // 2. Validate state transition
+      this.validateStateTransition(instance.status as InstanceStatus, 'active');
+
+      // 3. Start Docker container
+      await this.dockerService.startContainer(instanceId);
+
+      // 4. Update instance status
+      await this.instanceRepository.updateStatus(instanceId, 'active');
+
+      // 5. Reset restart attempts
+      await this.instanceRepository.resetRestartAttempts(instanceId);
+
+      logger.info('Instance started', { instanceId });
+
+      // 6. Fetch updated instance
+      return await this.getInstanceById(instanceId);
+    } catch (error) {
+      logger.error('Failed to start instance', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      throw this.errorService.createError('INSTANCE_START_FAILED', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Stop a running instance
+   *
+   * @param instanceId - Instance ID
+   * @param timeout - Timeout in seconds (default: 10)
+   * @returns Updated instance
+   * @throws AppError if stop fails
+   */
+  async stopInstance(instanceId: string, timeout: number = 10): Promise<Instance> {
+    try {
+      logger.info('Stopping instance', { instanceId, timeout });
+
+      // 1. Get instance
+      const instance = await this.getInstanceById(instanceId);
+
+      // 2. Validate state transition
+      this.validateStateTransition(instance.status as InstanceStatus, 'stopped');
+
+      // 3. Stop Docker container
+      await this.dockerService.stopContainer(instanceId, timeout);
+
+      // 4. Update instance status
+      await this.instanceRepository.updateStatus(instanceId, 'stopped');
+
+      logger.info('Instance stopped', { instanceId });
+
+      // 5. Fetch updated instance
+      return await this.getInstanceById(instanceId);
+    } catch (error) {
+      logger.error('Failed to stop instance', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      throw this.errorService.createError('INSTANCE_STOP_FAILED', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Restart an instance
+   *
+   * @param instanceId - Instance ID
+   * @param timeout - Timeout in seconds (default: 10)
+   * @returns Updated instance
+   * @throws AppError if restart fails
+   */
+  async restartInstance(instanceId: string, timeout: number = 10): Promise<Instance> {
+    try {
+      logger.info('Restarting instance', { instanceId, timeout });
+
+      // 1. Get instance
+      const instance = await this.getInstanceById(instanceId);
+
+      // 2. Validate state transition (restart is allowed from active, recovering, error)
+      if (!['active', 'recovering', 'error'].includes(instance.status as InstanceStatus)) {
+        throw this.errorService.createError('INVALID_STATE_TRANSITION', {
+          currentStatus: instance.status,
+          newStatus: 'active',
+          allowedTransitions: ['active', 'recovering', 'error']
+        });
+      }
+
+      // 3. Restart Docker container
+      await this.dockerService.restartContainer(instanceId, timeout);
+
+      // 4. Update instance status
+      await this.instanceRepository.updateStatus(instanceId, 'active');
+
+      // 5. Increment restart attempts
+      await this.instanceRepository.incrementRestartAttempts(instanceId);
+
+      logger.info('Instance restarted', { instanceId });
+
+      // 6. Fetch updated instance
+      return await this.getInstanceById(instanceId);
+    } catch (error) {
+      logger.error('Failed to restart instance', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      throw this.errorService.createError('INSTANCE_RESTART_FAILED', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Delete an instance (stop and remove container)
+   *
+   * @param instanceId - Instance ID
+   * @param force - Force deletion without stopping
+   * @throws AppError if deletion fails
+   */
+  async deleteInstance(instanceId: string, force: boolean = false): Promise<void> {
+    try {
+      logger.info('Deleting instance', { instanceId, force });
+
+      // 1. Get instance
+      const instance = await this.getInstanceById(instanceId);
+
+      // 2. Release API key
+      await this.apiKeyService.releaseKey(instanceId);
+
+      // 3. Remove Docker container
+      await this.dockerService.removeContainer(instanceId, force, true);
+
+      // 4. Delete instance record from database
+      await this.instanceRepository.delete(instance.id);
+
+      logger.info('Instance deleted', { instanceId });
+    } catch (error) {
+      logger.error('Failed to delete instance', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      throw this.errorService.createError('INSTANCE_DELETE_FAILED', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Get instance by ID
+   *
+   * @param instanceId - Instance ID
+   * @returns Instance
+   * @throws AppError if not found
+   */
+  async getInstanceById(instanceId: string): Promise<Instance> {
+    const instance = await this.instanceRepository.findByInstanceId(instanceId);
+
+    if (!instance) {
+      throw this.errorService.createError('INSTANCE_NOT_FOUND', { instanceId });
+    }
+
+    return instance;
+  }
+
+  /**
+   * Get instance status
+   *
+   * @param instanceId - Instance ID
+   * @returns Instance state information
+   */
+  async getInstanceStatus(instanceId: string): Promise<InstanceState> {
+    try {
+      const instance = await this.getInstanceById(instanceId);
+
+      // Get container status from Docker
+      let containerId: string | undefined;
+      try {
+        const containerStatus = await this.dockerService.getContainerStatus(instanceId);
+        containerId = containerStatus.id;
+      } catch (error) {
+        logger.warn('Failed to get container status', {
+          instanceId,
+          error: error instanceof Error ? error.message : String(error)
+        });
+      }
+
+      return {
+        instanceId: instance.instance_id,
+        status: instance.status as InstanceStatus,
+        containerId: instance.docker_container_id || containerId,
+        ownerId: instance.owner_id || undefined,
+        createdAt: instance.created_at,
+        expiresAt: instance.expires_at || undefined,
+        healthStatus: instance.health_status || undefined,
+        restartAttempts: instance.restart_attempts
+      };
+    } catch (error) {
+      logger.error('Failed to get instance status', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      throw this.errorService.createError('INSTANCE_STATUS_FAILED', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Get instance health status
+   *
+   * @param instanceId - Instance ID
+   * @returns Health status from Docker
+   */
+  async getInstanceHealth(instanceId: string): Promise<Record<string, any>> {
+    try {
+      const healthStatus = await this.dockerService.healthCheck(instanceId);
+
+      // Update health status in database
+      await this.instanceRepository.updateHealthStatus(instanceId, healthStatus);
+
+      return healthStatus;
+    } catch (error) {
+      logger.error('Failed to get instance health', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      return {
+        status: 'unknown',
+        reason: 'Failed to check health',
+        lastCheck: new Date()
+      };
+    }
+  }
+
+  /**
+   * List instances for a user
+   *
+   * @param userId - User ID
+   * @returns List of instances
+   */
+  async listUserInstances(userId: number): Promise<Instance[]> {
+    return this.instanceRepository.findByOwnerId(userId);
+  }
+
+  /**
+   * List instances by status
+   *
+   * @param status - Instance status
+   * @returns List of instances
+   */
+  async listInstancesByStatus(status: string): Promise<Instance[]> {
+    return this.instanceRepository.findByStatus(status);
+  }
+
+  /**
+   * Get instance statistics
+   *
+   * @returns Instance statistics
+   */
+  async getInstanceStats(): Promise<InstanceStats> {
+    const statusCounts = await this.instanceRepository.countByStatus();
+
+    return {
+      total: Object.values(statusCounts).reduce((sum, count) => sum + count, 0),
+      active: statusCounts.active || 0,
+      stopped: statusCounts.stopped || 0,
+      pending: statusCounts.pending || 0,
+      error: statusCounts.error || 0,
+      recovering: statusCounts.recovering || 0
+    };
+  }
+
+  /**
+   * Find expired instances
+   *
+   * @returns List of expired instances
+   */
+  async findExpiredInstances(): Promise<Instance[]> {
+    return this.instanceRepository.findExpiredInstances();
+  }
+
+  /**
+   * Claim an existing instance
+   *
+   * @param instanceId - Instance ID
+   * @param userId - User ID
+   * @returns Updated instance
+   */
+  async claimInstance(instanceId: string, userId: number): Promise<Instance> {
+    try {
+      const instance = await this.getInstanceById(instanceId);
+
+      // Check if instance is already claimed
+      if (instance.owner_id) {
+        throw this.errorService.createError('INSTANCE_ALREADY_CLAIMED', {
+          instanceId,
+          ownerId: instance.owner_id
+        });
+      }
+
+      // Claim instance
+      await this.instanceRepository.claimInstance(instanceId, userId);
+
+      logger.info('Instance claimed', { instanceId, userId });
+
+      return await this.getInstanceById(instanceId);
+    } catch (error) {
+      logger.error('Failed to claim instance', {
+        instanceId,
+        userId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Release an instance (remove owner)
+   *
+   * @param instanceId - Instance ID
+   */
+  async releaseInstance(instanceId: string): Promise<void> {
+    try {
+      await this.instanceRepository.releaseInstance(instanceId);
+
+      logger.info('Instance released', { instanceId });
+    } catch (error) {
+      logger.error('Failed to release instance', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      throw this.errorService.createError('INSTANCE_RELEASE_FAILED', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Validate state transition
+   *
+   * @param currentStatus - Current instance status
+   * @param newStatus - Desired instance status
+   * @throws AppError if transition is invalid
+   */
+  private validateStateTransition(currentStatus: InstanceStatus, newStatus: InstanceStatus): void {
+    const validTransitions: Record<InstanceStatus, InstanceStatus[]> = {
+      pending: ['active', 'error'],
+      active: ['stopped', 'recovering', 'error'],
+      stopped: ['active'],
+      error: ['recovering', 'stopped'],
+      recovering: ['active', 'error']
+    };
+
+    const allowed = validTransitions[currentStatus] || [];
+
+    if (!allowed.includes(newStatus)) {
+      throw this.errorService.createError('INVALID_STATE_TRANSITION', {
+        currentStatus,
+        newStatus,
+        allowedTransitions: allowed
+      });
+    }
+  }
+
+  /**
+   * Generate unique instance ID
+   *
+   * @returns Unique instance ID
+   */
+  private generateInstanceId(): string {
+    const timestamp = Date.now().toString(36);
+    const random = Math.random().toString(36).substring(2, 15);
+    return `inst-${timestamp}-${random}`;
+  }
+
+  /**
+   * Get default expiration date (30 days from now)
+   *
+   * @returns Default expiration date
+   */
+  private getDefaultExpiration(): Date {
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+    return expiresAt;
+  }
+
+  /**
+   * Get default skills based on template
+   *
+   * @param template - Instance template
+   * @returns Array of skill names
+   */
+  private getDefaultSkills(template: string): string[] {
+    const skillsByTemplate: Record<string, string[]> = {
+      personal: ['chat', 'code', 'write'],
+      team: ['chat', 'code', 'write', 'analyze', 'collaborate'],
+      enterprise: ['chat', 'code', 'write', 'analyze', 'collaborate', 'integrate', 'automate']
+    };
+
+    return skillsByTemplate[template] || skillsByTemplate.personal;
+  }
+
+  /**
+   * Get default system prompt based on template
+   *
+   * @param template - Instance template
+   * @returns System prompt
+   */
+  private getDefaultPrompt(template: string): string {
+    const promptsByTemplate: Record<string, string> = {
+      personal: 'You are a helpful AI assistant for personal productivity.',
+      team: 'You are a helpful AI assistant for team collaboration and productivity.',
+      enterprise: 'You are a helpful AI assistant for enterprise operations and automation.'
+    };
+
+    return promptsByTemplate[template] || promptsByTemplate.personal;
+  }
+}
