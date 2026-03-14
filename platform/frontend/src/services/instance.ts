@@ -1,0 +1,226 @@
+/**
+ * 实例服务 - 处理与后端实例 API 的交互
+ */
+
+import type {
+  Instance,
+  InstanceListResponse,
+  InstanceDetailResponse,
+  CreateInstanceRequest,
+  CreateInstanceResponse,
+  InstanceActionResponse,
+  InstanceUsageStats,
+  InstanceHealth,
+} from '../types/instance';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
+
+/**
+ * 从 localStorage 获取 Token
+ */
+function getToken(): string {
+  const token = localStorage.getItem('access_token');
+  if (!token) {
+    throw new Error('No authentication token found');
+  }
+  return token;
+}
+
+/**
+ * 处理 API 错误
+ */
+function handleApiError(_response: Response): never {
+  throw new Error('请求失败');
+}
+
+export class InstanceService {
+  private baseUrl: string;
+
+  constructor(baseUrl: string = API_BASE_URL) {
+    this.baseUrl = baseUrl;
+  }
+
+  /**
+   * 获取所有实例列表
+   */
+  async listInstances(params?: { status?: string; page?: number; limit?: number }): Promise<Instance[]> {
+    const queryParams = new URLSearchParams();
+    if (params?.status) queryParams.append('status', params.status);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+
+    const response = await fetch(`${this.baseUrl}/instances?${queryParams.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      handleApiError(response);
+    }
+
+    const result: InstanceListResponse = await response.json();
+    return result.data;
+  }
+
+  /**
+   * 获取实例详情
+   */
+  async getInstance(id: string): Promise<Instance> {
+    const response = await fetch(`${this.baseUrl}/instances/${id}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      handleApiError(response);
+    }
+
+    const result: InstanceDetailResponse = await response.json();
+    return result.data;
+  }
+
+  /**
+   * 创建新实例
+   */
+  async createInstance(request: CreateInstanceRequest): Promise<Instance> {
+    const response = await fetch(`${this.baseUrl}/instances`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    });
+
+    if (!response.ok) {
+      handleApiError(response);
+    }
+
+    const result: CreateInstanceResponse = await response.json();
+    return result.data;
+  }
+
+  /**
+   * 启动实例
+   */
+  async startInstance(id: string): Promise<Instance> {
+    const response = await fetch(`${this.baseUrl}/instances/${id}/start`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      handleApiError(response);
+    }
+
+    const result: InstanceActionResponse = await response.json();
+    return result.data;
+  }
+
+  /**
+   * 停止实例
+   */
+  async stopInstance(id: string): Promise<Instance> {
+    const response = await fetch(`${this.baseUrl}/instances/${id}/stop`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      handleApiError(response);
+    }
+
+    const result: InstanceActionResponse = await response.json();
+    return result.data;
+  }
+
+  /**
+   * 重启实例
+   */
+  async restartInstance(id: string): Promise<Instance> {
+    const response = await fetch(`${this.baseUrl}/instances/${id}/restart`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      handleApiError(response);
+    }
+
+    const result: InstanceActionResponse = await response.json();
+    return result.data;
+  }
+
+  /**
+   * 删除实例
+   */
+  async deleteInstance(id: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/instances/${id}`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      handleApiError(response);
+    }
+  }
+
+  /**
+   * 获取实例使用统计
+   */
+  async getInstanceUsage(id: string): Promise<InstanceUsageStats> {
+    const response = await fetch(`${this.baseUrl}/instances/${id}/usage`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      handleApiError(response);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * 获取实例健康状态
+   */
+  async getInstanceHealth(id: string): Promise<InstanceHealth> {
+    const response = await fetch(`${this.baseUrl}/health/instances/${id}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      handleApiError(response);
+    }
+
+    return response.json();
+  }
+}
+
+// 导出单例实例
+export const instanceService = new InstanceService();
