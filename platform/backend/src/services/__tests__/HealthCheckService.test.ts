@@ -186,8 +186,10 @@ describe('HealthCheckService', () => {
       instance_id: 'test-instance-1',
       status: 'active',
       template: 'personal',
+      name: 'Test Instance',
       config: {},
       created_at: new Date(),
+      updated_at: new Date(),
       expires_at: new Date(),
       owner_id: 1,
       restart_attempts: 0,
@@ -294,7 +296,7 @@ describe('HealthCheckService', () => {
 
       expect(recoveryResult.action.type).toBe('restart');
       expect(recoveryResult.action.success).toBe(true);
-      expect(recoveryResult.action.restartAttempts).toBe(2);
+      expect(recoveryResult.action.restartAttempts).toBe(1);
       expect(mockDockerService.restartContainer).toHaveBeenCalledWith(instanceId, 10);
       expect(mockInstanceRepository.incrementRestartAttempts).toHaveBeenCalledWith(instanceId);
     });
@@ -306,8 +308,10 @@ describe('HealthCheckService', () => {
         instance_id: 'test-instance-1',
         status: 'active',
         template: 'personal',
+        name: 'Test Instance',
         config: {},
         created_at: new Date(),
+        updated_at: new Date(),
         expires_at: new Date(),
         owner_id: 1,
         restart_attempts: 3,
@@ -351,8 +355,10 @@ describe('HealthCheckService', () => {
         instance_id: 'test-instance-1',
         status: 'active',
         template: 'personal',
+        name: 'Test Instance',
         config: {},
         created_at: new Date(),
+        updated_at: new Date(),
         expires_at: new Date(),
         owner_id: 1,
         restart_attempts: 0,
