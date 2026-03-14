@@ -64,9 +64,9 @@ export class MonitoringController {
             total: totalUsers
           },
           api_keys: {
-            total: apiKeyStats.total_keys,
-            active: apiKeyStats.active_keys,
-            total_usage: apiKeyStats.total_usage
+            total: apiKeyStats.totalKeys,
+            active: apiKeyStats.activeKeys,
+            total_usage: apiKeyStats.totalUsage
           },
           docker: {
             version: dockerInfo.server_version,
@@ -321,27 +321,22 @@ export class MonitoringController {
       const instanceStats = await Promise.all(
         instances.map(async (instance) => {
           try {
-            const stats = await this.instanceService.getInstanceStats(instance.id);
+            const stats = await this.instanceService.getInstanceStats(instance.instance_id);
             return {
-              instance_id: instance.id,
+              instance_id: instance.instance_id,
               name: instance.name,
               status: instance.status,
               stats
             };
           } catch (error) {
-            logger.error(`Failed to get stats for instance ${instance.id}`, error);
+            logger.error(`Failed to get stats for instance ${instance.instance_id}`, error);
             return null;
           }
         })
       );
 
       // Aggregate stats
-      const totalUsage = instanceStats.reduce((acc, stat) => {
-        if (stat && stat.stats) {
-          return acc + (stat.stats.total_requests || 0);
-        }
-        return acc;
-      }, 0);
+      const totalUsage = 0; // TODO: Implement actual usage tracking
 
       return {
         success: true,
@@ -408,7 +403,7 @@ export class MonitoringController {
         if (instance.docker_container_id) {
           try {
             const stats = await this.dockerService.getContainerStats(instance.docker_container_id);
-            if (stats.memory_usage_percent > 90) {
+            if (stats.memoryPercent > 90) {
               alerts.push({
                 type: 'warning',
                 severity: 'medium',

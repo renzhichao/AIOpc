@@ -180,6 +180,13 @@ export const ErrorCodes = {
     userMessage: '获取实例状态失败，请稍后重试'
   },
 
+  INSTANCE_LOGS_FAILED: {
+    statusCode: 500,
+    code: 'INSTANCE_LOGS_FAILED',
+    message: 'Failed to get instance logs',
+    userMessage: '获取实例日志失败，请稍后重试'
+  },
+
   INSTANCE_ALREADY_CLAIMED: {
     statusCode: 409,
     code: 'INSTANCE_ALREADY_CLAIMED',

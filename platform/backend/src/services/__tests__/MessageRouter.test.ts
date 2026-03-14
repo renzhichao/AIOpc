@@ -48,11 +48,13 @@ describe('MessageRouter', () => {
     owner_id: 1,
     status: 'active',
     template: 'personal',
+    name: 'Test Instance',
     docker_container_id: 'container-123',
     config: {},
     restart_attempts: 0,
     health_status: {},
     created_at: new Date(),
+    updated_at: new Date(),
   } as Instance;
 
   beforeEach(() => {

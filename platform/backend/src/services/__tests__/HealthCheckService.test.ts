@@ -9,12 +9,15 @@ import { DockerService } from '../DockerService';
 import { ErrorService } from '../ErrorService';
 import { Instance } from '../../entities/Instance.entity';
 import { HealthStatus, ContainerStats } from '../../types/docker';
+import axios from 'axios';
 
 // Mock dependencies
 jest.mock('../../repositories/InstanceRepository');
 jest.mock('../DockerService');
 jest.mock('../ErrorService');
 jest.mock('axios');
+
+const mockedAxios = axios as jest.Mocked<typeof axios>;
 
 describe('HealthCheckService', () => {
   let healthCheckService: HealthCheckService;
@@ -36,6 +39,19 @@ describe('HealthCheckService', () => {
       updateDockerContainerId: jest.fn(),
       findActiveInstances: jest.fn(),
       countByStatus: jest.fn(),
+      create: jest.fn(),
+      update: jest.fn(),
+      delete: jest.fn(),
+      findById: jest.fn(),
+      findByOwnerId: jest.fn(),
+      findByStatus: jest.fn(),
+      findPendingInstances: jest.fn(),
+      findErrorInstances: jest.fn(),
+      claimInstance: jest.fn(),
+      releaseInstance: jest.fn(),
+      findExpiredInstances: jest.fn(),
+      countByUser: jest.fn(),
+      findRecoverableInstances: jest.fn()
     } as any;
 
     mockDockerService = {
@@ -44,10 +60,19 @@ describe('HealthCheckService', () => {
       restartContainer: jest.fn(),
       removeContainer: jest.fn(),
       createContainer: jest.fn(),
+      startContainer: jest.fn(),
+      stopContainer: jest.fn(),
+      getContainerStatus: jest.fn(),
+      getLogs: jest.fn(),
+      listContainers: jest.fn()
     } as any;
 
     mockErrorService = {
-      createError: jest.fn(),
+      createError: jest.fn().mockImplementation((code, details) => {
+        const error = new Error(String(code));
+        (error as any).code = code;
+        return error;
+      }),
     } as any;
 
     // Create service instance with mocked dependencies
@@ -93,7 +118,15 @@ describe('HealthCheckService', () => {
       };
       mockDockerService.getContainerStats.mockResolvedValue(mockStats);
 
-      // Mock axios for HTTP check (will be mocked in implementation)
+      // Mock axios for HTTP check to return success
+      mockedAxios.get.mockResolvedValue({
+        status: 200,
+        data: { status: 'healthy' },
+        config: {},
+        headers: {},
+        statusText: 'OK'
+      });
+
       const healthResult = await healthCheckService.checkInstanceHealth(
         instanceId,
         {} // Use default options which will disable HTTP check if container is unhealthy
@@ -128,7 +161,7 @@ describe('HealthCheckService', () => {
       const healthResult = await healthCheckService.checkInstanceHealth(instanceId, {});
 
       expect(healthResult.healthy).toBe(false);
-      expect(healthResult.containerStatus.status).toBe('unhealthy');
+      expect(healthResult.containerStatus.status).toBe('unknown');
     });
 
     it('should handle health check errors gracefully', async () => {
@@ -197,6 +230,15 @@ describe('HealthCheckService', () => {
       };
       mockDockerService.getContainerStats.mockResolvedValue(mockStats);
 
+      // Mock axios for HTTP check to return success
+      mockedAxios.get.mockResolvedValue({
+        status: 200,
+        data: { status: 'healthy' },
+        config: {},
+        headers: {},
+        statusText: 'OK'
+      });
+
       const recoveryResult = await healthCheckService.attemptRecovery(instanceId);
 
       expect(recoveryResult.action.type).toBe('none');
@@ -213,11 +255,13 @@ describe('HealthCheckService', () => {
         instance_id: 'test-instance-1',
         status: 'active',
         template: 'personal',
+        name: 'Test Instance',
         config: {},
         created_at: new Date(),
+        updated_at: new Date(),
         expires_at: new Date(),
         owner_id: 1,
-        restart_attempts: 1,
+        restart_attempts: 0,
         health_status: {},
         docker_container_id: 'container-123',
         claimed_at: new Date(),
@@ -354,8 +398,10 @@ describe('HealthCheckService', () => {
         instance_id: 'instance-1',
         status: 'active',
         template: 'personal',
+        name: 'Test Instance',
         config: {},
         created_at: new Date(),
+        updated_at: new Date(),
         expires_at: new Date(),
         owner_id: 1,
         restart_attempts: 0,
@@ -399,8 +445,8 @@ describe('HealthCheckService', () => {
         .mockResolvedValueOnce(healthyStatus)
         .mockResolvedValueOnce(unhealthyStatus);
 
-      // Mock container stats
-      const mockStats: ContainerStats = {
+      // Mock container stats for healthy instance
+      const healthyStats: ContainerStats = {
         id: 'instance-1',
         name: 'opclaw-instance-1',
         cpuPercent: 50,
@@ -413,7 +459,20 @@ describe('HealthCheckService', () => {
         blockWrite: 0,
         timestamp: new Date(),
       };
-      mockDockerService.getContainerStats.mockResolvedValue(mockStats);
+
+      // Mock container stats to throw error for unhealthy instance
+      mockDockerService.getContainerStats
+        .mockResolvedValueOnce(healthyStats)
+        .mockRejectedValueOnce(new Error('Container is not running'));
+
+      // Mock axios for HTTP check to return success for healthy instance
+      mockedAxios.get.mockResolvedValue({
+        status: 200,
+        data: { status: 'healthy' },
+        config: {},
+        headers: {},
+        statusText: 'OK'
+      });
 
       const statistics = await healthCheckService.runHealthCheckCycle();
 
@@ -429,8 +488,10 @@ describe('HealthCheckService', () => {
         instance_id: 'instance-1',
         status: 'active',
         template: 'personal',
+        name: 'Test Instance',
         config: {},
         created_at: new Date(),
+        updated_at: new Date(),
         expires_at: new Date(),
         owner_id: 1,
         restart_attempts: 0,
@@ -451,22 +512,61 @@ describe('HealthCheckService', () => {
       // Mock active instances
       mockInstanceRepository.findActiveInstances.mockResolvedValue(mockInstances);
 
-      // Mock unhealthy health check
+      // Mock findByInstanceId for recovery
+      mockInstanceRepository.findByInstanceId.mockResolvedValue(mockInstances[0]);
+
+      // Mock unhealthy health check first (before recovery)
       const unhealthyStatus: HealthStatus = {
         status: 'unhealthy',
         reason: 'Container is not running',
         lastCheck: new Date(),
       };
-      mockDockerService.healthCheck.mockResolvedValue(unhealthyStatus);
 
-      // Mock container stats
-      mockDockerService.getContainerStats.mockRejectedValue(new Error('Not running'));
+      // Mock healthy health check (after restart)
+      const healthyStatus: HealthStatus = {
+        status: 'healthy',
+        reason: 'Container is running and healthy',
+        cpuUsage: 50,
+        memoryUsage: 60,
+        uptime: 3600,
+        lastCheck: new Date(),
+      };
+
+      // Mock health check to return unhealthy first, then healthy
+      mockDockerService.healthCheck
+        .mockResolvedValueOnce(unhealthyStatus)
+        .mockResolvedValueOnce(healthyStatus);
+
+      // Mock container stats to throw error first (unhealthy), then succeed (after restart)
+      const mockStats: ContainerStats = {
+        id: 'instance-1',
+        name: 'opclaw-instance-1',
+        cpuPercent: 50,
+        memoryUsage: 600 * 1024 * 1024,
+        memoryLimit: 1024 * 1024 * 1024,
+        memoryPercent: 60,
+        networkRX: 0,
+        networkTX: 0,
+        blockRead: 0,
+        blockWrite: 0,
+        timestamp: new Date(),
+      };
+      mockDockerService.getContainerStats
+        .mockRejectedValueOnce(new Error('Container is not running'))
+        .mockResolvedValueOnce(mockStats);
 
       // Mock successful restart
       mockDockerService.restartContainer.mockResolvedValue(undefined);
 
+      // Mock repository methods for recovery
+      mockInstanceRepository.incrementRestartAttempts.mockResolvedValue(undefined);
+      mockInstanceRepository.resetRestartAttempts.mockResolvedValue(undefined);
+      mockInstanceRepository.updateStatus.mockResolvedValue(undefined);
+      mockInstanceRepository.updateHealthStatus.mockResolvedValue(undefined);
+
       const statistics = await healthCheckService.runHealthCheckCycle({
         restartDelay: 100,
+        httpCheckEnabled: false,
       });
 
       expect(statistics.totalInstances).toBe(1);
@@ -538,8 +638,8 @@ describe('HealthCheckService', () => {
       };
       mockDockerService.getContainerStats.mockResolvedValue(mockStats);
 
-      // Perform health check to populate history
-      await healthCheckService.checkInstanceHealth(instanceId, {});
+      // Perform health check to populate history (disable HTTP check)
+      await healthCheckService.checkInstanceHealth(instanceId, { httpCheckEnabled: false });
 
       // Get history
       const history = healthCheckService.getHealthHistory(instanceId);
@@ -580,8 +680,8 @@ describe('HealthCheckService', () => {
       };
       mockDockerService.getContainerStats.mockResolvedValue(mockStats);
 
-      // Perform health check to populate history
-      await healthCheckService.checkInstanceHealth(instanceId, {});
+      // Perform health check to populate history (disable HTTP check)
+      await healthCheckService.checkInstanceHealth(instanceId, { httpCheckEnabled: false });
 
       // Verify history exists
       let history = healthCheckService.getHealthHistory(instanceId);

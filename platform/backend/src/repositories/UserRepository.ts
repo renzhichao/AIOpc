@@ -146,4 +146,11 @@ export class UserRepository extends BaseRepository<User> {
       .take(limit)
       .getMany();
   }
+
+  /**
+   * 获取用户总数
+   */
+  async getTotalUserCount(): Promise<number> {
+    return this.count();
+  }
 }

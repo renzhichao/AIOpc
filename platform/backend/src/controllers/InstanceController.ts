@@ -53,11 +53,10 @@ export class InstanceController {
         );
       }
 
-      const instance = await this.instanceService.createInstance(
-        user,
-        body.template,
-        body.config || {}
-      );
+      const instance = await this.instanceService.createInstance(user, {
+        template: body.template,
+        config: body.config || {}
+      });
 
       return {
         success: true,

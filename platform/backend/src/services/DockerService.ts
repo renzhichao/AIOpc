@@ -14,7 +14,7 @@
  */
 
 import { Service } from 'typedi';
-import * as Docker from 'dockerode';
+import Docker from 'dockerode';
 import { AppError } from '../utils/errors/AppError';
 import { logger } from '../config/logger';
 import {
@@ -32,7 +32,7 @@ import {
 
 @Service()
 export class DockerService {
-  private docker: any;
+  private docker: Docker;
   private readonly DEFAULT_IMAGE = 'openclaw:latest';
   private readonly DEFAULT_NETWORK_PREFIX = 'opclaw-network';
   private readonly DEFAULT_VOLUME_PREFIX = 'opclaw-data';
@@ -48,7 +48,7 @@ export class DockerService {
 
   constructor() {
     const socketPath = process.env.DOCKER_SOCKET_PATH || '/var/run/docker.sock';
-    this.docker = new (Docker as any).default({ socketPath });
+    this.docker = new Docker({ socketPath });
     logger.info(`DockerService initialized with socket: ${socketPath}`);
   }
 
@@ -513,7 +513,7 @@ export class DockerService {
         stderr: true,
         tail: options.tail || 100,
         follow: false,
-        timestamps: options.timestamps || true,
+        timestamps: options.timestamps !== undefined ? options.timestamps : true,
         since: options.since,
       });
 
@@ -689,6 +689,36 @@ export class DockerService {
         `Failed to create volume: ${error instanceof Error ? error.message : String(error)}`,
         { volumeName, error: error instanceof Error ? error.message : String(error) }
       );
+    }
+  }
+
+  /**
+   * Get Docker system information
+   *
+   * @returns System information
+   */
+  async getSystemInfo(): Promise<{
+    server_version: string;
+    containers: number;
+    containers_running: number;
+  }> {
+    try {
+      const version = await this.docker.version();
+      const info = await this.docker.info();
+
+      return {
+        server_version: version.Version || 'unknown',
+        containers: info.Containers || 0,
+        containers_running: info.ContainersRunning || 0
+      };
+    } catch (error) {
+      logger.error('Failed to get Docker system info:', error);
+
+      return {
+        server_version: 'unknown',
+        containers: 0,
+        containers_running: 0
+      };
     }
   }
 }

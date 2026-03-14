@@ -453,6 +453,50 @@ export class InstanceService {
   }
 
   /**
+   * Get instances for a user with filtering and pagination
+   *
+   * @param userId - User ID
+   * @param status - Optional status filter
+   * @param limit - Maximum number of instances to return
+   * @param offset - Number of instances to skip
+   * @returns List of instances
+   */
+  async getUserInstances(
+    userId: number,
+    status?: string,
+    limit: number = 20,
+    offset: number = 0
+  ): Promise<Instance[]> {
+    const instances = await this.instanceRepository.findByOwnerId(userId);
+
+    // Filter by status if provided
+    let filtered = instances;
+    if (status) {
+      filtered = instances.filter(instance => instance.status === status);
+    }
+
+    // Apply pagination
+    return filtered.slice(offset, offset + limit);
+  }
+
+  /**
+   * Count instances for a user
+   *
+   * @param userId - User ID
+   * @param status - Optional status filter
+   * @returns Count of instances
+   */
+  async countUserInstances(userId: number, status?: string): Promise<number> {
+    const instances = await this.instanceRepository.findByOwnerId(userId);
+
+    if (status) {
+      return instances.filter(instance => instance.status === status).length;
+    }
+
+    return instances.length;
+  }
+
+  /**
    * List instances by status
    *
    * @param status - Instance status
@@ -463,11 +507,43 @@ export class InstanceService {
   }
 
   /**
-   * Get instance statistics
+   * Get instance statistics for a specific instance
+   *
+   * @param instanceId - Instance ID
+   * @returns Instance statistics
+   */
+  async getInstanceStats(instanceId: string): Promise<{
+    status: string;
+    uptime?: number;
+    restartAttempts: number;
+    healthStatus?: Record<string, any>;
+  }> {
+    const instance = await this.getInstanceById(instanceId);
+
+    // Get container status from Docker
+    let uptime: number | undefined;
+    try {
+      const containerStatus = await this.dockerService.getContainerStatus(instanceId);
+      const startTime = containerStatus.started?.getTime() || Date.now();
+      uptime = Math.floor((Date.now() - startTime) / 1000);
+    } catch (error) {
+      // Container might not be running
+    }
+
+    return {
+      status: instance.status,
+      uptime,
+      restartAttempts: instance.restart_attempts,
+      healthStatus: instance.health_status
+    };
+  }
+
+  /**
+   * Get global instance statistics
    *
    * @returns Instance statistics
    */
-  async getInstanceStats(): Promise<InstanceStats> {
+  async getGlobalInstanceStats(): Promise<InstanceStats> {
     const statusCounts = await this.instanceRepository.countByStatus();
 
     return {
@@ -478,6 +554,43 @@ export class InstanceService {
       error: statusCounts.error || 0,
       recovering: statusCounts.recovering || 0
     };
+  }
+
+  /**
+   * Get instance logs
+   *
+   * @param instanceId - Instance ID
+   * @param lines - Number of lines to retrieve
+   * @returns Array of log entries
+   */
+  async getInstanceLogs(instanceId: string, lines: number = 100): Promise<Array<{
+    timestamp: Date;
+    message: string;
+    containerId: string;
+  }>> {
+    try {
+      // Verify instance exists
+      await this.getInstanceById(instanceId);
+
+      // Get logs from Docker service
+      const logs = await this.dockerService.getLogs(instanceId, { tail: lines });
+
+      return logs.map(log => ({
+        timestamp: log.timestamp || new Date(),
+        message: log.message,
+        containerId: instanceId
+      }));
+    } catch (error) {
+      logger.error('Failed to get instance logs', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      throw this.errorService.createError('INSTANCE_LOGS_FAILED', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
   }
 
   /**
@@ -627,5 +740,70 @@ export class InstanceService {
     };
 
     return promptsByTemplate[template] || promptsByTemplate.personal;
+  }
+
+  /**
+   * Get total instance count
+   *
+   * @returns Total number of instances
+   */
+  async getTotalInstanceCount(): Promise<number> {
+    const stats = await this.getGlobalInstanceStats();
+    return stats.total;
+  }
+
+  /**
+   * Get active instance count
+   *
+   * @returns Number of active instances
+   */
+  async getActiveInstanceCount(): Promise<number> {
+    const stats = await this.getGlobalInstanceStats();
+    return stats.active;
+  }
+
+  /**
+   * Check instance health
+   *
+   * @param instanceId - Instance ID
+   * @returns Health status
+   */
+  async checkInstanceHealth(instanceId: string): Promise<{
+    healthy: boolean;
+    status: string;
+    cpu_usage?: number;
+    memory_usage?: number;
+    [key: string]: any;
+  }> {
+    try {
+      const health = await this.getInstanceHealth(instanceId);
+
+      return {
+        healthy: health.status === 'healthy',
+        status: health.status,
+        cpu_usage: health.cpuUsage,
+        memory_usage: health.memoryUsage,
+        ...health
+      };
+    } catch (error) {
+      logger.error('Failed to check instance health', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      return {
+        healthy: false,
+        status: 'unknown'
+      };
+    }
+  }
+
+  /**
+   * Get all instances
+   *
+   * @returns All instances
+   */
+  async getAllInstances(): Promise<Instance[]> {
+    return this.instanceRepository.findAll();
   }
 }

@@ -21,11 +21,17 @@ export class Instance {
   @Column({ nullable: true })
   template: string;
 
+  @Column({ name: 'name', nullable: true })
+  name: string;
+
   @Column({ type: 'jsonb', nullable: true })
   config: Record<string, any>;
 
   @CreateDateColumn({ name: 'created_at' })
   created_at: Date;
+
+  @Column({ name: 'updated_at', type: 'timestamp', nullable: true })
+  updated_at: Date;
 
   @Column({ type: 'timestamp', nullable: true })
   expires_at: Date;
