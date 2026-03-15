@@ -19,6 +19,8 @@ import { AppError } from '../utils/errors/AppError';
 import { ErrorService } from './ErrorService';
 import { logger } from '../config/logger';
 import { InstanceConfig } from '../types/docker';
+import { InstancePresetConfig, InstanceTemplate } from '../types/config';
+import { getPresetConfig } from '../config/presets';
 
 /**
  * Instance status for state machine
@@ -30,9 +32,7 @@ export type InstanceStatus = 'pending' | 'active' | 'stopped' | 'error' | 'recov
  */
 export interface CreateInstanceOptions {
   /** Instance template (personal, team, enterprise) */
-  template: 'personal' | 'team' | 'enterprise';
-  /** Custom configuration */
-  config?: Partial<InstanceConfig>;
+  template: InstanceTemplate;
   /** Instance expiration (optional, default: 30 days) */
   expiresAt?: Date;
 }
@@ -107,13 +107,21 @@ export class InstanceService {
       // 2. Set expiration date (default: 30 days)
       const expiresAt = options.expiresAt || this.getDefaultExpiration();
 
-      // 3. Create instance record with pending status
+      // 3. Get preset configuration for the template
+      const presetConfig = getPresetConfig(options.template);
+      logger.info('Preset configuration loaded', {
+        template: options.template,
+        maxMessages: presetConfig.limits.max_messages_per_day,
+        maxStorage: presetConfig.limits.max_storage_mb
+      });
+
+      // 4. Create instance record with pending status
       const instance = await this.instanceRepository.create({
         instance_id: instanceId,
         owner_id: user.id,
         status: 'pending',
         template: options.template,
-        config: options.config || {},
+        config: presetConfig,
         expires_at: expiresAt,
         restart_attempts: 0,
         health_status: {}
@@ -125,22 +133,30 @@ export class InstanceService {
         status: 'pending'
       });
 
-      // 4. Get API key for the instance
+      // 5. Get API key for the instance
       const apiKey = await this.apiKeyService.assignKey(instanceId);
 
-      // 5. Prepare instance configuration
+      // 6. Prepare instance configuration from preset
       const instanceConfig: InstanceConfig = {
-        apiKey,
+        apiKey: presetConfig.llm.api_key || apiKey,
         feishuAppId: process.env.FEISHU_APP_ID || '',
         feishuAppSecret: process.env.FEISHU_APP_SECRET,
-        skills: this.getDefaultSkills(options.template),
-        systemPrompt: this.getDefaultPrompt(options.template),
-        temperature: 0.7,
-        maxTokens: 4000,
-        template: options.template
+        skills: presetConfig.skills.filter(s => s.enabled).map(s => s.name),
+        tools: presetConfig.tools.filter(t => t.enabled).map(t => ({ name: t.name, layer: t.layer })),
+        systemPrompt: presetConfig.system_prompt,
+        temperature: presetConfig.llm.temperature,
+        maxTokens: presetConfig.llm.max_tokens,
+        template: options.template,
+        apiBase: presetConfig.llm.api_base,
+        model: presetConfig.llm.model
       };
 
-      // 6. Create Docker container
+      logger.info('Instance configuration prepared', {
+        skills: instanceConfig.skills.length,
+        toolsCount: presetConfig.tools.filter(t => t.enabled).length
+      });
+
+      // 7. Create Docker container with preset configuration
       const containerId = await this.dockerService.createContainer(instanceId, instanceConfig);
 
       logger.info('Docker container created', {
@@ -148,20 +164,21 @@ export class InstanceService {
         containerId
       });
 
-      // 7. Update instance with container ID and active status
+      // 8. Update instance with container ID and active status
       await this.instanceRepository.update(instanceId, {
         docker_container_id: containerId,
         status: 'active',
-        config: instanceConfig
+        config: presetConfig
       });
 
-      // 8. Fetch updated instance
+      // 9. Fetch updated instance
       const updatedInstance = await this.instanceRepository.findByInstanceId(instanceId);
 
       logger.info('Instance created successfully', {
         instanceId,
         containerId,
-        status: 'active'
+        status: 'active',
+        template: options.template
       });
 
       return updatedInstance!;
@@ -708,38 +725,6 @@ export class InstanceService {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
     return expiresAt;
-  }
-
-  /**
-   * Get default skills based on template
-   *
-   * @param template - Instance template
-   * @returns Array of skill names
-   */
-  private getDefaultSkills(template: string): string[] {
-    const skillsByTemplate: Record<string, string[]> = {
-      personal: ['chat', 'code', 'write'],
-      team: ['chat', 'code', 'write', 'analyze', 'collaborate'],
-      enterprise: ['chat', 'code', 'write', 'analyze', 'collaborate', 'integrate', 'automate']
-    };
-
-    return skillsByTemplate[template] || skillsByTemplate.personal;
-  }
-
-  /**
-   * Get default system prompt based on template
-   *
-   * @param template - Instance template
-   * @returns System prompt
-   */
-  private getDefaultPrompt(template: string): string {
-    const promptsByTemplate: Record<string, string> = {
-      personal: 'You are a helpful AI assistant for personal productivity.',
-      team: 'You are a helpful AI assistant for team collaboration and productivity.',
-      enterprise: 'You are a helpful AI assistant for enterprise operations and automation.'
-    };
-
-    return promptsByTemplate[template] || promptsByTemplate.personal;
   }
 
   /**
