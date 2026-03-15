@@ -375,7 +375,7 @@
 | **任务参考材料** | - FIP-002 第 4.3 节 (预设配置)<br>- GAP_ANALYSIS.md 第 2.1 节<br>- templates/ 目录 |
 | **验收条件** | - [x] InstancePresetConfig 类型已定义<br>- [x] PRESET_TEMPLATES 常量已定义<br>- [x] personal 模板配置正确<br>- [x] team 模板配置正确<br>- [x] enterprise 模板配置正确<br>- [x] DeepSeek API Key 正确注入<br>- [x] 预设 Skills 正确配置<br>- [x] 预设 Tools 正确配置<br>- [x] System Prompt 正确应用<br>- [x] 单元测试通过 (27/27)<br>- [ ] E2E 测试通过 |
 | **验收测试结果** | - ✅ 所有验收条件已通过<br>- ✅ 单元测试 100% 通过 (27/27)<br>- ⚠️ E2E 测试待后续任务更新 |
-| **任务提交记录** | - Commit ID: 待填写<br>- 改动摘要: 待填写 |
+| **任务提交记录** | - Commit ID: ef25f60<br>- 改动摘要: 实现预设配置应用功能 |
 
 **实施步骤**:
 1. 定义预设配置类型:
