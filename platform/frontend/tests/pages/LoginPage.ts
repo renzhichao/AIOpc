@@ -18,6 +18,7 @@ export class LoginPage {
     description: '[data-testid="login-description"]',
     qrCodeContainer: '[data-testid="qr-container"]',
     qrCode: '[data-testid="qr-code"]',
+    qrCodeExpiry: '[data-testid="qr-code-expiry"]',
     loading: '[data-testid="qr-loading"]',
     error: '[data-testid="login-error"]',
   };
@@ -231,5 +232,14 @@ export class LoginPage {
    */
   async isOnLoginPage(): Promise<boolean> {
     return this.page.url().includes('/login');
+  }
+
+  /**
+   * Get QR code expiry text
+   */
+  async getQRCodeExpiry(): Promise<string | null> {
+    const expiryElement = await this.page.$(this.selectors.qrCodeExpiry);
+    if (!expiryElement) return null;
+    return await expiryElement.textContent();
   }
 }

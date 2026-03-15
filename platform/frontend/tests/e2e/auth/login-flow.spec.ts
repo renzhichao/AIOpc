@@ -53,6 +53,11 @@ test.describe('OAuth Login Flow', () => {
     const qrCodeUrl = await loginPage.getQRCodeUrl();
     expect(qrCodeUrl).toBeTruthy();
     expect(qrCodeUrl.length).toBeGreaterThan(0);
+
+    // Verify QR code expiry is displayed
+    const qrCodeExpiry = await loginPage.getQRCodeExpiry();
+    expect(qrCodeExpiry).toBeTruthy();
+    expect(qrCodeExpiry).toContain('有效期至');
   });
 
   test('should generate unique QR codes for each session', async ({ page }) => {

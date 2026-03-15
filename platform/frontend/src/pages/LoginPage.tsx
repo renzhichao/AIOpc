@@ -64,6 +64,16 @@ export default function LoginPage() {
     fetchAuthUrl();
   };
 
+  // 计算二维码过期时间（24小时后）
+  const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000);
+  const timeRemaining = expiresAt.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8" data-testid="login-container">
@@ -114,6 +124,11 @@ export default function LoginPage() {
               <p className="text-sm text-gray-500">
                 打开飞书APP，扫描上方二维码
               </p>
+              <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                <p className="text-xs text-blue-600" data-testid="qr-code-expiry">
+                  有效期至: {timeRemaining}
+                </p>
+              </div>
             </div>
 
             <button

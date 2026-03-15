@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Delete, Put, Body, Param, QueryParam, Req } from 'routing-controllers';
 import { Service } from 'typedi';
 import { InstanceService } from '../services/InstanceService';
+import { QRCodeService } from '../services/QRCodeService';
 import { logger } from '../config/logger';
 import { AppError, ErrorCodes } from '../utils/errors';
 
@@ -14,7 +15,8 @@ import { AppError, ErrorCodes } from '../utils/errors';
 @Controller('/instances')
 export class InstanceController {
   constructor(
-    private readonly instanceService: InstanceService
+    private readonly instanceService: InstanceService,
+    private readonly qrCodeService: QRCodeService
   ) {}
 
   /**
@@ -501,6 +503,67 @@ export class InstanceController {
         ErrorCodes.INTERNAL_ERROR.statusCode,
         ErrorCodes.INTERNAL_ERROR.code,
         'Failed to get instance logs'
+      );
+    }
+  }
+
+  /**
+   * Get QR code for instance claim
+   * GET /api/instances/:id/qr-code
+   *
+   * Generates or retrieves the QR code for claiming an instance.
+   * QR codes are valid for 24 hours and include anti-tampering signatures.
+   */
+  @Get('/:id/qr-code')
+  async getQRCode(@Param('id') id: string, @Req() req: any) {
+    try {
+      const user = req.user;
+
+      if (!user || !user.id) {
+        throw new AppError(
+          ErrorCodes.UNAUTHORIZED.statusCode,
+          ErrorCodes.UNAUTHORIZED.code,
+          'User not authenticated'
+        );
+      }
+
+      const instance = await this.instanceService.getInstanceById(id);
+
+      if (!instance) {
+        throw new AppError(
+          ErrorCodes.NOT_FOUND.statusCode,
+          ErrorCodes.NOT_FOUND.code,
+          `Instance ${id} not found`
+        );
+      }
+
+      // Check ownership
+      if (instance.owner_id !== user.id) {
+        throw new AppError(
+          ErrorCodes.FORBIDDEN.statusCode,
+          ErrorCodes.FORBIDDEN.code,
+          'Access denied to this instance'
+        );
+      }
+
+      // Generate or retrieve QR code
+      const qrData = await this.qrCodeService.generateQRCode(id);
+
+      return {
+        success: true,
+        data: qrData
+      };
+    } catch (error) {
+      logger.error('Failed to get QR code for instance', error);
+
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      throw new AppError(
+        ErrorCodes.INTERNAL_ERROR.statusCode,
+        ErrorCodes.INTERNAL_ERROR.code,
+        'Failed to get QR code'
       );
     }
   }
