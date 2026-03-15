@@ -106,12 +106,13 @@ export default function InstanceCard({
     <div
       className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden cursor-pointer"
       onClick={() => onClick(instance.id)}
+      data-testid="instance-card"
     >
       {/* 头部 */}
       <div className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1">
-            <h3 className="text-xl font-semibold text-gray-900 mb-1">
+            <h3 className="text-xl font-semibold text-gray-900 mb-1" data-testid="instance-name">
               {instance.config.name || `实例 ${instance.id.slice(0, 8)}`}
             </h3>
             {instance.config.description && (
@@ -122,6 +123,7 @@ export default function InstanceCard({
           </div>
           <span
             className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}
+            data-testid="instance-status"
           >
             <span className="mr-1">{statusInfo.icon}</span>
             {statusInfo.label}
@@ -130,7 +132,7 @@ export default function InstanceCard({
 
         {/* 元信息 */}
         <div className="flex items-center gap-4 text-sm text-gray-600 mb-4">
-          <span className="inline-flex items-center">
+          <span className="inline-flex items-center" data-testid="instance-template">
             <span className="mr-1">📦</span>
             {getTemplateName()}
           </span>
@@ -150,6 +152,7 @@ export default function InstanceCard({
               }}
               disabled={loading}
               className="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 text-sm font-medium"
+              data-testid="start-button"
             >
               {loading ? '启动中...' : '启动'}
             </button>
@@ -162,6 +165,7 @@ export default function InstanceCard({
               }}
               disabled={loading}
               className="flex-1 py-2 px-4 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 text-sm font-medium"
+              data-testid="stop-button"
             >
               {loading ? '停止中...' : '停止'}
             </button>
@@ -174,6 +178,7 @@ export default function InstanceCard({
               }}
               disabled={loading}
               className="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 text-sm font-medium"
+              data-testid="restart-button"
             >
               {loading ? '重启中...' : '重启'}
             </button>
@@ -187,6 +192,7 @@ export default function InstanceCard({
             }}
             disabled={loading}
             className="py-2 px-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 text-sm font-medium"
+            data-testid="delete-button"
           >
             删除
           </button>

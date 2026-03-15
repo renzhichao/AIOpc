@@ -190,7 +190,7 @@ export default function InstanceDetailPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center" data-testid="instance-details-container">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mx-auto mb-4"></div>
           <p className="text-gray-600">加载中...</p>
@@ -224,7 +224,7 @@ export default function InstanceDetailPage() {
   const canRestart = instance.status === 'active' || instance.status === 'error';
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50" data-testid="instance-details-container">
       {/* 头部 */}
       <div className="bg-white shadow-sm">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
@@ -232,6 +232,7 @@ export default function InstanceDetailPage() {
             <button
               onClick={() => navigate('/instances')}
               className="text-indigo-600 hover:text-indigo-700 font-medium"
+              data-testid="back-button"
             >
               ← 返回实例列表
             </button>
@@ -241,11 +242,11 @@ export default function InstanceDetailPage() {
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <div className="flex items-center gap-4 mb-2">
-                <h1 className="text-3xl font-bold text-gray-900">
+                <h1 className="text-3xl font-bold text-gray-900" data-testid="instance-name">
                   {instance.config.name || `实例 ${instance.id.slice(0, 8)}`}
                 </h1>
                 {statusInfo && (
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusInfo.color}`}>
+                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusInfo.color}`} data-testid="instance-status">
                     <span className="mr-1">{statusInfo.icon}</span>
                     {statusInfo.label}
                   </span>
@@ -263,6 +264,7 @@ export default function InstanceDetailPage() {
                   onClick={handleStart}
                   disabled={actionLoading}
                   className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 font-medium"
+                  data-testid="start-button"
                 >
                   {actionLoading ? '启动中...' : '启动'}
                 </button>
@@ -272,6 +274,7 @@ export default function InstanceDetailPage() {
                   onClick={handleStop}
                   disabled={actionLoading}
                   className="px-6 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 font-medium"
+                  data-testid="stop-button"
                 >
                   {actionLoading ? '停止中...' : '停止'}
                 </button>
@@ -281,6 +284,7 @@ export default function InstanceDetailPage() {
                   onClick={handleRestart}
                   disabled={actionLoading}
                   className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 font-medium"
+                  data-testid="restart-button"
                 >
                   {actionLoading ? '重启中...' : '重启'}
                 </button>

@@ -2,6 +2,8 @@
  * 本地存储工具
  */
 
+import type { User } from '../types/auth';
+
 const TOKEN_KEY = 'auth_token';
 const REFRESH_TOKEN_KEY = 'refresh_token';
 const USER_KEY = 'user_data';
@@ -52,18 +54,18 @@ export const storage = {
   /**
    * 保存用户信息
    */
-  setUser(user: unknown): void {
+  setUser(user: User): void {
     localStorage.setItem(USER_KEY, JSON.stringify(user));
   },
 
   /**
    * 获取用户信息
    */
-  getUser(): unknown | null {
+  getUser(): User | null {
     const userStr = localStorage.getItem(USER_KEY);
     if (userStr) {
       try {
-        return JSON.parse(userStr);
+        return JSON.parse(userStr) as User;
       } catch {
         return null;
       }
