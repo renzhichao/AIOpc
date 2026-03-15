@@ -421,6 +421,13 @@ export default function InstanceDetailPage() {
                   {actionLoading ? '重启中...' : '重启'}
                 </button>
               )}
+              <button
+                onClick={() => navigate(`/instances/${id}/config`)}
+                className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors duration-200 font-medium"
+                data-testid="config-button"
+              >
+                配置
+              </button>
             </div>
           </div>
         </div>

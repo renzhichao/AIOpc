@@ -65,6 +65,21 @@ export class LoginPage {
   }
 
   /**
+   * Get the QR code expiration text
+   */
+  async getQRCodeExpiry(): Promise<string> {
+    await this.waitForQRCode();
+    // Look for expiration text in the QR code container
+    const expiryElement = this.page.locator('[data-testid="qr-code-expiry"]');
+    if (await expiryElement.isVisible()) {
+      return (await expiryElement.textContent()) || '';
+    }
+    // Fallback: search in container text
+    const containerText = await this.qrCodeContainer.textContent();
+    return containerText || '';
+  }
+
+  /**
    * Simulate Feishu OAuth login flow
    * This mocks the actual QR code scanning process
    */

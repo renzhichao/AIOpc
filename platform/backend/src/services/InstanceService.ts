@@ -834,4 +834,47 @@ export class InstanceService {
       });
     }
   }
+
+  /**
+   * Update instance configuration
+   *
+   * @param instanceId - Instance ID
+   * @param newConfig - New configuration to apply
+   * @returns Updated instance
+   * @throws AppError if update fails
+   */
+  async updateConfig(instanceId: string, newConfig: InstancePresetConfig): Promise<Instance> {
+    try {
+      logger.info('Updating instance configuration', {
+        instanceId
+      });
+
+      const instance = await this.getInstanceById(instanceId);
+
+      // Update configuration
+      instance.config = newConfig;
+      instance.updated_at = new Date();
+
+      const updatedInstance = await this.instanceRepository.save(instance);
+
+      logger.info('Instance configuration updated successfully', {
+        instanceId
+      });
+
+      // Note: Container restart with new environment variables will be handled
+      // by the caller if needed (e.g., when LLM config changes)
+
+      return updatedInstance;
+    } catch (error) {
+      logger.error('Failed to update instance configuration', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      throw this.errorService.createError('INSTANCE_UPDATE_FAILED', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
 }

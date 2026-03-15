@@ -24,6 +24,14 @@ export class InstanceDetailsPage {
   readonly loadingSpinner;
   readonly errorMessage;
   readonly successMessage;
+  readonly renewButton;
+  readonly renewModal;
+  readonly renewButton30Days;
+  readonly renewButton90Days;
+  readonly renewButton180Days;
+  readonly renewalHistoryButton;
+  readonly renewalHistorySection;
+  readonly configButton;
 
   constructor(page: Page) {
     this.page = page;
@@ -44,6 +52,14 @@ export class InstanceDetailsPage {
     this.loadingSpinner = page.locator('[data-testid="loading-spinner"]');
     this.errorMessage = page.locator('[data-testid="error-message"]');
     this.successMessage = page.locator('[data-testid="success-message"]');
+    this.renewButton = page.locator('[data-testid="renew-button"]');
+    this.renewModal = page.locator('[data-testid="renew-modal"]');
+    this.renewButton30Days = page.getByRole('button', { name: /续费 1 个月|续费 30 天/i });
+    this.renewButton90Days = page.getByRole('button', { name: /续费 3 个月|续费 90 天/i });
+    this.renewButton180Days = page.getByRole('button', { name: /续费 6 个月|续费 180 天/i });
+    this.renewalHistoryButton = page.getByRole('button', { name: /查看续费历史|renewal history/i });
+    this.renewalHistorySection = page.locator('[data-testid="renewal-history-section"]');
+    this.configButton = page.locator('[data-testid="config-button"]');
   }
 
   /**
@@ -243,5 +259,98 @@ export class InstanceDetailsPage {
   async isStopped(): Promise<boolean> {
     const status = await this.getInstanceStatus();
     return status.toLowerCase().includes('stopped') || status.includes('已停止');
+  }
+
+  /**
+   * Check if renew button is visible
+   */
+  async isRenewButtonVisible(): Promise<boolean> {
+    return await this.renewButton.isVisible().catch(() => false);
+  }
+
+  /**
+   * Click renew button to open renewal modal
+   */
+  async clickRenewButton() {
+    await this.renewButton.click();
+    await this.renewModal.waitFor({ state: 'visible', timeout: 5000 });
+  }
+
+  /**
+   * Check if renewal modal is visible
+   */
+  async isRenewModalVisible(): Promise<boolean> {
+    return await this.renewModal.isVisible().catch(() => false);
+  }
+
+  /**
+   * Renew instance for 30 days
+   */
+  async renewFor30Days() {
+    await this.clickRenewButton();
+    await this.renewButton30Days.click();
+    await this.page.waitForLoadState('networkidle');
+  }
+
+  /**
+   * Renew instance for 90 days
+   */
+  async renewFor90Days() {
+    await this.clickRenewButton();
+    await this.renewButton90Days.click();
+    await this.page.waitForLoadState('networkidle');
+  }
+
+  /**
+   * Renew instance for 180 days
+   */
+  async renewFor180Days() {
+    await this.clickRenewButton();
+    await this.renewButton180Days.click();
+    await this.page.waitForLoadState('networkidle');
+  }
+
+  /**
+   * Close renewal modal
+   */
+  async closeRenewModal() {
+    const cancelButton = this.renewModal.getByRole('button', { name: /cancel|取消/i });
+    await cancelButton.click();
+    await this.renewModal.waitFor({ state: 'hidden', timeout: 5000 });
+  }
+
+  /**
+   * Show renewal history
+   */
+  async showRenewalHistory() {
+    await this.renewalHistoryButton.click();
+    await this.renewalHistorySection.waitFor({ state: 'visible', timeout: 5000 });
+  }
+
+  /**
+   * Hide renewal history
+   */
+  async hideRenewalHistory() {
+    const hideButton = this.page.getByRole('button', { name: /隐藏|hide/i });
+    await hideButton.click();
+    await this.renewalHistorySection.waitFor({ state: 'hidden', timeout: 5000 });
+  }
+
+  /**
+   * Check if renewal history is visible
+   */
+  async isRenewalHistoryVisible(): Promise<boolean> {
+    return await this.renewalHistorySection.isVisible().catch(() => false);
+  }
+
+  /**
+   * Get renewal history entries count
+   */
+  async getRenewalHistoryCount(): Promise<number> {
+    if (!await this.isRenewalHistoryVisible()) {
+      return 0;
+    }
+    const entries = this.renewalHistorySection.locator('[data-testid="renewal-entry"]');
+    return await entries.count();
   }
 }

@@ -60,7 +60,7 @@ export default function InstanceCreatePage() {
         messages: '无限',
         storage: '5GB',
         users: '最多50人',
-        skills: ['全部技能',包括代码助手', '数据分析'],
+        skills: ['全部技能', '包括代码助手', '数据分析'],
         features: ['全部能力', '系统集成', '自动化', '企业支持'],
       },
     },

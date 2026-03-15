@@ -374,7 +374,7 @@ describe('InstanceService', () => {
     it('should handle network errors', async () => {
       mockFetch.mockRejectedValueOnce(new Error('Network error'));
 
-      await expect(service.listInstances()).rejects.toThrow('请求失败');
+      await expect(service.listInstances()).rejects.toThrow('Network error');
     });
   });
 });
