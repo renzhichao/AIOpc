@@ -6,6 +6,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { instanceService } from '../services/instance';
 import type { Instance, InstanceUsageStats, InstanceHealth } from '../types/instance';
+import { LineChart } from '../components/charts/LineChart';
+import type { LineChartData, LineChartSeries } from '../components/charts/LineChart';
 
 /**
  * 续费记录类型
@@ -33,6 +35,52 @@ export default function InstanceDetailPage() {
   const [showRenewalHistory, setShowRenewalHistory] = useState(false);
   const [renewLoading, setRenewLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Metrics state
+  const [metricsPeriod, setMetricsPeriod] = useState<'hour' | 'day' | 'week' | 'month'>('day');
+  const [metricsData, setMetricsData] = useState<{
+    usageStats: any;
+    chartData: LineChartData[];
+  } | null>(null);
+  const [metricsLoading, setMetricsLoading] = useState(false);
+
+  /**
+   * 加载指标数据
+   */
+  const loadMetrics = useCallback(async () => {
+    if (!id) return;
+
+    try {
+      setMetricsLoading(true);
+
+      const response = await fetch(`/api/instances/${id}/usage?period=${metricsPeriod}`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        const stats = result.data;
+
+        // Transform hourly data for chart
+        const chartData: LineChartData[] = (stats.hourly_data || []).map((item: any) => ({
+          timestamp: item.timestamp,
+          'CPU 使用率 (%)': item.cpu_usage,
+          '内存使用 (MB)': item.memory_usage,
+        }));
+
+        setMetricsData({
+          usageStats: stats,
+          chartData,
+        });
+      }
+    } catch (err) {
+      console.error('加载指标数据失败:', err);
+    } finally {
+      setMetricsLoading(false);
+    }
+  }, [id, metricsPeriod]);
 
   /**
    * 加载实例详情
@@ -89,11 +137,19 @@ export default function InstanceDetailPage() {
    */
   useEffect(() => {
     loadInstanceDetails();
+    loadMetrics();
 
     // 设置定时刷新（每 5 秒）
     const interval = setInterval(loadInstanceDetails, 5000);
     return () => clearInterval(interval);
   }, [loadInstanceDetails]);
+
+  /**
+   * 当时间范围改变时重新加载指标
+   */
+  useEffect(() => {
+    loadMetrics();
+  }, [metricsPeriod, loadMetrics]);
 
   /**
    * 启动实例
@@ -494,6 +550,88 @@ export default function InstanceDetailPage() {
                     <p className="text-sm text-gray-900">{formatDate(usageStats.last_active)}</p>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* 使用量统计图表 */}
+            {metricsData && (
+              <div className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-lg font-semibold text-gray-900">使用量统计</h2>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={metricsPeriod}
+                      onChange={(e) => setMetricsPeriod(e.target.value as any)}
+                      className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      data-testid="metrics-period-selector"
+                    >
+                      <option value="hour">1小时</option>
+                      <option value="day">24小时</option>
+                      <option value="week">7天</option>
+                      <option value="month">30天</option>
+                    </select>
+                  </div>
+                </div>
+
+                {metricsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                  </div>
+                ) : (
+                  <>
+                    {/* 统计卡片 */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                      <div className="bg-indigo-50 rounded-lg p-4">
+                        <p className="text-xs text-indigo-600 font-medium mb-1">消息数</p>
+                        <p className="text-2xl font-bold text-indigo-900">
+                          {metricsData.usageStats?.total_messages || 0}
+                        </p>
+                      </div>
+                      <div className="bg-green-50 rounded-lg p-4">
+                        <p className="text-xs text-green-600 font-medium mb-1">Token数</p>
+                        <p className="text-2xl font-bold text-green-900">
+                          {metricsData.usageStats?.total_tokens || 0}
+                        </p>
+                      </div>
+                      <div className="bg-blue-50 rounded-lg p-4">
+                        <p className="text-xs text-blue-600 font-medium mb-1">平均CPU</p>
+                        <p className="text-2xl font-bold text-blue-900">
+                          {metricsData.usageStats?.avg_cpu_usage?.toFixed(1) || 0}%
+                        </p>
+                      </div>
+                      <div className="bg-purple-50 rounded-lg p-4">
+                        <p className="text-xs text-purple-600 font-medium mb-1">平均内存</p>
+                        <p className="text-2xl font-bold text-purple-900">
+                          {metricsData.usageStats?.avg_memory_usage?.toFixed(0) || 0} MB
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* 折线图 */}
+                    {metricsData.chartData.length > 0 ? (
+                      <LineChart
+                        data={metricsData.chartData}
+                        series={[
+                          {
+                            dataKey: 'CPU 使用率 (%)',
+                            name: 'CPU 使用率 (%)',
+                            color: '#3b82f6',
+                          },
+                          {
+                            dataKey: '内存使用 (MB)',
+                            name: '内存使用 (MB)',
+                            color: '#10b981',
+                          },
+                        ]}
+                        height={300}
+                      />
+                    ) : (
+                      <div className="text-center py-12 text-gray-500">
+                        暂无数据
+                      </div>
+                    )}
+                  </>
+                )}
               </div>
             )}
           </div>

@@ -24,7 +24,9 @@ import { MonitoringController } from './controllers/MonitoringController';
 import { ApiKeyController } from './controllers/ApiKeyController';
 import { HealthCheckController } from './controllers/HealthCheckController';
 import { FeishuWebhookController } from './controllers/FeishuWebhookController';
+import { MetricsController } from './controllers/MetricsController';
 import { ScheduledHealthCheckService } from './services/ScheduledHealthCheckService';
+import { MetricsCollectionService } from './services/MetricsCollectionService';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { sanitizeInput, preventSQLInjection } from './middleware/validate';
 import {
@@ -150,13 +152,14 @@ class Application {
         ApiKeyController,
         HealthCheckController,
         FeishuWebhookController,
+        MetricsController,
       ],
       middlewares: [],
       defaultErrorHandler: true,
       validation: true,
     });
 
-    logger.info('All controllers initialized (OAuth, Instance, User, Monitoring, ApiKey, HealthCheck, FeishuWebhook)');
+    logger.info('All controllers initialized (OAuth, Instance, User, Monitoring, ApiKey, HealthCheck, FeishuWebhook, Metrics)');
   }
 
   private initializeScheduledTasks() {
@@ -184,6 +187,22 @@ class Application {
       });
     } catch (error) {
       logger.error('Failed to initialize scheduled health check service', error);
+    }
+
+    try {
+      const metricsCollectionService = Container.get(MetricsCollectionService);
+
+      // Start metrics collection scheduler
+      const metricsEnabled = process.env.METRICS_COLLECTION_ENABLED !== 'false';
+
+      if (metricsEnabled) {
+        metricsCollectionService.startScheduler();
+        logger.info('Metrics collection scheduler started (every 5 minutes)');
+      } else {
+        logger.info('Metrics collection scheduler disabled');
+      }
+    } catch (error) {
+      logger.error('Failed to initialize metrics collection service', error);
     }
   }
 
