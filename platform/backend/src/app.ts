@@ -1,14 +1,23 @@
 import 'reflect-metadata';
+import dotenv from 'dotenv';
+import path from 'path';
+
+// 加载环境变量
+const envPath = path.resolve(__dirname, '../.env.development');
+dotenv.config({ path: envPath });
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import compression from 'compression';
 import { useContainer, useExpressServer } from 'routing-controllers';
 import { Container } from 'typedi';
+import { useContainer as useTypeOrmContainer } from 'typeorm';
 import { logger } from './config/logger';
 import { AppDataSource } from './config/database';
 import { redis } from './config/redis';
 import { OAuthController } from './controllers/OAuthController';
+import { MockOAuthController } from './controllers/MockOAuthController';
 import { InstanceController } from './controllers/InstanceController';
 import { UserController } from './controllers/UserController';
 import { MonitoringController } from './controllers/MonitoringController';
@@ -31,12 +40,21 @@ class Application {
 
   constructor() {
     this.app = express();
+    this.setupTypeDI(); // Setup TypeDI container FIRST
     this.initializeDatabase();
     this.initializeRedis();
     this.initializeMiddlewares();
     this.initializeControllers();
     this.initializeRoutes();
+    this.initializeErrorHandlers(); // Add error handlers AFTER routes
     this.initializeScheduledTasks();
+  }
+
+  private setupTypeDI() {
+    // Set up TypeDI container for both routing-controllers and TypeORM
+    useContainer(Container);
+    useTypeOrmContainer(Container);
+    logger.info('TypeDI container initialized for routing-controllers and TypeORM');
   }
 
   private async initializeDatabase() {
@@ -85,7 +103,9 @@ class Application {
 
     // Logging
     this.app.use(requestLogger);
+  }
 
+  private initializeErrorHandlers() {
     // Error handling middleware (must be after routes)
     this.app.use(notFoundHandler);
     this.app.use(errorHandler);
@@ -114,14 +134,16 @@ class Application {
   }
 
   private initializeControllers() {
-    // Set TypeDI container for routing-controllers
-    useContainer(Container);
+    // 在开发环境中使用 Mock OAuth Controller
+    const oauthController = process.env.NODE_ENV === 'development'
+      ? MockOAuthController
+      : OAuthController;
 
     // Configure routing-controllers
     useExpressServer(this.app, {
       routePrefix: '/api',
       controllers: [
-        OAuthController,
+        oauthController,
         InstanceController,
         UserController,
         MonitoringController,

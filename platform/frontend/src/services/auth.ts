@@ -16,15 +16,13 @@ export class AuthService {
   /**
    * 获取授权 URL（用于生成二维码）
    */
-  async getAuthorizationUrl(): Promise<{ url: string; state: string }> {
-    const response = await fetch(`${this.baseUrl}/oauth/authorize`, {
-      method: 'POST',
+  async getAuthorizationUrl(): Promise<{ url: string }> {
+    const redirectUri = `${window.location.origin}/oauth/callback`;
+    const response = await fetch(`${this.baseUrl}/oauth/authorize?redirect_uri=${encodeURIComponent(redirectUri)}`, {
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        redirect_uri: `${window.location.origin}/oauth/callback`,
-      }),
     });
 
     if (!response.ok) {

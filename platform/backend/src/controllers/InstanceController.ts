@@ -10,6 +10,7 @@ import { AppError, ErrorCodes } from '../utils/errors';
  * RESTful API endpoints for OpenClaw instance lifecycle management.
  * All endpoints require authentication via @UseBefore decorator in routing-controllers.
  */
+@Service()
 @Controller('/instances')
 export class InstanceController {
   constructor(

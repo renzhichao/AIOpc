@@ -8,6 +8,7 @@ import { logger } from '../config/logger';
  *
  * Provides REST endpoints for API key management and statistics.
  */
+@Service()
 @Controller('/api-keys')
 export class ApiKeyController {
   constructor(

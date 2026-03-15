@@ -12,6 +12,7 @@ import { AppError, ErrorCodes } from '../utils/errors';
  *
  * RESTful API endpoints for system monitoring, health checks, and statistics.
  */
+@Service()
 @Controller('/monitoring')
 export class MonitoringController {
   constructor(

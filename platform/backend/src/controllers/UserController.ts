@@ -10,6 +10,7 @@ import { AppError, ErrorCodes } from '../utils/errors';
  *
  * RESTful API endpoints for user management.
  */
+@Service()
 @Controller('/users')
 export class UserController {
   constructor(

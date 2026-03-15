@@ -7,6 +7,7 @@ import { logger } from '../config/logger';
  * OAuth 2.0 控制器
  * 处理 OAuth 授权流程相关的 HTTP 请求
  */
+@Service()
 @Controller('/oauth')
 export class OAuthController {
   constructor(
