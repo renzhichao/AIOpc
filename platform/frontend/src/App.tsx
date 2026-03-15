@@ -15,6 +15,7 @@ import DashboardPage from './pages/DashboardPage';
 import InstanceListPage from './pages/InstanceListPage';
 import InstanceDetailPage from './pages/InstanceDetailPage';
 import InstanceCreatePage from './pages/InstanceCreatePage';
+import InstanceConfigPage from './pages/InstanceConfigPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 // Use HashRouter for E2E testing to avoid React hydration issues
@@ -73,6 +74,16 @@ function App() {
             element={
               <ProtectedRoute>
                 <InstanceCreatePage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 实例配置 */}
+          <Route
+            path="/instances/:id/config"
+            element={
+              <ProtectedRoute>
+                <InstanceConfigPage />
               </ProtectedRoute>
             }
           />

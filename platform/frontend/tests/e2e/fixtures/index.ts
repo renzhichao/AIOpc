@@ -1,4 +1,4 @@
-import { test as base } from '@playwright/test';
+import { test as base, Page } from '@playwright/test';
 import { LoginPage } from '../pages/LoginPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { InstancesPage } from '../pages/InstancesPage';
@@ -15,7 +15,7 @@ export const test = base.extend<{
   dashboardPage: DashboardPage;
   instancesPage: InstancesPage;
   instanceDetailsPage: InstanceDetailsPage;
-  authenticatedPage: ReturnType<typeof base['page']>;
+  authenticatedPage: Page;
 }>({
   loginPage: async ({ page }, use) => {
     await use(new LoginPage(page));
@@ -60,7 +60,7 @@ export const TestUtils = {
   /**
    * Wait for API response
    */
-  async waitForResponse(page: ReturnType<typeof base['page']], urlPattern: string | RegExp) {
+  waitForResponse: async (page: Page, urlPattern: string | RegExp) => {
     return page.waitForResponse((response) => {
       return typeof urlPattern === 'string'
         ? response.url().includes(urlPattern)
@@ -71,7 +71,7 @@ export const TestUtils = {
   /**
    * Clear authentication
    */
-  async clearAuth(page: ReturnType<typeof base['page']>) {
+  clearAuth: async (page: Page) => {
     await page.evaluate(() => {
       localStorage.clear();
       sessionStorage.clear();
@@ -81,7 +81,7 @@ export const TestUtils = {
   /**
    * Mock authenticated user
    */
-  async mockAuth(page: ReturnType<typeof base['page']>, userId: string = 'user-001') {
+  mockAuth: async (page: Page, userId: string = 'user-001') => {
     const user = mockUsers.find((u) => u.id === userId);
     if (!user) throw new Error(`User ${userId} not found`);
 
@@ -94,7 +94,7 @@ export const TestUtils = {
   /**
    * Take screenshot on failure
    */
-  async captureFailure(page: ReturnType<typeof base['page']>, name: string) {
+  captureFailure: async (page: Page, name: string) => {
     await page.screenshot({ path: `test-results/failures/${name}.png`, fullPage: true });
   },
 };

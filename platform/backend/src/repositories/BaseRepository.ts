@@ -64,6 +64,13 @@ export abstract class BaseRepository<T extends ObjectLiteral> {
   }
 
   /**
+   * 保存实体
+   */
+  async save(entity: T): Promise<T> {
+    return this.repository.save(entity);
+  }
+
+  /**
    * 删除记录
    */
   async delete(id: string | number): Promise<void> {

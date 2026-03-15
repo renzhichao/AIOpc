@@ -221,6 +221,48 @@ export class InstanceService {
 
     return response.json();
   }
+
+  /**
+   * 获取实例配置
+   */
+  async getInstanceConfig(id: string): Promise<any> {
+    const response = await fetch(`${this.baseUrl}/instances/${id}/config`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      handleApiError(response);
+    }
+
+    const result = await response.json();
+    return result.data.config;
+  }
+
+  /**
+   * 更新实例配置
+   */
+  async updateInstanceConfig(id: string, config: any): Promise<any> {
+    const response = await fetch(`${this.baseUrl}/instances/${id}/config`, {
+      method: 'PATCH',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(config),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || '更新配置失败');
+    }
+
+    const result = await response.json();
+    return result.data.config;
+  }
 }
 
 // 导出单例实例

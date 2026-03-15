@@ -26,11 +26,44 @@ export default function InstanceCreatePage() {
     template: '',
   });
 
-  // Template options
+  // Template options with detailed configuration
   const templates = [
-    { id: 'personal', name: '个人体验版', description: '适合个人用户的基本配置' },
-    { id: 'team', name: '团队协作版', description: '适合小团队协作的增强配置' },
-    { id: 'enterprise', name: '企业版', description: '企业级完整配置' },
+    {
+      id: 'personal' as InstanceTemplate,
+      name: '个人体验版',
+      description: '适合个人用户的基本配置',
+      config: {
+        messages: '100条/天',
+        storage: '100MB',
+        users: '1人',
+        skills: ['通用对话', '网络搜索', '知识问答'],
+        features: ['基础能力', '个人使用'],
+      },
+    },
+    {
+      id: 'team' as InstanceTemplate,
+      name: '团队协作版',
+      description: '适合小团队协作的增强配置',
+      config: {
+        messages: '500条/天',
+        storage: '500MB',
+        users: '最多10人',
+        skills: ['通用对话', '网络搜索', '知识问答', '邮件处理'],
+        features: ['进阶能力', '团队协作', '任务管理'],
+      },
+    },
+    {
+      id: 'enterprise' as InstanceTemplate,
+      name: '企业版',
+      description: '企业级完整配置',
+      config: {
+        messages: '无限',
+        storage: '5GB',
+        users: '最多50人',
+        skills: ['全部技能', '包括代码助手', '数据分析'],
+        features: ['全部能力', '系统集成', '自动化', '企业支持'],
+      },
+    },
   ];
 
   /**
@@ -224,9 +257,14 @@ export default function InstanceCreatePage() {
                         className="mt-1 mr-3"
                         data-testid={`template-${template.id}`}
                       />
-                      <div>
+                      <div className="flex-1">
                         <div className="font-medium text-gray-900">{template.name}</div>
-                        <div className="text-sm text-gray-600">{template.description}</div>
+                        <div className="text-sm text-gray-600 mb-2">{template.description}</div>
+                        <div className="grid grid-cols-3 gap-2 text-xs text-gray-500">
+                          <div>💬 {template.config.messages}</div>
+                          <div>💾 {template.config.storage}</div>
+                          <div>👥 {template.config.users}</div>
+                        </div>
                       </div>
                     </label>
                   ))}
@@ -235,6 +273,54 @@ export default function InstanceCreatePage() {
                   <p className="mt-1 text-sm text-red-600" data-testid="template-error">{errors.template}</p>
                 )}
               </div>
+
+              {/* 配置预览 */}
+              {formData.template && (
+                <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200" data-testid="config-preview">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">
+                    配置预览 - {templates.find(t => t.id === formData.template)?.name}
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <div className="text-gray-600 mb-1">消息限制</div>
+                      <div className="font-medium text-gray-900">
+                        {templates.find(t => t.id === formData.template)?.config.messages}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-gray-600 mb-1">存储空间</div>
+                      <div className="font-medium text-gray-900">
+                        {templates.find(t => t.id === formData.template)?.config.storage}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-gray-600 mb-1">用户数量</div>
+                      <div className="font-medium text-gray-900">
+                        {templates.find(t => t.id === formData.template)?.config.users}
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-gray-600 mb-1">启用技能</div>
+                      <div className="font-medium text-gray-900">
+                        {templates.find(t => t.id === formData.template)?.config.skills.join(', ')}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-3">
+                    <div className="text-gray-600 mb-1 text-sm">特性</div>
+                    <div className="flex flex-wrap gap-2">
+                      {templates.find(t => t.id === formData.template)?.config.features.map((feature, index) => (
+                        <span
+                          key={index}
+                          className="px-2 py-1 bg-indigo-100 text-indigo-700 text-xs rounded"
+                        >
+                          {feature}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* 操作按钮 */}
               <div className="flex items-center gap-4">

@@ -176,7 +176,7 @@ describe('InstanceCard', () => {
     const activeInstance = { ...mockInstance, status: 'active' as const };
     render(<InstanceCard instance={activeInstance} {...mockHandlers} loading={true} />);
 
-    const stopButton = screen.getByText('停止');
+    const stopButton = screen.getByText('停止中...');
     expect(stopButton).toBeDisabled();
   });
 });

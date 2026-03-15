@@ -31,9 +31,9 @@ describe('AuthService', () => {
 
       expect(result).toEqual(mockResponse);
       expect(fetchMock).toHaveBeenCalledWith(
-        'http://test.api/oauth/authorize',
+        expect.stringContaining('http://test.api/oauth/authorize?redirect_uri='),
         expect.objectContaining({
-          method: 'POST',
+          method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },
@@ -109,7 +109,7 @@ describe('AuthService', () => {
       });
 
       await expect(authService.refreshToken('invalid-token')).rejects.toThrow(
-        '刷新 Token 失败'
+        '刷新失败'
       );
     });
   });

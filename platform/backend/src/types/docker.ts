@@ -87,6 +87,8 @@ export interface InstanceConfig {
   feishuAppSecret?: string;
   /** Enabled skills for the instance */
   skills: string[];
+  /** Enabled tools for the instance (with layer info) */
+  tools?: Array<{ name: string; layer: 1 | 2 }>;
   /** System prompt for the agent */
   systemPrompt?: string;
   /** Temperature for LLM (0-1) */
@@ -95,6 +97,10 @@ export interface InstanceConfig {
   maxTokens?: number;
   /** Instance template type */
   template?: 'personal' | 'team' | 'enterprise';
+  /** LLM API base URL */
+  apiBase?: string;
+  /** LLM model name */
+  model?: string;
 }
 
 /**

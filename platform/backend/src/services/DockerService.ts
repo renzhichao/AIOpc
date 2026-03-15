@@ -85,8 +85,11 @@ export class DockerService {
         env: {
           INSTANCE_ID: instanceId,
           DEEPSEEK_API_KEY: config.apiKey,
+          DEEPSEEK_API_BASE: config.apiBase || 'https://api.deepseek.com',
+          DEEPSEEK_MODEL: config.model || 'deepseek-chat',
           FEISHU_APP_ID: config.feishuAppId,
           ENABLED_SKILLS: config.skills.join(','),
+          ENABLED_TOOLS: config.tools ? JSON.stringify(config.tools) : '[]',
           SYSTEM_PROMPT: config.systemPrompt || '',
           TEMPERATURE: (config.temperature || 0.7).toString(),
           MAX_TOKENS: (config.maxTokens || 4000).toString(),
