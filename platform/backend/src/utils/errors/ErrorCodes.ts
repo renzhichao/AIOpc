@@ -173,6 +173,13 @@ export const ErrorCodes = {
     userMessage: '实例删除失败，请稍后重试'
   },
 
+  INSTANCE_UPDATE_FAILED: {
+    statusCode: 500,
+    code: 'INSTANCE_UPDATE_FAILED',
+    message: 'Failed to update instance',
+    userMessage: '更新实例失败，请稍后重试'
+  },
+
   INSTANCE_STATUS_FAILED: {
     statusCode: 500,
     code: 'INSTANCE_STATUS_FAILED',

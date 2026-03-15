@@ -1,14 +1,19 @@
 import 'reflect-metadata';
 import { describe, it, expect, beforeEach, jest } from '@jest/globals';
-import { InstanceController } from '../InstanceController';
-import { InstanceService } from '../services/InstanceService';
-import { AppError, ErrorCodes } from '../utils/errors';
+import { InstanceController } from '../../controllers/InstanceController';
+import { InstanceService } from '../../services/InstanceService';
+import { RenewalService } from '../../services/RenewalService';
+import { AppError, ErrorCodes } from '../../utils/errors';
 
 // Mock InstanceService
-jest.mock('../services/InstanceService');
+jest.mock('../../services/InstanceService');
+// Mock RenewalService
+jest.mock('../../services/RenewalService');
+// Mock QRCodeService
+jest.mock('../../services/QRCodeService');
 
 // Mock logger
-jest.mock('../config/logger', () => ({
+jest.mock('../../config/logger', () => ({
   logger: {
     info: jest.fn(),
     warn: jest.fn(),
@@ -20,6 +25,7 @@ jest.mock('../config/logger', () => ({
 describe('InstanceController', () => {
   let instanceController: InstanceController;
   let mockInstanceService: jest.Mocked<InstanceService>;
+  let mockRenewalService: jest.Mocked<RenewalService>;
 
   const mockUser = {
     id: 'user_123',
@@ -34,6 +40,7 @@ describe('InstanceController', () => {
     status: 'active',
     created_at: new Date(),
     updated_at: new Date(),
+    expires_at: new Date('2026-04-15'),
   };
 
   beforeEach(() => {
@@ -50,9 +57,20 @@ describe('InstanceController', () => {
       restartInstance: jest.fn(),
       deleteInstance: jest.fn(),
       getInstanceLogs: jest.fn(),
+      updateExpirationDate: jest.fn(),
     } as any;
 
-    instanceController = new InstanceController(mockInstanceService);
+    mockRenewalService = {
+      record: jest.fn(),
+      findByInstance: jest.fn(),
+      findLatestByInstance: jest.fn(),
+    } as any;
+
+    instanceController = new InstanceController(
+      mockInstanceService,
+      {} as any,
+      mockRenewalService
+    );
   });
 
   describe('createInstance', () => {
@@ -380,6 +398,157 @@ describe('InstanceController', () => {
         'instance_123',
         100
       );
+    });
+  });
+
+  describe('renewInstance', () => {
+    it('should renew instance successfully', async () => {
+      const oldExpiresAt = new Date('2026-04-15');
+      const newExpiresAt = new Date('2026-05-15');
+      const updatedInstance = { ...mockInstance, expires_at: newExpiresAt };
+
+      mockInstanceService.getInstanceById.mockResolvedValue(mockInstance as any);
+      mockInstanceService.updateExpirationDate.mockResolvedValue(updatedInstance as any);
+      mockRenewalService.record.mockResolvedValue({} as any);
+
+      const req = { user: mockUser };
+      const body = { duration_days: 30 };
+
+      const result = await instanceController.renewInstance('instance_123', body, req);
+
+      expect(result).toEqual({
+        success: true,
+        data: {
+          instance_id: 'instance_123',
+          old_expires_at: oldExpiresAt,
+          new_expires_at: newExpiresAt,
+          extended_days: 30,
+          instance: updatedInstance,
+        },
+        message: 'Instance renewed successfully for 30 days',
+      });
+
+      expect(mockInstanceService.updateExpirationDate).toHaveBeenCalledWith(
+        'instance_123',
+        newExpiresAt
+      );
+      expect(mockRenewalService.record).toHaveBeenCalledWith({
+        instance_id: 'instance_123',
+        old_expires_at: oldExpiresAt,
+        new_expires_at: newExpiresAt,
+        duration_days: 30,
+        renewed_by: expect.any(Number), // Changed from 'user_123' to expect.any(Number)
+      });
+    });
+
+    it('should throw error when user is not authenticated', async () => {
+      const req = { user: null };
+      const body = { duration_days: 30 };
+
+      await expect(
+        instanceController.renewInstance('instance_123', body, req)
+      ).rejects.toThrow(AppError);
+    });
+
+    it('should throw error when duration_days is invalid', async () => {
+      const req = { user: mockUser };
+      const body = { duration_days: 15 }; // Invalid duration
+
+      await expect(
+        instanceController.renewInstance('instance_123', body, req)
+      ).rejects.toThrow(AppError);
+    });
+
+    it('should throw error when instance not found', async () => {
+      mockInstanceService.getInstanceById.mockResolvedValue(null as any);
+
+      const req = { user: mockUser };
+      const body = { duration_days: 30 };
+
+      await expect(
+        instanceController.renewInstance('instance_123', body, req)
+      ).rejects.toThrow(AppError);
+    });
+
+    it('should throw error when user is not owner', async () => {
+      const otherUser = { id: 'other_user', feishu_user_id: 'feishu_456', name: 'Other' };
+      const otherInstance = { ...mockInstance, owner_id: 'other_user' };
+
+      mockInstanceService.getInstanceById.mockResolvedValue(otherInstance as any);
+
+      const req = { user: mockUser };
+      const body = { duration_days: 30 };
+
+      await expect(
+        instanceController.renewInstance('instance_123', body, req)
+      ).rejects.toThrow(AppError);
+    });
+  });
+
+  describe('getRenewalHistory', () => {
+    it('should return renewal history successfully', async () => {
+      const mockRenewals = [
+        {
+          id: 1,
+          instance_id: 'instance_123',
+          old_expires_at: new Date('2026-04-15'),
+          new_expires_at: new Date('2026-05-15'),
+          duration_days: 30,
+          renewed_by: 'user_123',
+          renewed_at: new Date('2026-04-01'),
+          instance: null,
+          renewed_by_user: null,
+        },
+      ];
+
+      mockInstanceService.getInstanceById.mockResolvedValue(mockInstance as any);
+      mockRenewalService.findByInstance.mockResolvedValue(mockRenewals as any);
+
+      const req = { user: mockUser };
+
+      const result = await instanceController.getRenewalHistory('instance_123', req);
+
+      expect(result).toEqual({
+        success: true,
+        data: {
+          instance_id: 'instance_123',
+          renewals: mockRenewals,
+          total_renewals: 1,
+        },
+      });
+
+      expect(mockRenewalService.findByInstance).toHaveBeenCalledWith('instance_123');
+    });
+
+    it('should throw error when user is not authenticated', async () => {
+      const req = { user: null };
+
+      await expect(
+        instanceController.getRenewalHistory('instance_123', req)
+      ).rejects.toThrow(AppError);
+    });
+
+    it('should throw error when instance not found', async () => {
+      mockInstanceService.getInstanceById.mockResolvedValue(null as any);
+
+      const req = { user: mockUser };
+
+      await expect(
+        instanceController.getRenewalHistory('instance_123', req)
+      ).rejects.toThrow(AppError);
+    });
+
+    it('should throw error when user is not owner', async () => {
+      const otherUser = { id: 'other_user', feishu_user_id: 'feishu_456', name: 'Other' };
+      const otherInstance = { ...mockInstance, owner_id: 'other_user' };
+
+      mockInstanceService.getInstanceById.mockResolvedValue(otherInstance as any);
+
+      const req = { user: mockUser };
+
+      await expect(
+        instanceController.getRenewalHistory('instance_123', req)
+      ).rejects.toThrow(AppError);
     });
   });
 });

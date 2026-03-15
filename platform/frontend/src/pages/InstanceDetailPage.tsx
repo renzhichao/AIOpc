@@ -7,14 +7,31 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { instanceService } from '../services/instance';
 import type { Instance, InstanceUsageStats, InstanceHealth } from '../types/instance';
 
+/**
+ * 续费记录类型
+ */
+interface InstanceRenewal {
+  id: number;
+  instance_id: string;
+  old_expires_at: string;
+  new_expires_at: string;
+  duration_days: number;
+  renewed_by: number;
+  renewed_at: string;
+}
+
 export default function InstanceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [instance, setInstance] = useState<Instance | null>(null);
   const [usageStats, setUsageStats] = useState<InstanceUsageStats | null>(null);
   const [health, setHealth] = useState<InstanceHealth | null>(null);
+  const [renewals, setRenewals] = useState<InstanceRenewal[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [showRenewModal, setShowRenewModal] = useState(false);
+  const [showRenewalHistory, setShowRenewalHistory] = useState(false);
+  const [renewLoading, setRenewLoading] = useState(false);
   const [error, setError] = useState('');
 
   /**
@@ -42,6 +59,28 @@ export default function InstanceDetailPage() {
       console.error('加载实例详情失败:', err);
     } finally {
       setLoading(false);
+    }
+  }, [id]);
+
+  /**
+   * 加载续费历史
+   */
+  const loadRenewalHistory = useCallback(async () => {
+    if (!id) return;
+
+    try {
+      const response = await fetch(`/api/instances/${id}/renewals`, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setRenewals(data.data.renewals || []);
+      }
+    } catch (err) {
+      console.error('加载续费历史失败:', err);
     }
   }, [id]);
 
@@ -107,6 +146,43 @@ export default function InstanceDetailPage() {
       console.error('重启实例失败:', err);
     } finally {
       setActionLoading(false);
+    }
+  };
+
+  /**
+   * 续费实例
+   */
+  const handleRenew = async (durationDays: number) => {
+    if (!id) return;
+
+    try {
+      setRenewLoading(true);
+
+      const response = await fetch(`/api/instances/${id}/renew`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({ duration_days: durationDays }),
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        alert(`续费成功！已延长 ${durationDays} 天`);
+        setShowRenewModal(false);
+        await loadInstanceDetails();
+        await loadRenewalHistory();
+      } else {
+        const errorData = await response.json();
+        alert(`续费失败: ${errorData.message || '未知错误'}`);
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '续费失败';
+      alert(message);
+      console.error('续费失败:', err);
+    } finally {
+      setRenewLoading(false);
     }
   };
 
@@ -301,7 +377,46 @@ export default function InstanceDetailPage() {
           <div className="lg:col-span-2 space-y-6">
             {/* 基本信息 */}
             <div className="bg-white rounded-lg shadow-md p-6">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">基本信息</h2>
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">基本信息</h2>
+                <button
+                  onClick={() => setShowRenewalHistory(!showRenewalHistory)}
+                  className="text-sm text-indigo-600 hover:text-indigo-700 font-medium"
+                >
+                  {showRenewalHistory ? '隐藏' : '查看'}续费历史
+                </button>
+              </div>
+
+              {/* 续费历史 */}
+              {showRenewalHistory && (
+                <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                  <h3 className="text-sm font-medium text-gray-900 mb-3">续费历史</h3>
+                  {renewals.length === 0 ? (
+                    <p className="text-sm text-gray-500">暂无续费记录</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {renewals.map((renewal) => (
+                        <div key={renewal.id} className="text-sm border-b border-gray-200 pb-2 last:border-0">
+                          <div className="flex justify-between items-center">
+                            <div>
+                              <p className="text-gray-900">
+                                续费 {renewal.duration_days} 天
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                {formatDate(renewal.old_expires_at)} → {formatDate(renewal.new_expires_at)}
+                              </p>
+                            </div>
+                            <p className="text-xs text-gray-500">
+                              {formatDate(renewal.renewed_at)}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">实例 ID</p>
@@ -322,6 +437,21 @@ export default function InstanceDetailPage() {
                 <div>
                   <p className="text-sm text-gray-600 mb-1">更新时间</p>
                   <p className="text-sm text-gray-900">{formatDate(instance.updated_at)}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">到期时间</p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm text-gray-900">
+                      {instance.expires_at ? formatDate(instance.expires_at) : '-'}
+                    </p>
+                    <button
+                      onClick={() => setShowRenewModal(true)}
+                      className="px-3 py-1 text-xs bg-indigo-600 hover:bg-indigo-700 text-white rounded transition-colors duration-200"
+                      data-testid="renew-button"
+                    >
+                      续费
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600 mb-1">最后活跃</p>
@@ -443,6 +573,69 @@ export default function InstanceDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* 续费模态框 */}
+      {showRenewModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" data-testid="renew-modal">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">续费实例</h3>
+
+              {instance && (
+                <div className="mb-4 p-4 bg-gray-50 rounded-lg">
+                  <p className="text-sm text-gray-600 mb-1">当前到期时间</p>
+                  <p className="text-base font-medium text-gray-900">
+                    {instance.expires_at ? formatDate(instance.expires_at) : '-'}
+                  </p>
+                </div>
+              )}
+
+              <p className="text-sm text-gray-600 mb-4">选择续费时长:</p>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => handleRenew(30)}
+                  disabled={renewLoading}
+                  className="w-full px-4 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 font-medium"
+                >
+                  续费 1 个月 (30 天)
+                </button>
+                <button
+                  onClick={() => handleRenew(90)}
+                  disabled={renewLoading}
+                  className="w-full px-4 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 font-medium"
+                >
+                  续费 3 个月 (90 天)
+                </button>
+                <button
+                  onClick={() => handleRenew(180)}
+                  disabled={renewLoading}
+                  className="w-full px-4 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 font-medium"
+                >
+                  续费 6 个月 (180 天)
+                </button>
+              </div>
+
+              {renewLoading && (
+                <div className="mt-4 text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
+                  <p className="text-sm text-gray-600 mt-2">处理中...</p>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 rounded-b-lg flex justify-end">
+              <button
+                onClick={() => setShowRenewModal(false)}
+                disabled={renewLoading}
+                className="px-4 py-2 text-gray-700 hover:text-gray-900 font-medium disabled:opacity-50"
+              >
+                取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

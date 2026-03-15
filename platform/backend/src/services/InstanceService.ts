@@ -791,4 +791,47 @@ export class InstanceService {
   async getAllInstances(): Promise<Instance[]> {
     return this.instanceRepository.findAll();
   }
+
+  /**
+   * Update instance expiration date
+   *
+   * @param instanceId - Instance ID
+   * @param newExpiresAt - New expiration date
+   * @returns Updated instance
+   * @throws AppError if update fails
+   */
+  async updateExpirationDate(instanceId: string, newExpiresAt: Date): Promise<Instance> {
+    try {
+      logger.info('Updating instance expiration date', {
+        instanceId,
+        newExpiresAt: newExpiresAt.toISOString()
+      });
+
+      const instance = await this.getInstanceById(instanceId);
+
+      // Update expiration date
+      instance.expires_at = newExpiresAt;
+      instance.updated_at = new Date();
+
+      const updatedInstance = await this.instanceRepository.save(instance);
+
+      logger.info('Instance expiration date updated successfully', {
+        instanceId,
+        oldExpiresAt: instance.expires_at?.toISOString(),
+        newExpiresAt: newExpiresAt.toISOString()
+      });
+
+      return updatedInstance;
+    } catch (error) {
+      logger.error('Failed to update instance expiration date', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      throw this.errorService.createError('INSTANCE_UPDATE_FAILED', {
+        instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
 }

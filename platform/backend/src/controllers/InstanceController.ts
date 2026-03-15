@@ -2,6 +2,7 @@ import { Controller, Get, Post, Delete, Put, Body, Param, QueryParam, Req } from
 import { Service } from 'typedi';
 import { InstanceService } from '../services/InstanceService';
 import { QRCodeService } from '../services/QRCodeService';
+import { RenewalService } from '../services/RenewalService';
 import { logger } from '../config/logger';
 import { AppError, ErrorCodes } from '../utils/errors';
 
@@ -16,7 +17,8 @@ import { AppError, ErrorCodes } from '../utils/errors';
 export class InstanceController {
   constructor(
     private readonly instanceService: InstanceService,
-    private readonly qrCodeService: QRCodeService
+    private readonly qrCodeService: QRCodeService,
+    private readonly renewalService: RenewalService
   ) {}
 
   /**
@@ -564,6 +566,171 @@ export class InstanceController {
         ErrorCodes.INTERNAL_ERROR.statusCode,
         ErrorCodes.INTERNAL_ERROR.code,
         'Failed to get QR code'
+      );
+    }
+  }
+
+  /**
+   * Renew an instance
+   * POST /api/instances/:id/renew
+   *
+   * Extends the expiration date of an instance by the specified duration.
+   * Only the instance owner can renew.
+   *
+   * Request body:
+   * {
+   *   "duration_days": 30 | 90 | 180
+   * }
+   */
+  @Post('/:id/renew')
+  async renewInstance(@Param('id') id: string, @Body() body: any, @Req() req: any) {
+    try {
+      const user = req.user;
+
+      if (!user || !user.id) {
+        throw new AppError(
+          ErrorCodes.UNAUTHORIZED.statusCode,
+          ErrorCodes.UNAUTHORIZED.code,
+          'User not authenticated'
+        );
+      }
+
+      // Validate duration_days
+      const validDurations = [30, 90, 180];
+      const durationDays = body.duration_days;
+
+      if (!durationDays || !validDurations.includes(durationDays)) {
+        throw new AppError(
+          ErrorCodes.VALIDATION_ERROR.statusCode,
+          ErrorCodes.VALIDATION_ERROR.code,
+          `Invalid duration. Must be one of: ${validDurations.join(', ')} days`
+        );
+      }
+
+      const instance = await this.instanceService.getInstanceById(id);
+
+      if (!instance) {
+        throw new AppError(
+          ErrorCodes.NOT_FOUND.statusCode,
+          ErrorCodes.NOT_FOUND.code,
+          `Instance ${id} not found`
+        );
+      }
+
+      // Check ownership
+      if (instance.owner_id !== user.id) {
+        throw new AppError(
+          ErrorCodes.FORBIDDEN.statusCode,
+          ErrorCodes.FORBIDDEN.code,
+          'Access denied to this instance'
+        );
+      }
+
+      // Calculate new expiration date
+      const oldExpiresAt = instance.expires_at ? new Date(instance.expires_at) : new Date();
+      const newExpiresAt = new Date(oldExpiresAt.getTime() + durationDays * 24 * 60 * 60 * 1000);
+
+      // Update instance expiration
+      await this.instanceService.updateExpirationDate(id, newExpiresAt);
+
+      // Record renewal history
+      await this.renewalService.record({
+        instance_id: id,
+        old_expires_at: oldExpiresAt,
+        new_expires_at: newExpiresAt,
+        duration_days: durationDays,
+        renewed_by: user.id
+      });
+
+      // Get updated instance
+      const updatedInstance = await this.instanceService.getInstanceById(id);
+
+      return {
+        success: true,
+        data: {
+          instance_id: id,
+          old_expires_at: oldExpiresAt,
+          new_expires_at: newExpiresAt,
+          extended_days: durationDays,
+          instance: updatedInstance
+        },
+        message: `Instance renewed successfully for ${durationDays} days`
+      };
+    } catch (error) {
+      logger.error('Failed to renew instance', error);
+
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      throw new AppError(
+        ErrorCodes.INTERNAL_ERROR.statusCode,
+        ErrorCodes.INTERNAL_ERROR.code,
+        'Failed to renew instance'
+      );
+    }
+  }
+
+  /**
+   * Get renewal history for an instance
+   * GET /api/instances/:id/renewals
+   *
+   * Returns all renewal records for the specified instance.
+   * Only the instance owner can view.
+   */
+  @Get('/:id/renewals')
+  async getRenewalHistory(@Param('id') id: string, @Req() req: any) {
+    try {
+      const user = req.user;
+
+      if (!user || !user.id) {
+        throw new AppError(
+          ErrorCodes.UNAUTHORIZED.statusCode,
+          ErrorCodes.UNAUTHORIZED.code,
+          'User not authenticated'
+        );
+      }
+
+      const instance = await this.instanceService.getInstanceById(id);
+
+      if (!instance) {
+        throw new AppError(
+          ErrorCodes.NOT_FOUND.statusCode,
+          ErrorCodes.NOT_FOUND.code,
+          `Instance ${id} not found`
+        );
+      }
+
+      // Check ownership
+      if (instance.owner_id !== user.id) {
+        throw new AppError(
+          ErrorCodes.FORBIDDEN.statusCode,
+          ErrorCodes.FORBIDDEN.code,
+          'Access denied to this instance'
+        );
+      }
+
+      const renewals = await this.renewalService.findByInstance(id);
+
+      return {
+        success: true,
+        data: {
+          instance_id: id,
+          renewals,
+          total_renewals: renewals.length
+        }
+      };
+    } catch (error) {
+      logger.error('Failed to get renewal history', error);
+
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      throw new AppError(
+        ErrorCodes.INTERNAL_ERROR.statusCode,
+        ErrorCodes.INTERNAL_ERROR.code,
+        'Failed to get renewal history'
       );
     }
   }
