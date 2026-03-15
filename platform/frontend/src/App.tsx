@@ -9,6 +9,8 @@ import ProtectedRoute from './pages/components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
 import OAuthCallbackPage from './pages/OAuthCallbackPage';
 import DashboardPage from './pages/DashboardPage';
+import InstanceListPage from './pages/InstanceListPage';
+import InstanceDetailPage from './pages/InstanceDetailPage';
 import NotFoundPage from './pages/NotFoundPage';
 
 function App() {
@@ -31,6 +33,26 @@ function App() {
             element={
               <ProtectedRoute>
                 <DashboardPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 实例管理 */}
+          <Route
+            path="/instances"
+            element={
+              <ProtectedRoute>
+                <InstanceListPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 实例详情 */}
+          <Route
+            path="/instances/:id"
+            element={
+              <ProtectedRoute>
+                <InstanceDetailPage />
               </ProtectedRoute>
             }
           />

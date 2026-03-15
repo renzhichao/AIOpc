@@ -45,8 +45,10 @@ describe('InstanceService', () => {
     instance_id: 'inst-abc123',
     status: 'active',
     template: 'personal',
+    name: 'Test Instance',
     config: {},
     created_at: new Date(),
+    updated_at: new Date(),
     expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
     owner_id: mockUser.id,
     owner: mockUser,
@@ -560,7 +562,7 @@ describe('InstanceService', () => {
       mockInstanceRepository.countByStatus.mockResolvedValue(statusCounts);
 
       // Act
-      const result = await instanceService.getInstanceStats();
+      const result = await instanceService.getGlobalInstanceStats();
 
       // Assert
       expect(result).toEqual({
@@ -578,7 +580,7 @@ describe('InstanceService', () => {
       mockInstanceRepository.countByStatus.mockResolvedValue({});
 
       // Act
-      const result = await instanceService.getInstanceStats();
+      const result = await instanceService.getGlobalInstanceStats();
 
       // Assert
       expect(result).toEqual({

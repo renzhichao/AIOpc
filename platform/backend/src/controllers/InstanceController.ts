@@ -10,6 +10,7 @@ import { AppError, ErrorCodes } from '../utils/errors';
  * RESTful API endpoints for OpenClaw instance lifecycle management.
  * All endpoints require authentication via @UseBefore decorator in routing-controllers.
  */
+@Service()
 @Controller('/instances')
 export class InstanceController {
   constructor(
@@ -53,11 +54,10 @@ export class InstanceController {
         );
       }
 
-      const instance = await this.instanceService.createInstance(
-        user,
-        body.template,
-        body.config || {}
-      );
+      const instance = await this.instanceService.createInstance(user, {
+        template: body.template,
+        config: body.config || {}
+      });
 
       return {
         success: true,

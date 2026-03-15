@@ -11,6 +11,9 @@ describe('ApiKeyService', () => {
   let mockErrorService: jest.Mocked<ErrorService>;
 
   beforeEach(() => {
+    // Set encryption password to match the service default
+    process.env.ENCRYPTION_PASSWORD = 'default-password-change-in-production';
+
     mockApiKeyRepository = {
       create: jest.fn(),
       findById: jest.fn(),
@@ -81,7 +84,7 @@ describe('ApiKeyService', () => {
   describe('assignKey', () => {
     const mockKey = {
       id: 1,
-      encrypted_key: encrypt('sk-12345', 'test-password'),
+      encrypted_key: encrypt('sk-12345', 'default-password-change-in-production'),
       usage_count: 5,
       quota: 1000,
       provider: 'deepseek',
@@ -130,7 +133,7 @@ describe('ApiKeyService', () => {
       const originalKey = 'sk-original-key-123';
       const encryptedMockKey = {
         ...mockKey,
-        encrypted_key: encrypt(originalKey, 'test-password')
+        encrypted_key: encrypt(originalKey, 'default-password-change-in-production')
       };
 
       mockApiKeyRepository.findAvailableKey.mockResolvedValue(encryptedMockKey as any);
@@ -241,8 +244,8 @@ describe('ApiKeyService', () => {
   describe('rotateKeys', () => {
     it('should rotate all keys with new password', async () => {
       const mockKeys = [
-        { id: 1, encrypted_key: encrypt('old-key-1', 'old-password') },
-        { id: 2, encrypted_key: encrypt('old-key-2', 'old-password') }
+        { id: 1, encrypted_key: encrypt('old-key-1', 'default-password-change-in-production') },
+        { id: 2, encrypted_key: encrypt('old-key-2', 'default-password-change-in-production') }
       ] as any;
 
       mockApiKeyRepository.findAll.mockResolvedValue(mockKeys);
@@ -281,7 +284,7 @@ describe('ApiKeyService', () => {
     it('should return decrypted key for instance', async () => {
       const originalKey = 'sk-instance-key';
       const mockKey = {
-        encrypted_key: encrypt(originalKey, 'test-password')
+        encrypted_key: encrypt(originalKey, 'default-password-change-in-production')
       } as any;
 
       mockApiKeyRepository.findByInstanceId.mockResolvedValue(mockKey);
@@ -303,7 +306,7 @@ describe('ApiKeyService', () => {
   describe('validateKey', () => {
     it('should return true for valid key', async () => {
       const validKey = {
-        encrypted_key: encrypt('test-key', 'test-password')
+        encrypted_key: encrypt('test-key', 'default-password-change-in-production')
       } as any;
 
       mockApiKeyRepository.findById.mockResolvedValue(validKey);

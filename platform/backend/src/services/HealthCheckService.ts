@@ -498,8 +498,9 @@ export class HealthCheckService {
       await this.instanceRepository.incrementRestartAttempts(instanceId);
       await this.instanceRepository.updateStatus(instanceId, 'recovering');
 
-      // Restart container
-      await this.dockerService.restartContainer(instanceId);
+      // Restart container with timeout
+      const restartTimeout = 10; // Default 10 second timeout
+      await this.dockerService.restartContainer(instanceId, restartTimeout);
 
       logger.info('Restart recovery successful', { instanceId });
 

@@ -2,12 +2,8 @@
  * Unit tests for DockerService
  */
 
-import { DockerService } from '../DockerService';
-import { InstanceConfig, HealthStatus } from '../../types/docker';
-import { AppError } from '../../utils/errors/AppError';
-
-// Mock Dockerode
-const dockerodeMock: any = {
+// Mock Dockerode BEFORE importing
+const mockDockerodeMethods = {
   createContainer: jest.fn(),
   getContainer: jest.fn(),
   getVolume: jest.fn(),
@@ -24,12 +20,14 @@ const dockerodeMock: any = {
   },
 };
 
-jest.mock('dockerode', () => ({
-  default: jest.fn(() => dockerodeMock),
-}));
+jest.mock('dockerode', () => {
+  return jest.fn(() => mockDockerodeMethods);
+});
 
-// Import Docker after mocking
 import Docker from 'dockerode';
+import { DockerService } from '../DockerService';
+import { InstanceConfig, HealthStatus } from '../../types/docker';
+import { AppError } from '../../utils/errors/AppError';
 
 describe('DockerService', () => {
   let dockerService: any;
@@ -62,7 +60,7 @@ describe('DockerService', () => {
     };
 
     // Setup dockerode mock
-    Object.assign(dockerodeMock, {
+    Object.assign(mockDockerodeMethods, {
       createContainer: jest.fn().mockResolvedValue(mockContainer),
       getContainer: jest.fn().mockReturnValue(mockContainer),
       getVolume: jest.fn().mockReturnValue(mockVolume),
@@ -94,17 +92,17 @@ describe('DockerService', () => {
 
     it('should create a container successfully', async () => {
       // Mock listImages to return empty (image not exists)
-      dockerodeMock.listImages.mockResolvedValue([]);
-      dockerodeMock.listNetworks.mockResolvedValue([]);
-      dockerodeMock.listVolumes.mockResolvedValue({ Volumes: [] });
+      mockDockerodeMethods.listImages.mockResolvedValue([]);
+      mockDockerodeMethods.listNetworks.mockResolvedValue([]);
+      mockDockerodeMethods.listVolumes.mockResolvedValue({ Volumes: [] });
 
       // Mock pull to succeed
-      dockerodeMock.pull.mockImplementation(((image: any, callback: any) => {
+      mockDockerodeMethods.pull.mockImplementation(((image: any, callback: any) => {
         callback(null, {} as any);
         return undefined;
       }) as any);
 
-      dockerodeMock.modem.followProgress.mockImplementation(((stream: any, callback: any) => {
+      mockDockerodeMethods.modem.followProgress.mockImplementation(((stream: any, callback: any) => {
         callback(null);
       }) as any);
 
@@ -112,7 +110,7 @@ describe('DockerService', () => {
         mockContainer.id
       );
 
-      expect(dockerodeMock.createContainer).toHaveBeenCalledWith(
+      expect(mockDockerodeMethods.createContainer).toHaveBeenCalledWith(
         expect.objectContaining({
           name: 'opclaw-test-instance-001',
           Image: 'openclaw:latest',
@@ -133,27 +131,27 @@ describe('DockerService', () => {
     });
 
     it('should use existing image if already pulled', async () => {
-      dockerodeMock.listImages.mockResolvedValue([
+      mockDockerodeMethods.listImages.mockResolvedValue([
         {
           RepoTags: ['openclaw:latest'],
         } as any,
       ]);
-      dockerodeMock.listNetworks.mockResolvedValue([]);
-      dockerodeMock.listVolumes.mockResolvedValue({ Volumes: [] });
+      mockDockerodeMethods.listNetworks.mockResolvedValue([]);
+      mockDockerodeMethods.listVolumes.mockResolvedValue({ Volumes: [] });
 
       await expect(dockerService.createContainer(instanceId, config)).resolves.toBe(
         mockContainer.id
       );
 
-      expect(dockerodeMock.pull).not.toHaveBeenCalled();
+      expect(mockDockerodeMethods.pull).not.toHaveBeenCalled();
     });
 
     it('should throw AppError on failure', async () => {
-      dockerodeMock.listImages.mockResolvedValue([]);
-      dockerodeMock.listNetworks.mockResolvedValue([]);
-      dockerodeMock.listVolumes.mockResolvedValue({ Volumes: [] });
+      mockDockerodeMethods.listImages.mockResolvedValue([]);
+      mockDockerodeMethods.listNetworks.mockResolvedValue([]);
+      mockDockerodeMethods.listVolumes.mockResolvedValue({ Volumes: [] });
 
-      dockerodeMock.pull.mockImplementation(((image: any, callback: any) => {
+      mockDockerodeMethods.pull.mockImplementation(((image: any, callback: any) => {
         callback(new Error('Pull failed'), {} as any);
         return undefined;
       }) as any);
@@ -177,7 +175,7 @@ describe('DockerService', () => {
     it('should start a stopped container', async () => {
       await expect(dockerService.startContainer(instanceId)).resolves.not.toThrow();
 
-      expect(dockerodeMock.getContainer).toHaveBeenCalledWith('opclaw-test-instance-001');
+      expect(mockDockerodeMethods.getContainer).toHaveBeenCalledWith('opclaw-test-instance-001');
       expect(mockContainer.start).toHaveBeenCalled();
     });
 
@@ -201,7 +199,7 @@ describe('DockerService', () => {
     it('should stop a running container', async () => {
       await expect(dockerService.stopContainer(instanceId)).resolves.not.toThrow();
 
-      expect(dockerodeMock.getContainer).toHaveBeenCalledWith('opclaw-test-instance-001');
+      expect(mockDockerodeMethods.getContainer).toHaveBeenCalledWith('opclaw-test-instance-001');
       expect(mockContainer.stop).toHaveBeenCalledWith({ t: 10 });
     });
 
@@ -231,7 +229,7 @@ describe('DockerService', () => {
     it('should restart a container', async () => {
       await expect(dockerService.restartContainer(instanceId)).resolves.not.toThrow();
 
-      expect(dockerodeMock.getContainer).toHaveBeenCalledWith('opclaw-test-instance-001');
+      expect(mockDockerodeMethods.getContainer).toHaveBeenCalledWith('opclaw-test-instance-001');
       expect(mockContainer.restart).toHaveBeenCalledWith({ t: 10 });
     });
 
@@ -262,6 +260,19 @@ describe('DockerService', () => {
       // Mock container is running
       mockContainer.inspect.mockResolvedValue({
         State: { Running: true },
+      });
+
+      // Mock getContainerStatus to return running container
+      dockerService.getContainerStatus = jest.fn().mockResolvedValue({
+        id: 'container-123',
+        name: 'opclaw-test-instance-001',
+        state: 'running',
+        status: 'running',
+        isRunning: true,
+        isPaused: false,
+        isRestarting: false,
+        created: new Date(),
+        started: new Date(),
       });
 
       await expect(
@@ -591,6 +602,7 @@ describe('DockerService', () => {
         tail: 50,
         follow: false,
         timestamps: false,
+        since: undefined,
       });
     });
 
@@ -610,7 +622,7 @@ describe('DockerService', () => {
 
   describe('listContainers', () => {
     it('should return all OpenClaw containers', async () => {
-      dockerodeMock.listContainers.mockResolvedValue([
+      mockDockerodeMethods.listContainers.mockResolvedValue([
         {
           Id: 'container-1',
           Names: ['/opclaw-instance-001'],
@@ -643,7 +655,7 @@ describe('DockerService', () => {
     });
 
     it('should throw AppError on failure', async () => {
-      dockerodeMock.listContainers.mockRejectedValue(new Error('List failed'));
+      mockDockerodeMethods.listContainers.mockRejectedValue(new Error('List failed'));
 
       await expect(dockerService.listContainers()).rejects.toThrow(AppError);
 

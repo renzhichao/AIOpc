@@ -48,11 +48,13 @@ describe('MessageRouter', () => {
     owner_id: 1,
     status: 'active',
     template: 'personal',
+    name: 'Test Instance',
     docker_container_id: 'container-123',
     config: {},
     restart_attempts: 0,
     health_status: {},
     created_at: new Date(),
+    updated_at: new Date(),
   } as Instance;
 
   beforeEach(() => {
@@ -122,7 +124,7 @@ describe('MessageRouter', () => {
           },
         }),
       };
-      (messageRouter as any).docker.docker = {
+      (messageRouter as any).dockerService.docker = {
         getContainer: jest.fn().mockReturnValue(mockContainer),
       };
 
@@ -134,13 +136,8 @@ describe('MessageRouter', () => {
         },
       });
 
-      // Mock axios POST for Feishu API
-      mockedAxios.post.mockResolvedValueOnce({
-        data: {
-          code: 0,
-          tenant_access_token: 'test-token',
-        },
-      });
+      // Mock sendFeishuResponse to avoid Feishu API call
+      jest.spyOn(messageRouter as any, 'sendFeishuResponse').mockResolvedValue(undefined);
 
       // Execute
       const response = await messageRouter.routeMessage(mockRequest);
@@ -187,18 +184,23 @@ describe('MessageRouter', () => {
 
   describe('getRoutingEntry', () => {
     it('should return routing entry from cache', async () => {
+      const lastMessageAt = new Date();
       const mockEntry = {
         feishuUserId: 'test_user',
         instanceId: 'inst-123',
         messageCount: 5,
-        lastMessageAt: new Date(),
+        lastMessageAt: lastMessageAt,
       };
 
       (redis.get as jest.Mock).mockResolvedValue(JSON.stringify(mockEntry));
 
       const entry = await messageRouter.getRoutingEntry('test_user');
 
-      expect(entry).toEqual(mockEntry);
+      expect(entry).toBeDefined();
+      expect(entry?.feishuUserId).toBe(mockEntry.feishuUserId);
+      expect(entry?.instanceId).toBe(mockEntry.instanceId);
+      expect(entry?.messageCount).toBe(mockEntry.messageCount);
+      expect(new Date(entry!.lastMessageAt as unknown as string)).toEqual(lastMessageAt);
       expect(redis.get).toHaveBeenCalledWith('message:route:test_user');
     });
 
@@ -221,6 +223,7 @@ describe('MessageRouter', () => {
 
   describe('getMessageLog', () => {
     it('should return message log from cache', async () => {
+      const timestamp = new Date();
       const mockLog = {
         id: 'log-123',
         messageId: 'msg-123',
@@ -229,14 +232,20 @@ describe('MessageRouter', () => {
         content: 'Test message',
         processingTime: 1000,
         success: true,
-        timestamp: new Date(),
+        timestamp: timestamp,
       };
 
       (redis.get as jest.Mock).mockResolvedValue(JSON.stringify(mockLog));
 
       const log = await messageRouter.getMessageLog('log-123');
 
-      expect(log).toEqual(mockLog);
+      expect(log).toBeDefined();
+      expect(log?.id).toBe(mockLog.id);
+      expect(log?.messageId).toBe(mockLog.messageId);
+      expect(log?.instanceId).toBe(mockLog.instanceId);
+      expect(log?.processingTime).toBe(mockLog.processingTime);
+      expect(log?.success).toBe(mockLog.success);
+      expect(new Date(log!.timestamp as unknown as string)).toEqual(timestamp);
       expect(redis.get).toHaveBeenCalledWith('message:log:log-123');
     });
 
@@ -310,20 +319,15 @@ describe('MessageRouter', () => {
           },
         }),
       };
-      (messageRouter as any).docker.docker = {
+      (messageRouter as any).dockerService.docker = {
         getContainer: jest.fn().mockReturnValue(mockContainer),
       };
 
       // Mock axios timeout
-      mockedAxios.post.mockRejectedValue(new Error('timeout of 30000ms exceeded'));
+      mockedAxios.post.mockRejectedValueOnce(new Error('timeout of 30000ms exceeded'));
 
-      // Mock Feishu token and error message sending
-      mockedAxios.post.mockResolvedValueOnce({
-        data: {
-          code: 0,
-          tenant_access_token: 'test-token',
-        },
-      });
+      // Mock sendFeishuResponse to avoid Feishu API call
+      jest.spyOn(messageRouter as any, 'sendFeishuResponse').mockResolvedValue(undefined);
 
       await expect(messageRouter.routeMessage(mockRequest)).rejects.toThrow();
     });
@@ -342,22 +346,17 @@ describe('MessageRouter', () => {
           },
         }),
       };
-      (messageRouter as any).docker.docker = {
+      (messageRouter as any).dockerService.docker = {
         getContainer: jest.fn().mockReturnValue(mockContainer),
       };
 
       // Mock axios connection refused
       const connectionError = new Error('connect ECONNREFUSED');
       (connectionError as any).code = 'ECONNREFUSED';
-      mockedAxios.post.mockRejectedValue(connectionError);
+      mockedAxios.post.mockRejectedValueOnce(connectionError);
 
-      // Mock Feishu token and error message sending
-      mockedAxios.post.mockResolvedValueOnce({
-        data: {
-          code: 0,
-          tenant_access_token: 'test-token',
-        },
-      });
+      // Mock sendFeishuResponse to avoid Feishu API call
+      jest.spyOn(messageRouter as any, 'sendFeishuResponse').mockResolvedValue(undefined);
 
       await expect(messageRouter.routeMessage(mockRequest)).rejects.toThrow();
     });

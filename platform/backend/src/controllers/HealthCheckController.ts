@@ -51,8 +51,8 @@ export class HealthCheckController extends Controller {
    * @param retries Number of HTTP check retries
    */
   @Get('/instances/:instanceId')
-  @Response<404, { code: string; message: string }>('Instance not found')
-  @Response<500, { code: string; message: string }>('Internal server error')
+  @Response<404, { code: string; message: string }>(404, 'Instance not found')
+  @Response<500, { code: string; message: string }>(500, 'Internal server error')
   public async checkInstanceHealth(
     @Path() instanceId: string,
     @Query() httpCheckEnabled?: boolean,
@@ -85,8 +85,8 @@ export class HealthCheckController extends Controller {
    * @param config Recovery configuration
    */
   @Post('/instances/:instanceId/recover')
-  @Response<404, { code: string; message: string }>('Instance not found')
-  @Response<500, { code: string; message: string }>('Recovery failed')
+  @Response<404, { code: string; message: string }>(404, 'Instance not found')
+  @Response<500, { code: string; message: string }>(500, 'Recovery failed')
   public async triggerRecovery(
     @Path() instanceId: string,
     @Body() config?: AutoRecoveryConfig
@@ -124,7 +124,7 @@ export class HealthCheckController extends Controller {
    * @param instanceId Instance ID
    */
   @Get('/instances/:instanceId/history')
-  @Response<404, { code: string; message: string }>('Instance not found')
+  @Response<404, { code: string; message: string }>(404, 'Instance not found')
   public async getHealthHistory(@Path() instanceId: string): Promise<ExtendedHealthStatus[]> {
     try {
       return this.healthCheckService.getHealthHistory(instanceId);
@@ -142,7 +142,7 @@ export class HealthCheckController extends Controller {
    * @param instanceId Instance ID
    */
   @Post('/instances/:instanceId/history/clear')
-  @Response<404, { code: string; message: string }>('Instance not found')
+  @Response<404, { code: string; message: string }>(404, 'Instance not found')
   public async clearHealthHistory(@Path() instanceId: string): Promise<{ message: string }> {
     try {
       this.healthCheckService.clearHealthHistory(instanceId);
@@ -161,8 +161,8 @@ export class HealthCheckController extends Controller {
    * @param config Recovery configuration
    */
   @Post('/cycle')
-  @Response<403, { code: string; message: string }>('Forbidden')
-  @Response<500, { code: string; message: string }>('Health check cycle failed')
+  @Response<403, { code: string; message: string }>(403, 'Forbidden')
+  @Response<500, { code: string; message: string }>(500, 'Health check cycle failed')
   public async runHealthCheckCycle(
     @Body() config?: AutoRecoveryConfig
   ): Promise<HealthStatistics> {

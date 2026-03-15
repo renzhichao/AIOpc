@@ -1,6 +1,7 @@
 import { Controller, Get, Post, Put, Delete, Body, Param, Req } from 'routing-controllers';
 import { Service } from 'typedi';
 import { UserRepository } from '../repositories/UserRepository';
+import { InstanceRepository } from '../repositories/InstanceRepository';
 import { logger } from '../config/logger';
 import { AppError, ErrorCodes } from '../utils/errors';
 
@@ -9,10 +10,12 @@ import { AppError, ErrorCodes } from '../utils/errors';
  *
  * RESTful API endpoints for user management.
  */
+@Service()
 @Controller('/users')
 export class UserController {
   constructor(
-    private readonly userRepository: UserRepository
+    private readonly userRepository: UserRepository,
+    private readonly instanceRepository: InstanceRepository
   ) {}
 
   /**
@@ -244,7 +247,7 @@ export class UserController {
         );
       }
 
-      const instances = await this.userRepository.getUserInstances(user.id);
+      const instances = await this.instanceRepository.findByOwnerId(user.id);
 
       return {
         success: true,
