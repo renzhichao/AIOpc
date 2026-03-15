@@ -66,12 +66,12 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8">
+      <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8" data-testid="login-container">
         {/* Logo 和标题 */}
         <div className="text-center mb-8">
           <div className="text-6xl mb-4">🦞</div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">OpenClaw</h1>
-          <p className="text-gray-600">扫码即用 AI 智能体平台</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2" data-testid="login-title">OpenClaw</h1>
+          <p className="text-gray-600" data-testid="login-subtitle">扫码即用 AI 智能体平台</p>
         </div>
 
         {/* 错误提示 */}
@@ -97,7 +97,7 @@ export default function LoginPage() {
 
         {/* 二维码显示 */}
         {!loading && qrCodeUrl && (
-          <div className="flex flex-col items-center">
+          <div className="flex flex-col items-center" data-testid="qr-container">
             <div className="bg-white p-6 rounded-lg shadow-inner border-2 border-gray-200 mb-6">
               <QRCodeSVG
                 value={qrCodeUrl}
@@ -105,6 +105,7 @@ export default function LoginPage() {
                 level="M"
                 includeMargin={false}
                 className="block"
+                data-testid="qr-code"
               />
             </div>
 

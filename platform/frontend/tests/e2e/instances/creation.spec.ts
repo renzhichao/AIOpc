@@ -2,6 +2,7 @@ import { test, expect } from '../../fixtures';
 import { InstancesPage } from '../../pages/InstancesPage';
 import { LoginPage } from '../../pages/LoginPage';
 import { TestDataHelpers, mockTemplates } from '../../fixtures/test-data';
+import { setupApiMocks } from '../helpers/api-mocks';
 
 /**
  * E2E Tests for Instance Creation Flow
@@ -24,6 +25,7 @@ test.describe('Instance Creation Flow', () => {
     instancesPage = new InstancesPage(authenticatedPage);
 
     // Start from instances page
+    // Note: API mocks are already set up in the authenticatedPage fixture
     await instancesPage.goto();
   });
 
@@ -47,7 +49,9 @@ test.describe('Instance Creation Flow', () => {
     await instancesPage.clickCreateInstance();
 
     // Verify templates are displayed
-    for (const template of mockTemplates) {
+    // mockTemplates is an object, so we need to convert to array
+    const templates = Object.values(mockTemplates);
+    for (const template of templates) {
       const templateElement = authenticatedPage.locator(
         `[data-testid="template-${template.id}"]`
       );
@@ -59,12 +63,13 @@ test.describe('Instance Creation Flow', () => {
     // Navigate to create page
     await instancesPage.clickCreateInstance();
 
-    // Click on personal template
-    const personalTemplate = authenticatedPage.locator('[data-testid="template-personal"]');
-    await personalTemplate.click();
+    // Click on personal template (the label containing the radio input)
+    const personalTemplateLabel = authenticatedPage.locator('label').filter({ hasText: '个人体验版' });
+    await personalTemplateLabel.click();
 
-    // Verify template is selected
-    await expect(personalTemplate).toHaveClass(/selected|active/);
+    // Verify template is selected by checking the radio input
+    const personalTemplateInput = authenticatedPage.locator('[data-testid="template-personal"]');
+    await expect(personalTemplateInput).toBeChecked();
   });
 
   test('should validate instance name input', async ({ authenticatedPage }) => {
@@ -72,13 +77,13 @@ test.describe('Instance Creation Flow', () => {
     await instancesPage.clickCreateInstance();
 
     // Try to submit without name
-    const submitButton = authenticatedPage.getByRole('button', { name: /create|提交/i });
+    const submitButton = authenticatedPage.locator('[data-testid="submit-button"]');
     await submitButton.click();
 
     // Should show validation error
     const errorMessage = authenticatedPage.locator('[data-testid="name-error"]');
     await expect(errorMessage).toBeVisible();
-    await expect(errorMessage).toContainText(/required|必填/i);
+    await expect(errorMessage).toContainText(/实例名称不能为空/);
   });
 
   test('should validate instance name length', async ({ authenticatedPage }) => {
@@ -90,13 +95,13 @@ test.describe('Instance Creation Flow', () => {
     await nameInput.fill('a'.repeat(101)); // Assuming max is 100
 
     // Try to submit
-    const submitButton = authenticatedPage.getByRole('button', { name: /create|提交/i });
+    const submitButton = authenticatedPage.locator('[data-testid="submit-button"]');
     await submitButton.click();
 
     // Should show validation error
     const errorMessage = authenticatedPage.locator('[data-testid="name-error"]');
     await expect(errorMessage).toBeVisible();
-    await expect(errorMessage).toContainText(/too long|过长/i);
+    await expect(errorMessage).toContainText(/不能超过100个字符/);
   });
 
   test('should create instance with personal template', async ({ authenticatedPage }) => {
@@ -118,7 +123,7 @@ test.describe('Instance Creation Flow', () => {
     await descInput.fill(instanceDescription);
 
     // Submit form
-    const submitButton = authenticatedPage.getByRole('button', { name: /create|提交/i });
+    const submitButton = authenticatedPage.locator('[data-testid="submit-button"]');
     await submitButton.click();
 
     // Wait for success and redirect
@@ -149,7 +154,7 @@ test.describe('Instance Creation Flow', () => {
     await descInput.fill(instanceDescription);
 
     // Submit form
-    const submitButton = authenticatedPage.getByRole('button', { name: /create|提交/i });
+    const submitButton = authenticatedPage.locator('[data-testid="submit-button"]');
     await submitButton.click();
 
     // Wait for success and redirect
@@ -175,12 +180,12 @@ test.describe('Instance Creation Flow', () => {
     await nameInput.fill(instanceName);
 
     // Submit and check for loading state
-    const submitButton = authenticatedPage.getByRole('button', { name: /create|提交/i });
+    const submitButton = authenticatedPage.locator('[data-testid="submit-button"]');
     await submitButton.click();
 
-    // Verify loading spinner appears
-    const loadingSpinner = authenticatedPage.locator('[data-testid="loading-spinner"]');
-    await expect(loadingSpinner).toBeVisible();
+    // Verify loading state appears
+    const loadingState = authenticatedPage.locator('[data-testid="loading-state"]');
+    await expect(loadingState).toBeVisible();
   });
 
   test('should display success message after creation', async ({ authenticatedPage }) => {
@@ -200,7 +205,7 @@ test.describe('Instance Creation Flow', () => {
     await descInput.fill('Test instance description');
 
     // Submit form
-    const submitButton = authenticatedPage.getByRole('button', { name: /create|提交/i });
+    const submitButton = authenticatedPage.locator('[data-testid="submit-button"]');
     await submitButton.click();
 
     // Verify success message
@@ -218,7 +223,7 @@ test.describe('Instance Creation Flow', () => {
     const nameInput = authenticatedPage.locator('[data-testid="instance-name-input"]');
     await nameInput.fill(duplicateName);
 
-    const submitButton = authenticatedPage.getByRole('button', { name: /create|提交/i });
+    const submitButton = authenticatedPage.locator('[data-testid="submit-button"]');
     await submitButton.click();
 
     // Verify error message
@@ -268,7 +273,7 @@ test.describe('Instance Creation Flow', () => {
       await descInput.fill(instanceDescription);
 
       // Submit form
-      const submitButton = authenticatedPage.getByRole('button', { name: /create|提交/i });
+      const submitButton = authenticatedPage.locator('[data-testid="submit-button"]');
       await submitButton.click();
 
       // Wait for redirect

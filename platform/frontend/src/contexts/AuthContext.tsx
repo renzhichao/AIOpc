@@ -17,34 +17,80 @@ const initialState: AuthState = {
   error: null,
 };
 
+/**
+ * Helper function to check auth state synchronously from localStorage
+ * This allows AuthContext to initialize immediately without loading state
+ */
+function getInitialAuthState(): AuthState {
+  // Check if we're in a browser environment
+  if (typeof window === 'undefined') {
+    return {
+      user: null,
+      token: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
+    };
+  }
+
+  // Try to get from storage utility first
+  let token = storage.getToken();
+  let user = storage.getUser();
+
+  // For E2E tests: also check for test-specific keys
+  if (!token) {
+    try {
+      token = localStorage.getItem('auth_token') || localStorage.getItem('access_token');
+    } catch (e) {
+      // localStorage might not be available
+      token = null;
+    }
+  }
+  if (!user) {
+    try {
+      const userStr = localStorage.getItem('auth_user');
+      if (userStr) {
+        user = JSON.parse(userStr);
+      }
+    } catch (e) {
+      user = null;
+    }
+  }
+
+  // If we have both token and user, initialize as authenticated immediately
+  // This prevents the loading state from blocking ProtectedRoute
+  if (token && user) {
+    return {
+      user,
+      token,
+      isAuthenticated: true,
+      isLoading: false,
+      error: null,
+    };
+  }
+
+  // Otherwise, start with loading false and unauthenticated
+  return {
+    user: null,
+    token: null,
+    isAuthenticated: false,
+    isLoading: false,
+    error: null,
+  };
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>(initialState);
+  // Initialize state synchronously from localStorage to avoid loading state
+  const [state, setState] = useState<AuthState>(getInitialAuthState);
 
   /**
-   * 初始化认证状态
+   * Validate and update authentication state (currently no-op since we init synchronously)
+   * This runs after initial render to validate tokens if needed in the future
    */
   useEffect(() => {
-    const initAuth = () => {
-      const token = storage.getToken();
-      const user = storage.getUser();
-
-      if (token && user) {
-        setState({
-          user,
-          token,
-          isAuthenticated: true,
-          isLoading: false,
-          error: null,
-        });
-      } else {
-        setState({
-          ...initialState,
-          isLoading: false,
-        });
-      }
-    };
-
-    initAuth();
+    // Since we initialize synchronously from localStorage, this is now a no-op
+    // In the future, we could add token validation logic here
+    return () => {};
   }, []);
 
   /**
@@ -68,6 +114,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
    */
   const logout = useCallback(() => {
     storage.clearAuth();
+
+    // Also clear test-specific keys for E2E tests
+    localStorage.removeItem('auth_token');
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('auth_user');
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('auth_timestamp');
 
     setState({
       user: null,

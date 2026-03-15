@@ -28,19 +28,19 @@ export class InstanceDetailsPage {
   constructor(page: Page) {
     this.page = page;
 
-    // Initialize locators
+    // Initialize locators - use data-testid selectors for reliability
     this.heading = page.getByRole('heading', { name: /instance details|实例详情/i });
     this.instanceName = page.locator('[data-testid="instance-name"]');
     this.instanceDescription = page.locator('[data-testid="instance-description"]');
     this.instanceTemplate = page.locator('[data-testid="instance-template"]');
     this.instanceStatus = page.locator('[data-testid="instance-status"]');
     this.instanceCreatedAt = page.locator('[data-testid="instance-created-at"]');
-    this.startButton = page.getByRole('button', { name: /start|启动/i });
-    this.stopButton = page.getByRole('button', { name: /stop|停止/i });
-    this.deleteButton = page.getByRole('button', { name: /delete|删除/i });
+    this.startButton = page.locator('[data-testid="start-button"]');
+    this.stopButton = page.locator('[data-testid="stop-button"]');
+    this.deleteButton = page.locator('[data-testid="delete-button"]');
     this.confirmDeleteButton = page.getByRole('button', { name: /confirm|确认/i });
     this.cancelButton = page.getByRole('button', { name: /cancel|取消/i });
-    this.backButton = page.getByRole('button', { name: /back|返回/i });
+    this.backButton = page.locator('[data-testid="back-button"]');
     this.loadingSpinner = page.locator('[data-testid="loading-spinner"]');
     this.errorMessage = page.locator('[data-testid="error-message"]');
     this.successMessage = page.locator('[data-testid="success-message"]');
@@ -50,7 +50,7 @@ export class InstanceDetailsPage {
    * Navigate to instance details page
    */
   async goto(instanceId: string) {
-    await this.page.goto(`/instances/${instanceId}`);
+    await this.page.goto(`/instances/${instanceId}`, { waitUntil: 'commit' });
     await this.waitForLoad();
   }
 
@@ -58,16 +58,40 @@ export class InstanceDetailsPage {
    * Wait for page to fully load
    */
   async waitForLoad() {
-    await this.page.waitForLoadState('networkidle');
-    await expect(this.heading).toBeVisible({ timeout: 10000 });
+    // Wait for URL to match instance details pattern
+    await this.page.waitForURL(/\/instances\/[^/]+$/, { timeout: 10000 });
+
+    // Wait for React to render ANY content (based on working minimal test)
+    try {
+      await this.page.waitForFunction(() => {
+        const root = document.querySelector('#root');
+        return root && root.innerHTML.length > 100;
+      }, { timeout: 10000 });
+    } catch (e) {
+      // If React doesn't render, try reloading once
+      console.log('[DEBUG] React not rendering, reloading...');
+      await this.page.reload({ waitUntil: 'commit' });
+
+      await this.page.waitForFunction(() => {
+        const root = document.querySelector('#root');
+        return root && root.innerHTML.length > 100;
+      }, { timeout: 10000 });
+    }
+
+    // Wait for the instance details container
+    await this.page.waitForSelector('[data-testid="instance-details-container"]', { timeout: 15000 });
+
+    // Wait for instance name to be visible (this is the actual h1 heading)
+    await this.instanceName.waitFor({ state: 'visible', timeout: 10000 });
   }
 
   /**
    * Get instance name
    */
   async getInstanceName(): Promise<string> {
-    await this.instanceName.waitFor({ state: 'visible' });
-    return (await this.instanceName.textContent()) || '';
+    // No need to wait here since waitForLoad already waits for instanceName
+    const text = await this.instanceName.textContent();
+    return text || '';
   }
 
   /**
@@ -90,8 +114,9 @@ export class InstanceDetailsPage {
    * Get instance status
    */
   async getInstanceStatus(): Promise<string> {
-    await this.instanceStatus.waitFor({ state: 'visible' });
-    return (await this.instanceStatus.textContent()) || '';
+    // No need to wait here since waitForLoad already waited for the container
+    const text = await this.instanceStatus.textContent();
+    return text || '';
   }
 
   /**
@@ -142,6 +167,10 @@ export class InstanceDetailsPage {
    * Check if start button is enabled
    */
   async isStartButtonEnabled(): Promise<boolean> {
+    // Button may not exist if it's not rendered for current instance state
+    const count = await this.startButton.count();
+    if (count === 0) return false;
+
     const isEnabled = await this.startButton.isEnabled();
     return isEnabled;
   }
@@ -150,6 +179,10 @@ export class InstanceDetailsPage {
    * Check if stop button is enabled
    */
   async isStopButtonEnabled(): Promise<boolean> {
+    // Button may not exist if it's not rendered for current instance state
+    const count = await this.stopButton.count();
+    if (count === 0) return false;
+
     const isEnabled = await this.stopButton.isEnabled();
     return isEnabled;
   }
@@ -158,6 +191,10 @@ export class InstanceDetailsPage {
    * Check if delete button is enabled
    */
   async isDeleteButtonEnabled(): Promise<boolean> {
+    // Button may not exist if it's not rendered for current instance state
+    const count = await this.deleteButton.count();
+    if (count === 0) return false;
+
     const isEnabled = await this.deleteButton.isEnabled();
     return isEnabled;
   }

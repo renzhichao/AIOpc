@@ -1,9 +1,12 @@
 /**
  * 应用入口 - 配置路由和全局状态
+ *
+ * TESTING MODE: Uses HashRouter during E2E tests to avoid React hydration issues.
+ * Set USE_HASH_ROUTER=true in .env.test or via environment variable to enable.
  */
 
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import ProtectedRoute from './pages/components/ProtectedRoute';
 import LoginPage from './pages/LoginPage';
@@ -11,12 +14,19 @@ import OAuthCallbackPage from './pages/OAuthCallbackPage';
 import DashboardPage from './pages/DashboardPage';
 import InstanceListPage from './pages/InstanceListPage';
 import InstanceDetailPage from './pages/InstanceDetailPage';
+import InstanceCreatePage from './pages/InstanceCreatePage';
 import NotFoundPage from './pages/NotFoundPage';
+
+// Use HashRouter for E2E testing to avoid React hydration issues
+// Set environment variable USE_HASH_ROUTER=true to enable
+const useHashRouter = import.meta.env.USE_HASH_ROUTER === 'true';
+
+const Router = useHashRouter ? HashRouter : BrowserRouter;
 
 function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <Router>
         <Routes>
           {/* 根路径重定向到登录页 */}
           <Route path="/" element={<Navigate to="/login" replace />} />
@@ -57,10 +67,20 @@ function App() {
             }
           />
 
+          {/* 创建实例 */}
+          <Route
+            path="/instances/create"
+            element={
+              <ProtectedRoute>
+                <InstanceCreatePage />
+              </ProtectedRoute>
+            }
+          />
+
           {/* 404 页面 */}
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
-      </BrowserRouter>
+      </Router>
     </AuthProvider>
   );
 }

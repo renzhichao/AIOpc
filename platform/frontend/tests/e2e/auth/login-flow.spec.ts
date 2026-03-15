@@ -1,7 +1,8 @@
 import { test, expect } from '../../fixtures';
 import { LoginPage } from '../../pages/LoginPage';
 import { DashboardPage } from '../../pages/DashboardPage';
-import { mockUsers } from '../../fixtures/test-data';
+import { mockUsersArray } from '../../fixtures/test-data';
+import { setupApiMocks } from '../helpers/api-mocks';
 
 /**
  * E2E Tests for OAuth Login Flow
@@ -23,11 +24,20 @@ test.describe('OAuth Login Flow', () => {
     loginPage = new LoginPage(page);
     dashboardPage = new DashboardPage(page);
 
+    // Setup API mocks
+    await setupApiMocks(page);
+
     // Clear any existing authentication
-    await page.evaluate(() => {
-      localStorage.clear();
-      sessionStorage.clear();
-    });
+    // Note: Must navigate first to avoid SecurityError on about:blank
+    try {
+      await page.goto('/login', { waitUntil: 'domcontentloaded' });
+      await page.evaluate(() => {
+        localStorage.clear();
+        sessionStorage.clear();
+      });
+    } catch (error) {
+      // Ignore SecurityError if localStorage is not accessible
+    }
   });
 
   test('should display login page with QR code', async ({ page }) => {
@@ -60,7 +70,7 @@ test.describe('OAuth Login Flow', () => {
   });
 
   test('should successfully authenticate and redirect to dashboard', async ({ page }) => {
-    const testUser = mockUsers[0];
+    const testUser = mockUsersArray[0];
 
     // Navigate to login page
     await loginPage.goto();
@@ -82,7 +92,7 @@ test.describe('OAuth Login Flow', () => {
   });
 
   test('should store authentication tokens in localStorage', async ({ page }) => {
-    const testUser = mockUsers[0];
+    const testUser = mockUsersArray[0];
 
     // Navigate to login page
     await loginPage.goto();
@@ -113,7 +123,7 @@ test.describe('OAuth Login Flow', () => {
   });
 
   test('should maintain authentication across page navigation', async ({ page }) => {
-    const testUser = mockUsers[0];
+    const testUser = mockUsersArray[0];
 
     // Authenticate user
     await loginPage.goto();
@@ -133,7 +143,7 @@ test.describe('OAuth Login Flow', () => {
   });
 
   test('should logout and redirect to login page', async ({ page }) => {
-    const testUser = mockUsers[0];
+    const testUser = mockUsersArray[0];
 
     // Authenticate user
     await loginPage.goto();
@@ -157,31 +167,31 @@ test.describe('OAuth Login Flow', () => {
   test('should handle multiple users correctly', async ({ page }) => {
     // Login with first user
     await loginPage.goto();
-    await loginPage.simulateOAuthLogin(mockUsers[0].id, mockUsers[0].accessToken);
+    await loginPage.simulateOAuthLogin(mockUsersArray[0].id, mockUsersArray[0].accessToken);
     await dashboardPage.waitForLoad();
 
     const firstUserToken = await page.evaluate(() => {
       return localStorage.getItem('access_token');
     });
-    expect(firstUserToken).toBe(mockUsers[0].accessToken);
+    expect(firstUserToken).toBe(mockUsersArray[0].accessToken);
 
     // Logout
     await dashboardPage.logout();
 
     // Login with second user
     await loginPage.goto();
-    await loginPage.simulateOAuthLogin(mockUsers[1].id, mockUsers[1].accessToken);
+    await loginPage.simulateOAuthLogin(mockUsersArray[1].id, mockUsersArray[1].accessToken);
     await dashboardPage.waitForLoad();
 
     const secondUserToken = await page.evaluate(() => {
       return localStorage.getItem('access_token');
     });
-    expect(secondUserToken).toBe(mockUsers[1].accessToken);
+    expect(secondUserToken).toBe(mockUsersArray[1].accessToken);
     expect(secondUserToken).not.toBe(firstUserToken);
   });
 
   test('should display welcome message on dashboard after login', async ({ page }) => {
-    const testUser = mockUsers[0];
+    const testUser = mockUsersArray[0];
 
     // Authenticate user
     await loginPage.goto();
@@ -195,7 +205,7 @@ test.describe('OAuth Login Flow', () => {
   });
 
   test('should persist authentication on browser refresh', async ({ page }) => {
-    const testUser = mockUsers[0];
+    const testUser = mockUsersArray[0];
 
     // Authenticate user
     await loginPage.goto();

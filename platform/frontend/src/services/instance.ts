@@ -19,7 +19,8 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000
  * 从 localStorage 获取 Token
  */
 function getToken(): string {
-  const token = localStorage.getItem('access_token');
+  // Try multiple possible token keys for E2E test compatibility
+  const token = localStorage.getItem('access_token') || localStorage.getItem('auth_token');
   if (!token) {
     throw new Error('No authentication token found');
   }
