@@ -60,5 +60,7 @@ module.exports = {
       testMatch: ['<rootDir>/tests/performance/**/*.test.ts'],
       testTimeout: 120000, // 120s for performance tests
     }
-  ]
+  ],
+  // Add verbose logging for debugging
+  verbose: false,
 };

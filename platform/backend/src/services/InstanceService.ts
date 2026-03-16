@@ -126,7 +126,7 @@ export class InstanceService {
         config: presetConfig,
         expires_at: expiresAt,
         restart_attempts: 0,
-        health_status: {}
+        health_status: null
       });
 
       logger.info('Instance record created', {
@@ -417,7 +417,7 @@ export class InstanceService {
         ownerId: instance.owner_id || undefined,
         createdAt: instance.created_at,
         expiresAt: instance.expires_at || undefined,
-        healthStatus: instance.health_status || undefined,
+        healthStatus: (instance.health_status || undefined) as any,
         restartAttempts: instance.restart_attempts
       };
     } catch (error) {
@@ -553,7 +553,7 @@ export class InstanceService {
       status: instance.status,
       uptime,
       restartAttempts: instance.restart_attempts,
-      healthStatus: instance.health_status
+      healthStatus: instance.health_status as any
     };
   }
 

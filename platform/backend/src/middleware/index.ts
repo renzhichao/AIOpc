@@ -14,7 +14,6 @@ export * from './logging';
 export * from './rateLimit';
 
 // Validation middleware
-export * from './validate';
 export * from './validation.middleware';
 
 // Response format middleware

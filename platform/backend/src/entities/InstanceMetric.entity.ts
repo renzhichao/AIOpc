@@ -22,7 +22,7 @@ export class InstanceMetric {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: 'instance_id', length: 255 })
+  @Column({ name: 'instance_id' })
   instance_id: string;
 
   @ManyToOne(() => Instance, { onDelete: 'CASCADE' })
@@ -44,7 +44,6 @@ export class InstanceMetric {
    */
   @Column({
     name: 'metric_type',
-    length: 50,
     type: 'enum',
     enum: [
       'cpu_usage',
@@ -88,7 +87,12 @@ export class InstanceMetric {
    * - bytes: for network and disk metrics
    * - count: for message_count and token_usage
    */
-  @Column({ name: 'unit', length: 20, nullable: true })
+  @Column({
+    name: 'unit',
+    type: 'enum',
+    enum: ['percent', 'mb', 'bytes', 'count'],
+    nullable: true
+  })
   unit: 'percent' | 'mb' | 'bytes' | 'count' | null;
 
   /**

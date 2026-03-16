@@ -307,7 +307,7 @@ export class MetricsCollectionService {
 
       // Update instance health status
       await this.instanceRepository.update(instanceId, {
-        health_status: healthStatus,
+        health_status: healthStatus as any,
         health_reason: healthReason,
         health_last_checked: new Date(),
       });

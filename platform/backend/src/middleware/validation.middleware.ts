@@ -177,7 +177,7 @@ function formatValidationErrors(errors: ValidationError[]): ValidationErrorDetai
 
   for (const error of errors) {
     const constraints = error.constraints
-      ? Object.values(error.constraints)
+      ? Object.values(error.constraints).map(String)
       : ['Invalid value'];
 
     formattedErrors.push({
@@ -326,7 +326,7 @@ export const validators = {
 /**
  * Create a custom validation error
  */
-export class ValidationError extends HttpError {
+export class CustomValidationError extends HttpError {
   public errors: ValidationErrorDetail[];
 
   constructor(errors: ValidationErrorDetail[]) {

@@ -4,6 +4,14 @@
  */
 
 /**
+ * 飞书 Webhook 加密请求体（当配置 Encrypt Key 时）
+ */
+export interface FeishuWebhookEncryptedRequest {
+  /** 加密数据 */
+  encrypt: string;
+}
+
+/**
  * 飞书 Webhook 请求体
  */
 export interface FeishuWebhookRequest {

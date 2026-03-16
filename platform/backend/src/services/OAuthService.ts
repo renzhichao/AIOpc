@@ -2,6 +2,7 @@ import { Service } from 'typedi';
 import axios from 'axios';
 import jwt from 'jsonwebtoken';
 import { UserRepository } from '../repositories/UserRepository';
+import { InstanceRepository } from '../repositories/InstanceRepository';
 import { logger } from '../config/logger';
 import type { StringValue } from 'ms';
 import {
@@ -19,7 +20,8 @@ import {
 @Service()
 export class OAuthService {
   constructor(
-    private readonly userRepository: UserRepository
+    private readonly userRepository: UserRepository,
+    private readonly instanceRepository: InstanceRepository
   ) {}
 
   /**
@@ -96,20 +98,37 @@ export class OAuthService {
       this.validateConfig([
         'FEISHU_APP_ID',
         'FEISHU_APP_SECRET',
-        'FEISHU_OAUTH_TOKEN_URL',
-        'FEISHU_USER_INFO_URL',
         'JWT_SECRET'
       ]);
 
-      // 1. 使用授权码换取访问令牌
+      // 1. 使用授权码换取访问令牌（飞书 /authen/v1/access_token 已直接返回用户信息）
       const tokenResponse = await this.exchangeCodeForToken(authCode);
 
-      // 2. 从飞书获取用户信息
-      const userInfo = await this.getUserInfo(tokenResponse.access_token);
+      // 2. 从 token 响应中提取用户信息
+      if (!tokenResponse.data) {
+        throw new Error('Token response does not contain user information');
+      }
+
+      const feishuUserData = tokenResponse.data;
+      const userInfo: FeishuUserInfo = {
+        user_id: feishuUserData.open_id,
+        name: feishuUserData.name,
+        en_name: feishuUserData.en_name,
+        email: feishuUserData.email,
+        avatar_url: feishuUserData.avatar_url,
+        union_id: feishuUserData.union_id,
+        open_id: feishuUserData.open_id
+      };
+
+      logger.info('User info extracted from token response', {
+        open_id: userInfo.open_id,
+        union_id: userInfo.union_id,
+        name: userInfo.name
+      });
 
       // 3. 在数据库中查找或创建用户
       const user = await this.userRepository.findOrCreate({
-        feishu_user_id: userInfo.user_id,
+        feishu_user_id: userInfo.open_id,
         feishu_union_id: userInfo.union_id,
         name: userInfo.name,
         email: userInfo.email || undefined,
@@ -118,6 +137,9 @@ export class OAuthService {
 
       // 4. 更新最后登录时间
       await this.userRepository.updateLastLogin(user.id);
+
+      // 5. 自动认领未认领的实例（TASK-001）
+      const claimedInstance = await this.autoClaimInstanceIfAvailable(user.id);
 
       // 5. 生成 JWT Token
       const jwtPayload: JwtPayload = {
@@ -143,7 +165,11 @@ export class OAuthService {
           feishu_user_id: user.feishu_user_id,
           name: user.name,
           email: user.email
-        }
+        },
+        // TASK-001: Auto-claim response fields
+        has_instance: !!claimedInstance,
+        instance_id: claimedInstance?.instance_id || null,
+        redirect_to: claimedInstance ? '/chat' : '/no-instance'
       };
     } catch (error) {
       logger.error('OAuth callback failed', error);
@@ -209,24 +235,31 @@ export class OAuthService {
    */
   private async exchangeCodeForToken(authCode: string): Promise<FeishuTokenResponse> {
     try {
-      const tokenUrl = process.env.FEISHU_OAUTH_TOKEN_URL;
       const appId = process.env.FEISHU_APP_ID;
       const appSecret = process.env.FEISHU_APP_SECRET;
 
       // 验证必需的环境变量
-      if (!tokenUrl || !appId || !appSecret) {
+      if (!appId || !appSecret) {
         throw new Error(
           'Missing required configuration for token exchange. ' +
-          'Please check FEISHU_OAUTH_TOKEN_URL, FEISHU_APP_ID, and FEISHU_APP_SECRET.'
+          'Please check FEISHU_APP_ID and FEISHU_APP_SECRET.'
         );
       }
+
+      logger.info('Exchanging code for token', {
+        appId,
+        codeLength: authCode?.length
+      });
+
+      // 使用飞书标准 OAuth 2.0 端点
+      const tokenUrl = 'https://open.feishu.cn/open-apis/authen/v1/access_token';
 
       const response = await axios.post<FeishuTokenResponse>(
         tokenUrl,
         {
           grant_type: 'authorization_code',
-          client_id: appId,
-          client_secret: appSecret,
+          app_id: appId,
+          app_secret: appSecret,
           code: authCode
         },
         {
@@ -236,13 +269,31 @@ export class OAuthService {
         }
       );
 
+      // 详细记录飞书 API 响应
+      logger.info('Feishu token API response', {
+        status: response.status,
+        statusText: response.statusText,
+        rawData: JSON.stringify(response.data),
+        dataType: typeof response.data,
+        dataKeys: Object.keys(response.data),
+        hasCode: 'code' in response.data,
+        codeValue: (response.data as any).code,
+        hasMsg: 'msg' in response.data,
+        msgValue: (response.data as any).msg,
+        hasAccessToken: 'access_token' in response.data,
+        hasData: 'data' in response.data
+      });
+
       if (response.data.code !== 0) {
         throw new Error(`Feishu API error: ${response.data.msg}`);
       }
 
       return response.data;
     } catch (error) {
-      logger.error('Failed to exchange code for token', error);
+      logger.error('Failed to exchange code for token', {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       throw new Error('Failed to exchange authorization code');
     }
   }
@@ -254,12 +305,12 @@ export class OAuthService {
    */
   private async getUserInfo(accessToken: string): Promise<FeishuUserInfo> {
     try {
-      const userInfoUrl = process.env.FEISHU_USER_INFO_URL;
+      const userInfoUrl = process.env.FEISHU_OAUTH_USERINFO_URL;
 
       if (!userInfoUrl) {
         throw new Error(
           'Missing required configuration for user info. ' +
-          'Please check FEISHU_USER_INFO_URL.'
+          'Please check FEISHU_OAUTH_USERINFO_URL.'
         );
       }
 
@@ -310,5 +361,39 @@ export class OAuthService {
   private generateState(): string {
     return Math.random().toString(36).substring(2, 15) +
            Math.random().toString(36).substring(2, 15);
+  }
+
+  /**
+   * 自动为用户认领可用实例（TASK-001）
+   * @param userId 用户 ID
+   * @returns 认领的实例，如果没有可用实例则返回 null
+   */
+  private async autoClaimInstanceIfAvailable(userId: number): Promise<{ instance_id: string } | null> {
+    try {
+      const unclaimedInstance = await this.instanceRepository.findUnclaimed();
+
+      if (unclaimedInstance) {
+        await this.instanceRepository.claimInstance(
+          unclaimedInstance.instance_id,
+          userId
+        );
+
+        logger.info('Auto-claimed instance for user', {
+          userId: userId,
+          instanceId: unclaimedInstance.instance_id
+        });
+
+        return { instance_id: unclaimedInstance.instance_id };
+      }
+
+      return null;
+    } catch (error) {
+      // 如果自动认领失败，记录错误但不中断登录流程
+      logger.error('Failed to auto-claim instance for user', {
+        userId: userId,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      return null;
+    }
   }
 }

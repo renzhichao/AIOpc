@@ -54,10 +54,7 @@ export class OAuthController {
 
       const url = this.oauthService.getAuthorizationUrl({ redirect_uri: redirectUri });
 
-      return {
-        success: true,
-        data: { url }
-      };
+      return { url };
     } catch (error) {
       logger.error('Failed to generate authorization URL', error);
 
