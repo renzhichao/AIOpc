@@ -21,9 +21,19 @@ export class InstanceMetricRepository extends BaseRepository<InstanceMetric> {
    */
   async recordMetric(data: {
     instance_id: string;
-    metric_type: 'cpu_usage' | 'memory_usage' | 'message_count' | 'token_usage';
+    metric_type:
+      | 'cpu_usage'
+      | 'memory_usage'
+      | 'memory_percent'
+      | 'memory_limit'
+      | 'network_rx_bytes'
+      | 'network_tx_bytes'
+      | 'disk_read_bytes'
+      | 'disk_write_bytes'
+      | 'message_count'
+      | 'token_usage';
     metric_value: number;
-    unit: 'percent' | 'mb' | 'count' | null;
+    unit: 'percent' | 'mb' | 'bytes' | 'count' | null;
     recorded_at: Date;
   }): Promise<InstanceMetric> {
     const metric = this.repository.create(data);
@@ -213,6 +223,13 @@ export class InstanceMetricRepository extends BaseRepository<InstanceMetric> {
       .execute();
 
     return result.affected || 0;
+  }
+
+  /**
+   * Delete metrics older than a specific date (alias for deleteOldMetrics)
+   */
+  async deleteOlderThan(cutoffDate: Date): Promise<number> {
+    return this.deleteOldMetrics(cutoffDate);
   }
 
   /**

@@ -12,7 +12,7 @@ export class Instance {
 
   @Column({
     type: 'enum',
-    enum: ['pending', 'active', 'stopped', 'error', 'recovering'],
+    enum: ['pending', 'active', 'stopped', 'error', 'recovering', 'running'],
     default: 'pending'
   })
   @Index()
@@ -53,6 +53,28 @@ export class Instance {
   @Column({ default: 0 })
   restart_attempts: number;
 
-  @Column({ type: 'jsonb', nullable: true })
-  health_status: Record<string, any>;
+  /**
+   * Health status: 'healthy', 'warning', 'unhealthy'
+   * Updated by MetricsCollectionService based on container metrics
+   */
+  @Column({
+    type: 'enum',
+    enum: ['healthy', 'warning', 'unhealthy'],
+    default: 'healthy',
+    nullable: true
+  })
+  @Index()
+  health_status: 'healthy' | 'warning' | 'unhealthy' | null;
+
+  /**
+   * Human-readable reason for the current health status
+   */
+  @Column({ name: 'health_reason', type: 'text', nullable: true })
+  health_reason: string | null;
+
+  /**
+   * Timestamp of the last health check
+   */
+  @Column({ name: 'health_last_checked', type: 'timestamp', nullable: true })
+  health_last_checked: Date | null;
 }

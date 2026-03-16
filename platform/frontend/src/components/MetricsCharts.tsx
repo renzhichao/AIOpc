@@ -14,7 +14,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { LineChart } from './charts/LineChart';
-import type { LineChartData, LineChartSeries } from './charts/LineChart';
+import type { LineChartData } from './charts/LineChart';
 import type { InstanceMetricsResponse, MetricsPeriod } from '../types/metrics';
 
 interface MetricsChartsProps {

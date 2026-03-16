@@ -248,52 +248,6 @@ export default function InstanceDetailPage() {
   };
 
   /**
-   * 获取状态显示信息
-   */
-  const getStatusInfo = () => {
-    if (!instance) return null;
-
-    switch (instance.status) {
-      case 'active':
-        return {
-          label: '运行中',
-          color: 'bg-green-100 text-green-800',
-          icon: '🟢',
-        };
-      case 'stopped':
-        return {
-          label: '已停止',
-          color: 'bg-gray-100 text-gray-800',
-          icon: '⏸️',
-        };
-      case 'pending':
-        return {
-          label: '启动中',
-          color: 'bg-yellow-100 text-yellow-800',
-          icon: '🔄',
-        };
-      case 'error':
-        return {
-          label: '错误',
-          color: 'bg-red-100 text-red-800',
-          icon: '❌',
-        };
-      case 'recovering':
-        return {
-          label: '恢复中',
-          color: 'bg-blue-100 text-blue-800',
-          icon: '🔧',
-        };
-      default:
-        return {
-          label: '未知',
-          color: 'bg-gray-100 text-gray-800',
-          icon: '❓',
-        };
-    }
-  };
-
-  /**
    * 格式化时间
    */
   const formatDate = (dateString?: string) => {
@@ -354,11 +308,6 @@ export default function InstanceDetailPage() {
       </div>
     );
   }
-
-  const statusInfo = getStatusInfo();
-  const canStart = instance.status === 'stopped' || instance.status === 'error';
-  const canStop = instance.status === 'active';
-  const canRestart = instance.status === 'active' || instance.status === 'error';
 
   return (
     <div className="min-h-screen bg-gray-50" data-testid="instance-details-container">

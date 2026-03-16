@@ -4,7 +4,6 @@
 
 import type { Instance } from '../types/instance';
 import { StatusBadge } from './StatusBadge';
-import { InstanceControls } from './InstanceControls';
 
 interface InstanceCardProps {
   instance: Instance;
@@ -67,14 +66,6 @@ export default function InstanceCard({
     if (value < 50) return 'bg-green-500';
     if (value < 80) return 'bg-yellow-500';
     return 'bg-red-500';
-  };
-
-  /**
-   * Handle control clicks without triggering card click
-   */
-  const handleControlClick = (e: React.MouseEvent, handler?: () => void) => {
-    e.stopPropagation();
-    handler?.();
   };
 
   const canStart = instance.status === 'stopped' || instance.status === 'error';
