@@ -23,17 +23,45 @@ export class OAuthService {
   ) {}
 
   /**
+   * 验证必需的环境变量
+   * @param vars 需要验证的环境变量列表
+   * @throws {Error} 如果缺少必需的环境变量
+   */
+  private validateConfig(vars: string[] = []): void {
+    const defaultRequiredVars = [
+      'FEISHU_APP_ID',
+      'FEISHU_REDIRECT_URI',
+      'FEISHU_OAUTH_AUTHORIZE_URL'
+    ];
+
+    const requiredVars = vars.length > 0 ? vars : defaultRequiredVars;
+    const missingVars = requiredVars.filter(varName => !process.env[varName]);
+
+    if (missingVars.length > 0) {
+      throw new Error(
+        `Missing required environment variables: ${missingVars.join(', ')}. ` +
+        `Please check your .env configuration.`
+      );
+    }
+  }
+
+  /**
    * 生成飞书授权 URL
    * @param options 授权 URL 选项
    * @returns 飞书授权 URL
+   * @throws {Error} 如果缺少必需的配置
    */
   getAuthorizationUrl(options: FeishuAuthUrlOptions = {}): string {
+    // 验证配置
+    this.validateConfig();
+
     const {
       state = this.generateState(),
       redirect_uri = process.env.FEISHU_REDIRECT_URI,
       scope = 'contact:user.base:readonly'
     } = options;
 
+    // 构建查询参数
     const params = new URLSearchParams({
       app_id: process.env.FEISHU_APP_ID!,
       redirect_uri: redirect_uri!,
@@ -41,7 +69,17 @@ export class OAuthService {
       state: state
     });
 
-    const url = `${process.env.FEISHU_OAUTH_AUTHORIZE_URL}?${params}`;
+    const authorizeUrl = process.env.FEISHU_OAUTH_AUTHORIZE_URL!;
+    const url = `${authorizeUrl}?${params}`;
+
+    // 验证生成的 URL 不包含 "undefined"
+    if (url.includes('undefined')) {
+      logger.error('Generated OAuth URL contains "undefined"', { url });
+      throw new Error(
+        'Failed to generate valid OAuth URL: URL contains undefined values. ' +
+        'Please check your environment configuration.'
+      );
+    }
 
     logger.info('Generated Feishu authorization URL', { state });
     return url;
@@ -54,6 +92,15 @@ export class OAuthService {
    */
   async handleCallback(authCode: string): Promise<OAuthTokenResponse> {
     try {
+      // 验证配置
+      this.validateConfig([
+        'FEISHU_APP_ID',
+        'FEISHU_APP_SECRET',
+        'FEISHU_OAUTH_TOKEN_URL',
+        'FEISHU_USER_INFO_URL',
+        'JWT_SECRET'
+      ]);
+
       // 1. 使用授权码换取访问令牌
       const tokenResponse = await this.exchangeCodeForToken(authCode);
 
@@ -111,6 +158,9 @@ export class OAuthService {
    */
   async refreshToken(refreshToken: string): Promise<{ access_token: string }> {
     try {
+      // 验证配置
+      this.validateConfig(['JWT_SECRET']);
+
       const payload = jwt.verify(
         refreshToken,
         process.env.JWT_SECRET!
@@ -141,6 +191,9 @@ export class OAuthService {
    */
   verifyToken(token: string): JwtPayload {
     try {
+      // 验证配置
+      this.validateConfig(['JWT_SECRET']);
+
       const payload = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
       return payload;
     } catch (error) {
@@ -156,12 +209,24 @@ export class OAuthService {
    */
   private async exchangeCodeForToken(authCode: string): Promise<FeishuTokenResponse> {
     try {
+      const tokenUrl = process.env.FEISHU_OAUTH_TOKEN_URL;
+      const appId = process.env.FEISHU_APP_ID;
+      const appSecret = process.env.FEISHU_APP_SECRET;
+
+      // 验证必需的环境变量
+      if (!tokenUrl || !appId || !appSecret) {
+        throw new Error(
+          'Missing required configuration for token exchange. ' +
+          'Please check FEISHU_OAUTH_TOKEN_URL, FEISHU_APP_ID, and FEISHU_APP_SECRET.'
+        );
+      }
+
       const response = await axios.post<FeishuTokenResponse>(
-        process.env.FEISHU_OAUTH_TOKEN_URL!,
+        tokenUrl,
         {
           grant_type: 'authorization_code',
-          client_id: process.env.FEISHU_APP_ID,
-          client_secret: process.env.FEISHU_APP_SECRET,
+          client_id: appId,
+          client_secret: appSecret,
           code: authCode
         },
         {
@@ -189,8 +254,17 @@ export class OAuthService {
    */
   private async getUserInfo(accessToken: string): Promise<FeishuUserInfo> {
     try {
+      const userInfoUrl = process.env.FEISHU_USER_INFO_URL;
+
+      if (!userInfoUrl) {
+        throw new Error(
+          'Missing required configuration for user info. ' +
+          'Please check FEISHU_USER_INFO_URL.'
+        );
+      }
+
       const response = await axios.get<{ code: number; data: FeishuUserInfo }>(
-        process.env.FEISHU_USER_INFO_URL!,
+        userInfoUrl,
         {
           headers: {
             'Authorization': `Bearer ${accessToken}`

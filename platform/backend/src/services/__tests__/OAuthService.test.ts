@@ -48,6 +48,37 @@ describe('OAuthService', () => {
       expect(url).toContain('state=');
     });
 
+    it('should NOT contain "undefined" in authorization URL', () => {
+      const url = oauthService.getAuthorizationUrl();
+
+      // This is the critical test - URL should never contain "undefined"
+      expect(url).not.toContain('undefined');
+      expect(url).toMatch(/^https?:\/\//); // Should start with http:// or https://
+    });
+
+    it('should throw error when FEISHU_APP_ID is missing', () => {
+      // Temporarily unset the environment variable
+      delete process.env.FEISHU_APP_ID;
+
+      // Should throw an error instead of generating URL with "undefined"
+      expect(() => {
+        oauthService.getAuthorizationUrl();
+      }).toThrow();
+
+      // Restore for other tests
+      process.env.FEISHU_APP_ID = 'test_app_id';
+    });
+
+    it('should throw error when FEISHU_REDIRECT_URI is missing', () => {
+      delete process.env.FEISHU_REDIRECT_URI;
+
+      expect(() => {
+        oauthService.getAuthorizationUrl();
+      }).toThrow();
+
+      process.env.FEISHU_REDIRECT_URI = 'http://localhost:5173/oauth/callback';
+    });
+
     it('should generate authorization URL with custom redirect URI', () => {
       const customRedirectUri = 'http://custom.example.com/callback';
       const url = oauthService.getAuthorizationUrl({ redirect_uri: customRedirectUri });
