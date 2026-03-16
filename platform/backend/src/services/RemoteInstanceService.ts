@@ -212,7 +212,7 @@ export class RemoteInstanceService {
       const instance = await this.validateInstanceApiKey(instanceId, platformApiKey);
 
       // 2. Update heartbeat timestamp
-      await this.instanceRepository.update(instanceId, {
+      await this.instanceRepository.updateByInstanceId(instanceId, {
         last_heartbeat_at: new Date(),
         health_last_checked: new Date(),
         updated_at: new Date()
@@ -220,7 +220,7 @@ export class RemoteInstanceService {
 
       // 3. Update health status based on heartbeat
       const healthStatus = this.determineHealthStatus(heartbeat);
-      await this.instanceRepository.update(instanceId, {
+      await this.instanceRepository.updateByInstanceId(instanceId, {
         health_status: healthStatus,
         health_reason: `Heartbeat received: ${heartbeat.status}`,
         updated_at: new Date()
@@ -277,7 +277,7 @@ export class RemoteInstanceService {
       const instance = await this.validateInstanceApiKey(instanceId, platformApiKey);
 
       // 2. Update instance status
-      await this.instanceRepository.update(instanceId, {
+      await this.instanceRepository.updateByInstanceId(instanceId, {
         status: 'stopped',
         health_status: 'unhealthy',
         health_reason: `Unregistered: ${reason}`,

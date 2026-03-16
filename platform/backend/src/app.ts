@@ -47,10 +47,12 @@ import { HealthCheckController } from './controllers/HealthCheckController';
 import { FeishuWebhookController } from './controllers/FeishuWebhookController';
 import { MetricsController } from './controllers/MetricsController';
 import { ChatController } from './controllers/ChatController';
+import { RemoteInstanceController } from './controllers/RemoteInstanceController';
 import { ScheduledHealthCheckService } from './services/ScheduledHealthCheckService';
 import { MetricsCollectionService } from './services/MetricsCollectionService';
 import { WebSocketGateway } from './services/WebSocketGateway';
 import { InstanceRegistry } from './services/InstanceRegistry';
+import { RemoteHeartbeatMonitorService } from './services/RemoteHeartbeatMonitor';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { sanitizeInput, preventSQLInjection } from './middleware/validate';
 import {
@@ -196,13 +198,14 @@ class Application {
         FeishuWebhookController,
         MetricsController,
         ChatController,
+        RemoteInstanceController,
       ],
       middlewares: [],
       defaultErrorHandler: true, // Enable routing-controllers default error handling
       validation: true,
     });
 
-    logger.info('All controllers initialized (OAuth, Instance, User, Monitoring, ApiKey, HealthCheck, FeishuWebhook, Metrics, Chat)');
+    logger.info('All controllers initialized (OAuth, Instance, User, Monitoring, ApiKey, HealthCheck, FeishuWebhook, Metrics, Chat, RemoteInstance)');
     logger.info('Routing-controllers routes registered successfully');
   }
 
@@ -247,6 +250,22 @@ class Application {
       }
     } catch (error) {
       logger.error('Failed to initialize metrics collection service', error);
+    }
+
+    try {
+      const remoteHeartbeatMonitor = Container.get(RemoteHeartbeatMonitorService);
+
+      // Start remote instance heartbeat monitor
+      const heartbeatEnabled = process.env.REMOTE_HEARTBEAT_MONITOR_ENABLED !== 'false';
+
+      if (heartbeatEnabled) {
+        remoteHeartbeatMonitor.start();
+        logger.info('Remote instance heartbeat monitor started');
+      } else {
+        logger.info('Remote instance heartbeat monitor disabled');
+      }
+    } catch (error) {
+      logger.error('Failed to initialize remote heartbeat monitor service', error);
     }
   }
 

@@ -93,7 +93,7 @@ export class RemoteHeartbeatMonitorService {
    */
   private async markInstanceOffline(instance: any): Promise<void> {
     try {
-      await this.instanceRepository.update(instance.instance_id, {
+      await this.instanceRepository.updateByInstanceId(instance.instance_id, {
         status: 'offline',
         health_status: 'unhealthy',
         health_reason: 'No heartbeat received within timeout period',

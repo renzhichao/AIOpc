@@ -19,7 +19,7 @@ import { AppError } from '../utils/errors/AppError';
 import { ErrorCodes } from '../utils/errors/ErrorCodes';
 
 @Service()
-@Controller('/api/instances')
+@Controller('/instances')
 export class RemoteInstanceController {
   constructor(
     private readonly remoteInstanceService: RemoteInstanceService

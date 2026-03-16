@@ -90,6 +90,16 @@ export class InstanceRepository extends BaseRepository<Instance> {
   }
 
   /**
+   * 根据 instance_id 更新实例
+   */
+  async updateByInstanceId(instanceId: string, updates: Partial<Instance>): Promise<void> {
+    await this.repository.update(
+      { instance_id: instanceId },
+      updates as any
+    );
+  }
+
+  /**
    * 更新实例健康状态
    */
   async updateHealthStatus(
