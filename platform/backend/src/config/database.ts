@@ -45,7 +45,9 @@ export const AppDataSource = new DataSource({
   synchronize,
   logging,
   entities: [User, Instance, ApiKey, Document, DocumentChunk, QRCode, InstanceRenewal, InstanceMetric],
-  migrations: [join(__dirname, '../../migrations/**/*.ts')],
+  // Use empty migrations array in development since we use synchronize
+  // In production, migrations should be compiled to dist/migrations/**/*.js
+  migrations: isDevelopment ? [] : [join(__dirname, '../migrations/**/*.js')],
   subscribers: [],
 
   // Production connection pool configuration
