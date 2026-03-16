@@ -1,16 +1,13 @@
 import { Service } from 'typedi';
 import { Repository } from 'typeorm';
-import { InjectRepository } from 'typeorm-typedi-extensions';
 import { QRCode } from '../entities/QRCode.entity';
 import { BaseRepository } from './BaseRepository';
+import { AppDataSource } from '../config/database';
 
 @Service()
 export class QRCodeRepository extends BaseRepository<QRCode> {
-  constructor(
-    @InjectRepository(QRCode)
-    repository: Repository<QRCode>
-  ) {
-    super(repository);
+  constructor() {
+    super(() => AppDataSource.getRepository(QRCode));
   }
 
   /**

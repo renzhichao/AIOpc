@@ -11,13 +11,13 @@
  * - POST /api/health/cycle - Run health check cycle
  */
 
-import { Router } from 'express';
+import { Router, Request, Response, Express } from 'express';
 import { HealthCheckController } from '../controllers/HealthCheckController';
 import { Container } from 'typedi';
 import { asyncHandler } from '../middleware/asyncHandler';
 import { authMiddleware } from '../middleware/auth';
 
-const router = Router();
+const router: Router = Router();
 
 // Get health check controller from container
 const getController = (): HealthCheckController => {
@@ -25,7 +25,7 @@ const getController = (): HealthCheckController => {
 };
 
 // Platform health (no auth required)
-router.get('/', asyncHandler(async (req, res) => {
+router.get('/', asyncHandler(async (req: Request, res: Response) => {
   const controller = getController();
   const health = await controller.getPlatformHealth();
   res.json(health);
@@ -35,7 +35,7 @@ router.get('/', asyncHandler(async (req, res) => {
 router.get(
   '/instances/:instanceId',
   authMiddleware,
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const controller = getController();
     const health = await controller.checkInstanceHealth(
       req.params.instanceId,
@@ -51,7 +51,7 @@ router.get(
 router.post(
   '/instances/:instanceId/recover',
   authMiddleware,
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const controller = getController();
     const result = await controller.triggerRecovery(req.params.instanceId, req.body);
     res.json(result);
@@ -62,7 +62,7 @@ router.post(
 router.get(
   '/statistics',
   authMiddleware,
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const controller = getController();
     const stats = await controller.getHealthStatistics();
     res.json(stats);
@@ -73,7 +73,7 @@ router.get(
 router.get(
   '/instances/:instanceId/history',
   authMiddleware,
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const controller = getController();
     const history = await controller.getHealthHistory(req.params.instanceId);
     res.json(history);
@@ -84,7 +84,7 @@ router.get(
 router.post(
   '/instances/:instanceId/history/clear',
   authMiddleware,
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const controller = getController();
     const result = await controller.clearHealthHistory(req.params.instanceId);
     res.json(result);
@@ -95,7 +95,7 @@ router.post(
 router.post(
   '/cycle',
   authMiddleware,
-  asyncHandler(async (req, res) => {
+  asyncHandler(async (req: Request, res: Response) => {
     const controller = getController();
     const stats = await controller.runHealthCheckCycle(req.body);
     res.json(stats);

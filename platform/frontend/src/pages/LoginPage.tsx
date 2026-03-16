@@ -2,7 +2,7 @@
  * 登录页面 - 显示二维码进行扫码登录
  */
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/auth';

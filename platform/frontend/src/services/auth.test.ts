@@ -12,7 +12,7 @@ describe('AuthService', () => {
   beforeEach(() => {
     authService = new AuthService('http://test.api');
     fetchMock = vi.fn();
-    global.fetch = fetchMock;
+    (global as any).fetch = fetchMock;
   });
 
   describe('getAuthorizationUrl', () => {

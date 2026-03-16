@@ -101,6 +101,11 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
 }
 
 /**
+ * Alias for authenticate for backward compatibility
+ */
+export const authMiddleware = authenticate;
+
+/**
  * Optional authentication - doesn't fail if no token
  * Attaches user info if valid token is present
  */

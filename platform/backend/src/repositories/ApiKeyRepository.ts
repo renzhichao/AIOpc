@@ -1,8 +1,8 @@
 import { Service } from 'typedi';
 import { Repository } from 'typeorm';
-import { InjectRepository } from 'typeorm-typedi-extensions';
 import { ApiKey } from '../entities/ApiKey.entity';
 import { BaseRepository } from './BaseRepository';
+import { AppDataSource } from '../config/database';
 
 /**
  * API Key 仓储类
@@ -10,11 +10,8 @@ import { BaseRepository } from './BaseRepository';
  */
 @Service()
 export class ApiKeyRepository extends BaseRepository<ApiKey> {
-  constructor(
-    @InjectRepository(ApiKey)
-    repository: Repository<ApiKey>
-  ) {
-    super(repository);
+  constructor() {
+    super(() => AppDataSource.getRepository(ApiKey));
   }
 
   /**

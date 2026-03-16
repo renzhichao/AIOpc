@@ -1,8 +1,8 @@
 import { Service } from 'typedi';
 import { Repository } from 'typeorm';
-import { InjectRepository } from 'typeorm-typedi-extensions';
 import { User } from '../entities/User.entity';
 import { BaseRepository } from './BaseRepository';
+import { AppDataSource } from '../config/database';
 
 /**
  * 用户仓储类
@@ -10,11 +10,10 @@ import { BaseRepository } from './BaseRepository';
  */
 @Service()
 export class UserRepository extends BaseRepository<User> {
-  constructor(
-    @InjectRepository(User)
-    repository: Repository<User>
-  ) {
-    super(repository);
+  constructor() {
+    // Pass a function that gets the repository lazily
+    // This ensures the repository is only accessed after DB is initialized
+    super(() => AppDataSource.getRepository(User));
   }
 
   /**

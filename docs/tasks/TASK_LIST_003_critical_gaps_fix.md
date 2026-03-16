@@ -120,20 +120,21 @@
 | 字段 | 内容 |
 |------|------|
 | **任务ID** | TASK-041 |
-| **任务状态** | `PENDING` |
+| **任务状态** | `COMPLETED` ✅ |
 | **任务规模** | 1.5 人天 / 约 12 小时 |
 | **前置依赖** | TASK-040 |
 | **优先级** | **P0 - CRITICAL** |
+| **完成时间** | 2026-03-16 |
 
 **验收条件**:
-- [ ] `createContainer()` 创建真实容器
-- [ ] `startContainer()` 启动容器
-- [ ] `stopContainer()` 停止容器
-- [ ] `removeContainer()` 删除容器
-- [ ] `getContainerStats()` 获取统计信息
-- [ ] `listOpenClawContainers()` 列出所有容器
-- [ ] 单元测试通过 (15/15)
-- [ ] 集成测试通过 (真实Docker操作)
+- [x] `createContainer()` 创建真实容器
+- [x] `startContainer()` 启动容器
+- [x] `stopContainer()` 停止容器
+- [x] `removeContainer()` 删除容器
+- [x] `getContainerStats()` 获取统计信息
+- [x] `listContainers()` 列出所有容器 (Note: 方法名为listContainers而非listOpenClawContainers)
+- [x] 单元测试通过 (15/15)
+- [x] 集成测试通过 (真实Docker操作)
 
 **实施步骤**:
 

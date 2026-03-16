@@ -31,6 +31,10 @@ CMD ["pnpm", "run", "dev"]
 ################################################################################
 FROM node:22-alpine AS build
 
+# Add build timestamp for cache busting
+ARG BUILD_TIMESTAMP
+ENV BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
+
 WORKDIR /app
 
 # 安装 pnpm
@@ -70,8 +74,10 @@ RUN pnpm install --prod --frozen-lockfile
 # 从构建阶段复制构建产物
 COPY --from=build /app/dist ./dist
 
+# 删除迁移文件（迁移通过 TypeORM synchronize 自动处理）
+RUN rm -rf /app/dist/migrations
+
 # 复制其他必要文件
-COPY ormconfig.js ./
 COPY package.json ./
 
 # 创建非 root 用户

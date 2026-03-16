@@ -1,14 +1,21 @@
 import { Service } from 'typedi';
-import { InjectRepository } from 'typeorm-typedi-extensions';
 import { Repository } from 'typeorm';
 import { InstanceRenewal } from '../entities/InstanceRenewal.entity';
+import { AppDataSource } from '../config/database';
 
 @Service()
 export class InstanceRenewalRepository {
-  constructor(
-    @InjectRepository(InstanceRenewal)
-    private readonly repository: Repository<InstanceRenewal>
-  ) {}
+  private _repository?: Repository<InstanceRenewal>;
+
+  /**
+   * Get repository lazily (only when first accessed)
+   */
+  private get repository(): Repository<InstanceRenewal> {
+    if (!this._repository) {
+      this._repository = AppDataSource.getRepository(InstanceRenewal);
+    }
+    return this._repository;
+  }
 
   async create(data: {
     instance_id: string;

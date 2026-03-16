@@ -12,6 +12,6 @@ export const AppDataSource = new DataSource({
   synchronize: process.env.NODE_ENV !== 'production',
   logging: process.env.NODE_ENV === 'development' ? true : false,
   entities: [User, Instance, ApiKey, Document, DocumentChunk, QRCode, InstanceRenewal],
-  migrations: [join(__dirname, '..', 'migrations', '**', '*{.ts,.js}')],
+  migrations: [], // Disable automatic migrations - run manually via CLI
   subscribers: [],
 });

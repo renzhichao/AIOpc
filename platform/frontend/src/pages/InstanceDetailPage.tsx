@@ -2,12 +2,12 @@
  * 实例详情页面
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { instanceService } from '../services/instance';
 import type { Instance, InstanceUsageStats, InstanceHealth } from '../types/instance';
 import { LineChart } from '../components/charts/LineChart';
-import type { LineChartData, LineChartSeries } from '../components/charts/LineChart';
+import type { LineChartData } from '../components/charts/LineChart';
 
 /**
  * 续费记录类型
@@ -224,7 +224,7 @@ export default function InstanceDetailPage() {
       });
 
       if (response.ok) {
-        const result = await response.json();
+        await response.json();
         alert(`续费成功！已延长 ${durationDays} 天`);
         setShowRenewModal(false);
         await loadInstanceDetails();

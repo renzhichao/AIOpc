@@ -1,8 +1,8 @@
 import { Service } from 'typedi';
 import { Repository, Between, MoreThanOrEqual } from 'typeorm';
-import { InjectRepository } from 'typeorm-typedi-extensions';
 import { InstanceMetric } from '../entities/InstanceMetric.entity';
 import { BaseRepository } from './BaseRepository';
+import { AppDataSource } from '../config/database';
 
 /**
  * Instance Metric Repository
@@ -12,11 +12,8 @@ import { BaseRepository } from './BaseRepository';
  */
 @Service()
 export class InstanceMetricRepository extends BaseRepository<InstanceMetric> {
-  constructor(
-    @InjectRepository(InstanceMetric)
-    repository: Repository<InstanceMetric>
-  ) {
-    super(repository);
+  constructor() {
+    super(() => AppDataSource.getRepository(InstanceMetric));
   }
 
   /**

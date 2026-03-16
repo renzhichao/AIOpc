@@ -7,7 +7,7 @@ import { InstanceService } from './instance';
 
 // Mock fetch
 const mockFetch = vi.fn();
-global.fetch = mockFetch as any;
+(global as any).fetch = mockFetch;
 
 describe('InstanceService', () => {
   let service: InstanceService;

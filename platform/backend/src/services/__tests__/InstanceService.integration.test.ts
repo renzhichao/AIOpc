@@ -54,18 +54,18 @@ describe('InstanceService Integration Tests', () => {
 
     // Create mock Docker service
     const mockDockerService = {
-      createContainer: jest.fn().mockResolvedValue('test-container-id-123'),
-      removeContainer: jest.fn().mockResolvedValue(undefined),
-      startContainer: jest.fn().mockResolvedValue(undefined),
-      stopContainer: jest.fn().mockResolvedValue(undefined),
+      createContainer: jest.fn().mockResolvedValue('test-container-id-123') as any,
+      removeContainer: jest.fn().mockResolvedValue(undefined) as any,
+      startContainer: jest.fn().mockResolvedValue(undefined) as any,
+      stopContainer: jest.fn().mockResolvedValue(undefined) as any,
       getContainerStats: jest.fn().mockResolvedValue({
         cpu: 10.5,
         memory: 256,
         memoryLimit: 1024,
-      }),
-    } as any;
+      }) as any,
+    };
 
-    dockerService = mockDockerService as jest.Mocked<DockerService>;
+    dockerService = mockDockerService as unknown as jest.Mocked<DockerService>;
 
     // Create ApiKeyService with all dependencies
     apiKeyService = new ApiKeyService(

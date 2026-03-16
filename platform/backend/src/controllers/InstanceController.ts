@@ -848,7 +848,7 @@ export class InstanceController {
 
       // Validate configuration update
       const validatedConfig = this.configValidationService.validateConfigUpdate(
-        instance.config,
+        instance.config as any,
         body
       );
 

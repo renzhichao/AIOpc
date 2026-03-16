@@ -2,7 +2,7 @@
  * OAuth 回调页面 - 处理飞书 OAuth 回调
  */
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { authService } from '../services/auth';
 import { useAuth } from '../contexts/AuthContext';

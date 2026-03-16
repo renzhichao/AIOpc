@@ -50,6 +50,7 @@ describe('storage', () => {
     it('应该正确保存和获取用户信息', () => {
       const user = {
         id: '123',
+        feishu_user_id: 'feishu-123',
         name: 'Test User',
         email: 'test@example.com',
       };
@@ -67,7 +68,7 @@ describe('storage', () => {
     it('应该清除所有认证信息', () => {
       storage.setToken('token');
       storage.setRefreshToken('refresh-token');
-      storage.setUser({ id: '123' });
+      storage.setUser({ id: '123', feishu_user_id: 'feishu-123', name: 'Test' });
 
       storage.clearAuth();
 

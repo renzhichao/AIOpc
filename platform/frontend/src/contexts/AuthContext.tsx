@@ -9,14 +9,6 @@ import { storage } from '../utils/storage';
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-const initialState: AuthState = {
-  user: null,
-  token: null,
-  isAuthenticated: false,
-  isLoading: true,
-  error: null,
-};
-
 /**
  * Helper function to check auth state synchronously from localStorage
  * This allows AuthContext to initialize immediately without loading state

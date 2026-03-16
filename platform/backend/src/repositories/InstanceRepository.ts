@@ -1,8 +1,8 @@
 import { Service } from 'typedi';
 import { Repository } from 'typeorm';
-import { InjectRepository } from 'typeorm-typedi-extensions';
 import { Instance } from '../entities/Instance.entity';
 import { BaseRepository } from './BaseRepository';
+import { AppDataSource } from '../config/database';
 
 /**
  * 实例仓储类
@@ -10,11 +10,8 @@ import { BaseRepository } from './BaseRepository';
  */
 @Service()
 export class InstanceRepository extends BaseRepository<Instance> {
-  constructor(
-    @InjectRepository(Instance)
-    repository: Repository<Instance>
-  ) {
-    super(repository);
+  constructor() {
+    super(() => AppDataSource.getRepository(Instance));
   }
 
   /**
