@@ -77,4 +77,66 @@ export class Instance {
    */
   @Column({ name: 'health_last_checked', type: 'timestamp', nullable: true })
   health_last_checked: Date | null;
+
+  /**
+   * Deployment type: 'local' (platform-managed Docker) or 'remote' (self-hosted Agent)
+   */
+  @Column({
+    name: 'deployment_type',
+    type: 'enum',
+    enum: ['local', 'remote'],
+    default: 'local'
+  })
+  @Index()
+  deployment_type: 'local' | 'remote';
+
+  /**
+   * Remote instance hostname/IP (only for remote instances)
+   */
+  @Column({ name: 'remote_host', nullable: true })
+  remote_host: string | null;
+
+  /**
+   * Remote instance port (only for remote instances)
+   */
+  @Column({ name: 'remote_port', nullable: true })
+  remote_port: number | null;
+
+  /**
+   * OpenClaw Agent version (only for remote instances)
+   */
+  @Column({ name: 'remote_version', nullable: true })
+  remote_version: string | null;
+
+  /**
+   * Platform API key assigned to this remote instance
+   * Used for authentication when instance registers and sends heartbeats
+   */
+  @Column({ name: 'platform_api_key', nullable: true })
+  platform_api_key: string | null;
+
+  /**
+   * Timestamp of the last heartbeat received from remote instance
+   */
+  @Column({ name: 'last_heartbeat_at', type: 'timestamp', nullable: true })
+  @Index()
+  last_heartbeat_at: Date | null;
+
+  /**
+   * Heartbeat interval in milliseconds (default: 30000ms)
+   */
+  @Column({ name: 'heartbeat_interval', default: 30000 })
+  heartbeat_interval: number;
+
+  /**
+   * Remote instance capabilities (e.g., ['chat', 'web_search', 'code_execution'])
+   */
+  @Column({ name: 'capabilities', type: 'text', nullable: true })
+  capabilities: string | null;
+
+  /**
+   * Additional metadata for remote instances
+   */
+  @Column({ name: 'remote_metadata', type: 'jsonb', nullable: true })
+  remote_metadata: Record<string, any> | null;
 }
