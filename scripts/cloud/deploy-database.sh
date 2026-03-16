@@ -328,13 +328,7 @@ verify_migration() {
 
     info "Checking created tables..."
 
-    local table_count=$(ssh "$SERVER" "
-        sudo -u postgres psql -d $DB_NAME -t -c "
-            SELECT COUNT(*)
-            FROM information_schema.tables
-            WHERE table_schema = 'public';
-        " | tr -d ' '
-    ")
+    local table_count=$(ssh "$SERVER" "sudo -u postgres psql -d $DB_NAME -t -c 'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = '\''public'\'';' | tr -d ' ")
 
     info "Table count: $table_count"
 
