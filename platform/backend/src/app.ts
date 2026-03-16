@@ -14,6 +14,13 @@ import { useContainer, useExpressServer } from 'routing-controllers';
 import { Container } from 'typedi';
 import { useContainer as useTypeOrmContainer } from 'typeorm';
 import { logger } from './config/logger';
+
+// IMPORTANT: Set up TypeDI container for TypeORM BEFORE importing database
+// This is critical because the DataSource is created at module load time
+useTypeOrmContainer(Container);
+logger.info('TypeDI container initialized for TypeORM');
+
+// Now we can safely import the database (DataSource will be created with container awareness)
 import { AppDataSource } from './config/database';
 import { redis } from './config/redis';
 import { OAuthController } from './controllers/OAuthController';
@@ -42,21 +49,34 @@ class Application {
 
   constructor() {
     this.app = express();
-    this.setupTypeDI(); // Setup TypeDI container FIRST
-    this.initializeDatabase();
-    this.initializeRedis();
+    this.setupRoutingControllersContainer(); // Setup TypeDI for routing-controllers early
     this.initializeMiddlewares();
-    this.initializeControllers();
     this.initializeRoutes();
-    this.initializeErrorHandlers(); // Add error handlers AFTER routes
-    this.initializeScheduledTasks();
+    // Note: Error handlers are added AFTER controllers in initialize()
   }
 
-  private setupTypeDI() {
-    // Set up TypeDI container for both routing-controllers and TypeORM
+  private setupRoutingControllersContainer() {
+    // Set up TypeDI container for routing-controllers
     useContainer(Container);
-    useTypeOrmContainer(Container);
-    logger.info('TypeDI container initialized for routing-controllers and TypeORM');
+    logger.info('TypeDI container initialized for routing-controllers');
+  }
+
+  public async initialize() {
+    // Initialize database FIRST (must complete before controllers)
+    await this.initializeDatabase();
+
+    // Initialize Redis
+    this.initializeRedis();
+
+    // Initialize controllers AFTER database is ready
+    // This is important because controllers depend on repositories
+    this.initializeControllers();
+
+    // Add error handlers AFTER all routes (both manual and routing-controllers)
+    this.initializeErrorHandlers();
+
+    // Initialize scheduled tasks
+    this.initializeScheduledTasks();
   }
 
   private async initializeDatabase() {
@@ -136,16 +156,13 @@ class Application {
   }
 
   private initializeControllers() {
-    // 在开发环境中使用 Mock OAuth Controller
-    const oauthController = process.env.NODE_ENV === 'development'
-      ? MockOAuthController
-      : OAuthController;
+    logger.info('Initializing routing-controllers...');
 
-    // Configure routing-controllers
+    // Configure routing-controllers with class-based controller registration
     useExpressServer(this.app, {
       routePrefix: '/api',
       controllers: [
-        oauthController,
+        OAuthController,
         InstanceController,
         UserController,
         MonitoringController,
@@ -155,11 +172,12 @@ class Application {
         MetricsController,
       ],
       middlewares: [],
-      defaultErrorHandler: true,
+      defaultErrorHandler: false, // We use our own error handlers
       validation: true,
     });
 
     logger.info('All controllers initialized (OAuth, Instance, User, Monitoring, ApiKey, HealthCheck, FeishuWebhook, Metrics)');
+    logger.info('Routing-controllers routes registered successfully');
   }
 
   private initializeScheduledTasks() {
@@ -216,9 +234,21 @@ class Application {
   }
 }
 
-const app = new Application();
-app.listen();
+async function main() {
+  const app = new Application();
+
+  // Initialize database and controllers BEFORE listening
+  await app.initialize();
+
+  // Start listening for requests
+  app.listen();
+}
+
+main().catch((error) => {
+  logger.error('Failed to start application', error);
+  process.exit(1);
+});
 
 // Export the express app for testing
-export const expressApp = app.app;
-export default app;
+export const expressApp = new Application().app;
+export default Application;

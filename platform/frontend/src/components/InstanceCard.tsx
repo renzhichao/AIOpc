@@ -3,6 +3,7 @@
  */
 
 import type { Instance } from '../types/instance';
+import { StatusBadge } from './StatusBadge';
 
 interface InstanceCardProps {
   instance: Instance;
@@ -12,6 +13,8 @@ interface InstanceCardProps {
   onDelete: (id: string) => void;
   onClick: (id: string) => void;
   loading?: boolean;
+  cpuUsage?: number;
+  memoryUsage?: number;
 }
 
 export default function InstanceCard({
@@ -22,51 +25,9 @@ export default function InstanceCard({
   onDelete,
   onClick,
   loading = false,
+  cpuUsage,
+  memoryUsage,
 }: InstanceCardProps) {
-  /**
-   * 获取状态显示信息
-   */
-  const getStatusInfo = () => {
-    switch (instance.status) {
-      case 'active':
-        return {
-          label: '运行中',
-          color: 'bg-green-100 text-green-800',
-          icon: '🟢',
-        };
-      case 'stopped':
-        return {
-          label: '已停止',
-          color: 'bg-gray-100 text-gray-800',
-          icon: '⏸️',
-        };
-      case 'pending':
-        return {
-          label: '启动中',
-          color: 'bg-yellow-100 text-yellow-800',
-          icon: '🔄',
-        };
-      case 'error':
-        return {
-          label: '错误',
-          color: 'bg-red-100 text-red-800',
-          icon: '❌',
-        };
-      case 'recovering':
-        return {
-          label: '恢复中',
-          color: 'bg-blue-100 text-blue-800',
-          icon: '🔧',
-        };
-      default:
-        return {
-          label: '未知',
-          color: 'bg-gray-100 text-gray-800',
-          icon: '❓',
-        };
-    }
-  };
-
   /**
    * 获取模板显示名称
    */
@@ -97,22 +58,31 @@ export default function InstanceCard({
     });
   };
 
-  const statusInfo = getStatusInfo();
+  /**
+   * Get resource usage color based on value
+   */
+  const getResourceColor = (value?: number) => {
+    if (value === undefined) return 'bg-gray-200';
+    if (value < 50) return 'bg-green-500';
+    if (value < 80) return 'bg-yellow-500';
+    return 'bg-red-500';
+  };
+
   const canStart = instance.status === 'stopped' || instance.status === 'error';
   const canStop = instance.status === 'active';
   const canRestart = instance.status === 'active' || instance.status === 'error';
 
   return (
     <div
-      className="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 overflow-hidden cursor-pointer"
+      className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200 overflow-hidden cursor-pointer"
       onClick={() => onClick(instance.id)}
       data-testid="instance-card"
     >
       {/* 头部 */}
       <div className="p-6">
         <div className="flex items-start justify-between mb-4">
-          <div className="flex-1">
-            <h3 className="text-xl font-semibold text-gray-900 mb-1" data-testid="instance-name">
+          <div className="flex-1 min-w-0">
+            <h3 className="text-xl font-semibold text-gray-900 mb-1 truncate" data-testid="instance-name">
               {instance.config.name || `实例 ${instance.id.slice(0, 8)}`}
             </h3>
             {instance.config.description && (
@@ -121,13 +91,7 @@ export default function InstanceCard({
               </p>
             )}
           </div>
-          <span
-            className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}
-            data-testid="instance-status"
-          >
-            <span className="mr-1">{statusInfo.icon}</span>
-            {statusInfo.label}
-          </span>
+          <StatusBadge status={instance.status} size="sm" />
         </div>
 
         {/* 元信息 */}
@@ -142,14 +106,48 @@ export default function InstanceCard({
           </span>
         </div>
 
+        {/* 资源使用率预览 */}
+        {(cpuUsage !== undefined || memoryUsage !== undefined) && (
+          <div className="mb-4 space-y-2">
+            {cpuUsage !== undefined && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-600 w-12">CPU</span>
+                <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div
+                    className={`h-full ${getResourceColor(cpuUsage)} transition-all duration-300`}
+                    style={{ width: `${Math.min(cpuUsage, 100)}%` }}
+                  ></div>
+                </div>
+                <span className="text-xs font-medium text-gray-900 w-12 text-right">
+                  {cpuUsage.toFixed(1)}%
+                </span>
+              </div>
+            )}
+            {memoryUsage !== undefined && (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-600 w-12">内存</span>
+                <div className="flex-1 bg-gray-200 rounded-full h-2 overflow-hidden">
+                  <div
+                    className={`h-full ${getResourceColor(memoryUsage)} transition-all duration-300`}
+                    style={{ width: `${Math.min(memoryUsage, 100)}%` }}
+                  ></div>
+                </div>
+                <span className="text-xs font-medium text-gray-900 w-12 text-right">
+                  {memoryUsage.toFixed(1)}%
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* 操作按钮 */}
-        <div className="flex items-center gap-2">
+        <div
+          className="flex items-center gap-2"
+          onClick={(e) => e.stopPropagation()}
+        >
           {canStart && (
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onStart(instance.id);
-              }}
+              onClick={() => onStart(instance.id)}
               disabled={loading}
               className="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 text-sm font-medium"
               data-testid="start-button"
@@ -159,10 +157,7 @@ export default function InstanceCard({
           )}
           {canStop && (
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onStop(instance.id);
-              }}
+              onClick={() => onStop(instance.id)}
               disabled={loading}
               className="flex-1 py-2 px-4 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 text-sm font-medium"
               data-testid="stop-button"
@@ -172,10 +167,7 @@ export default function InstanceCard({
           )}
           {canRestart && (
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onRestart(instance.id);
-              }}
+              onClick={() => onRestart(instance.id)}
               disabled={loading}
               className="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 text-sm font-medium"
               data-testid="restart-button"
@@ -184,8 +176,7 @@ export default function InstanceCard({
             </button>
           )}
           <button
-            onClick={(e) => {
-              e.stopPropagation();
+            onClick={() => {
               if (confirm(`确定要删除实例 "${instance.config.name || instance.id.slice(0, 8)}" 吗？`)) {
                 onDelete(instance.id);
               }

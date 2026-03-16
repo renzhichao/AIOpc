@@ -15,6 +15,10 @@ export * from './rateLimit';
 
 // Validation middleware
 export * from './validate';
+export * from './validation.middleware';
+
+// Response format middleware
+export * from './responseFormat';
 
 // Error handling middleware
 export * from './errorHandler';

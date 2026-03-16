@@ -33,6 +33,8 @@ export type InstanceStatus = 'pending' | 'active' | 'stopped' | 'error' | 'recov
 export interface CreateInstanceOptions {
   /** Instance template (personal, team, enterprise) */
   template: InstanceTemplate;
+  /** Instance configuration (optional) */
+  config?: Record<string, any>;
   /** Instance expiration (optional, default: 30 days) */
   expiresAt?: Date;
 }

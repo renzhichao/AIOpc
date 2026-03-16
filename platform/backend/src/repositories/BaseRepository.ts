@@ -3,9 +3,24 @@ import { Repository, FindManyOptions, DeepPartial, ObjectLiteral } from 'typeorm
 /**
  * 基础仓储类
  * 提供通用的 CRUD 操作
+ * 支持延迟初始化 - repository 在首次访问时才获取
  */
 export abstract class BaseRepository<T extends ObjectLiteral> {
-  constructor(protected repository: Repository<T>) {}
+  protected _repository?: Repository<T>;
+
+  constructor(
+    protected readonly getRepository: () => Repository<T>
+  ) {}
+
+  /**
+   * 获取 repository (延迟初始化)
+   */
+  protected get repository(): Repository<T> {
+    if (!this._repository) {
+      this._repository = this.getRepository();
+    }
+    return this._repository;
+  }
 
   /**
    * 创建新记录

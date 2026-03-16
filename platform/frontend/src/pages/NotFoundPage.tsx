@@ -2,7 +2,6 @@
  * 404 页面 - 页面未找到
  */
 
-import React from 'react';
 import { Link } from 'react-router-dom';
 
 export default function NotFoundPage() {

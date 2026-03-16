@@ -2,12 +2,16 @@
  * 实例详情页面
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { instanceService } from '../services/instance';
 import type { Instance, InstanceUsageStats, InstanceHealth } from '../types/instance';
+import { StatusBadge } from '../components/StatusBadge';
+import { InstanceControls } from '../components/InstanceControls';
+import { MetricsCharts } from '../components/MetricsCharts';
 import { LineChart } from '../components/charts/LineChart';
-import type { LineChartData, LineChartSeries } from '../components/charts/LineChart';
+import type { LineChartData } from '../components/charts/LineChart';
+import type { MetricsPeriod } from '../types/metrics';
 
 /**
  * 续费记录类型
@@ -37,7 +41,8 @@ export default function InstanceDetailPage() {
   const [error, setError] = useState('');
 
   // Metrics state
-  const [metricsPeriod, setMetricsPeriod] = useState<'hour' | 'day' | 'week' | 'month'>('day');
+  const [metricsPeriod, setMetricsPeriod] = useState<MetricsPeriod>('30m');
+  const [showAdvancedMetrics, setShowAdvancedMetrics] = useState(false);
   const [metricsData, setMetricsData] = useState<{
     usageStats: any;
     chartData: LineChartData[];
@@ -224,7 +229,7 @@ export default function InstanceDetailPage() {
       });
 
       if (response.ok) {
-        const result = await response.json();
+        await response.json();
         alert(`续费成功！已延长 ${durationDays} 天`);
         setShowRenewModal(false);
         await loadInstanceDetails();
@@ -239,52 +244,6 @@ export default function InstanceDetailPage() {
       console.error('续费失败:', err);
     } finally {
       setRenewLoading(false);
-    }
-  };
-
-  /**
-   * 获取状态显示信息
-   */
-  const getStatusInfo = () => {
-    if (!instance) return null;
-
-    switch (instance.status) {
-      case 'active':
-        return {
-          label: '运行中',
-          color: 'bg-green-100 text-green-800',
-          icon: '🟢',
-        };
-      case 'stopped':
-        return {
-          label: '已停止',
-          color: 'bg-gray-100 text-gray-800',
-          icon: '⏸️',
-        };
-      case 'pending':
-        return {
-          label: '启动中',
-          color: 'bg-yellow-100 text-yellow-800',
-          icon: '🔄',
-        };
-      case 'error':
-        return {
-          label: '错误',
-          color: 'bg-red-100 text-red-800',
-          icon: '❌',
-        };
-      case 'recovering':
-        return {
-          label: '恢复中',
-          color: 'bg-blue-100 text-blue-800',
-          icon: '🔧',
-        };
-      default:
-        return {
-          label: '未知',
-          color: 'bg-gray-100 text-gray-800',
-          icon: '❓',
-        };
     }
   };
 
@@ -350,11 +309,6 @@ export default function InstanceDetailPage() {
     );
   }
 
-  const statusInfo = getStatusInfo();
-  const canStart = instance.status === 'stopped' || instance.status === 'error';
-  const canStop = instance.status === 'active';
-  const canRestart = instance.status === 'active' || instance.status === 'error';
-
   return (
     <div className="min-h-screen bg-gray-50" data-testid="instance-details-container">
       {/* 头部 */}
@@ -377,12 +331,7 @@ export default function InstanceDetailPage() {
                 <h1 className="text-3xl font-bold text-gray-900" data-testid="instance-name">
                   {instance.config.name || `实例 ${instance.id.slice(0, 8)}`}
                 </h1>
-                {statusInfo && (
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusInfo.color}`} data-testid="instance-status">
-                    <span className="mr-1">{statusInfo.icon}</span>
-                    {statusInfo.label}
-                  </span>
-                )}
+                <StatusBadge status={instance.status} size="md" />
               </div>
               {instance.config.description && (
                 <p className="text-gray-600">{instance.config.description}</p>
@@ -390,45 +339,15 @@ export default function InstanceDetailPage() {
             </div>
 
             {/* 操作按钮 */}
-            <div className="flex items-center gap-2">
-              {canStart && (
-                <button
-                  onClick={handleStart}
-                  disabled={actionLoading}
-                  className="px-6 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 font-medium"
-                  data-testid="start-button"
-                >
-                  {actionLoading ? '启动中...' : '启动'}
-                </button>
-              )}
-              {canStop && (
-                <button
-                  onClick={handleStop}
-                  disabled={actionLoading}
-                  className="px-6 py-2 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 font-medium"
-                  data-testid="stop-button"
-                >
-                  {actionLoading ? '停止中...' : '停止'}
-                </button>
-              )}
-              {canRestart && (
-                <button
-                  onClick={handleRestart}
-                  disabled={actionLoading}
-                  className="px-6 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 font-medium"
-                  data-testid="restart-button"
-                >
-                  {actionLoading ? '重启中...' : '重启'}
-                </button>
-              )}
-              <button
-                onClick={() => navigate(`/instances/${id}/config`)}
-                className="px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors duration-200 font-medium"
-                data-testid="config-button"
-              >
-                配置
-              </button>
-            </div>
+            <InstanceControls
+              status={instance.status}
+              onStart={handleStart}
+              onStop={handleStop}
+              onRestart={handleRestart}
+              onConfig={() => navigate(`/instances/${id}/config`)}
+              loading={actionLoading}
+              size="md"
+            />
           </div>
         </div>
       </div>
@@ -568,15 +487,23 @@ export default function InstanceDetailPage() {
                   <div className="flex items-center gap-2">
                     <select
                       value={metricsPeriod}
-                      onChange={(e) => setMetricsPeriod(e.target.value as any)}
+                      onChange={(e) => setMetricsPeriod(e.target.value as MetricsPeriod)}
                       className="px-3 py-1 text-sm border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500"
                       data-testid="metrics-period-selector"
                     >
-                      <option value="hour">1小时</option>
-                      <option value="day">24小时</option>
-                      <option value="week">7天</option>
-                      <option value="month">30天</option>
+                      <option value="30m">30分钟</option>
+                      <option value="1h">1小时</option>
+                      <option value="6h">6小时</option>
+                      <option value="24h">24小时</option>
+                      <option value="7d">7天</option>
+                      <option value="30d">30天</option>
                     </select>
+                    <button
+                      onClick={() => setShowAdvancedMetrics(!showAdvancedMetrics)}
+                      className="px-3 py-1 text-sm bg-indigo-100 hover:bg-indigo-200 text-indigo-700 rounded-lg transition-colors duration-200"
+                    >
+                      {showAdvancedMetrics ? '隐藏' : '显示'}详细指标
+                    </button>
                   </div>
                 </div>
 
@@ -639,6 +566,18 @@ export default function InstanceDetailPage() {
                     )}
                   </>
                 )}
+              </div>
+            )}
+
+            {/* 高级指标图表 */}
+            {showAdvancedMetrics && id && (
+              <div className="space-y-4">
+                <MetricsCharts
+                  instanceId={id}
+                  period={metricsPeriod}
+                  refreshInterval={5000}
+                  height={250}
+                />
               </div>
             )}
           </div>

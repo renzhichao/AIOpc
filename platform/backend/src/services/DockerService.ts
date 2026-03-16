@@ -33,7 +33,7 @@ import {
 @Service()
 export class DockerService {
   private docker: Docker;
-  private readonly DEFAULT_IMAGE = 'openclaw:latest';
+  private readonly DEFAULT_IMAGE = 'openclaw/agent:latest';
   private readonly DEFAULT_NETWORK_PREFIX = 'opclaw-network';
   private readonly DEFAULT_VOLUME_PREFIX = 'opclaw-data';
   private readonly DEFAULT_CONTAINER_PREFIX = 'opclaw';
@@ -46,10 +46,54 @@ export class DockerService {
     cpuShares: 512, // Relative weight (default: 1024)
   };
 
+  // Performance optimization: Cache for resource existence checks
+  private imageCache: Set<string> = new Set();
+  private networkCache: Set<string> = new Set();
+  private volumeCache: Set<string> = new Set();
+  private cacheInitialized = false;
+
   constructor() {
     const socketPath = process.env.DOCKER_SOCKET_PATH || '/var/run/docker.sock';
     this.docker = new Docker({ socketPath });
     logger.info(`DockerService initialized with socket: ${socketPath}`);
+  }
+
+  /**
+   * Initialize resource caches for performance optimization
+   * This should be called once during service initialization or periodically
+   */
+  private async initializeCache(): Promise<void> {
+    if (this.cacheInitialized) {
+      return;
+    }
+
+    try {
+      const startTime = Date.now();
+
+      // Parallel cache initialization for better performance
+      const [images, networks, volumes] = await Promise.all([
+        this.docker.listImages(),
+        this.docker.listNetworks(),
+        this.docker.listVolumes(),
+      ]);
+
+      // Populate caches
+      images.forEach((img: any) => {
+        if (img.RepoTags) {
+          img.RepoTags.forEach((tag: string) => this.imageCache.add(tag));
+        }
+      });
+
+      networks.forEach((n: any) => this.networkCache.add(n.Name));
+      volumes.Volumes?.forEach((v: any) => this.volumeCache.add(v.Name));
+
+      this.cacheInitialized = true;
+      const duration = Date.now() - startTime;
+      logger.info(`Resource cache initialized in ${duration}ms (${this.imageCache.size} images, ${this.networkCache.size} networks, ${this.volumeCache.size} volumes)`);
+    } catch (error) {
+      logger.warn('Failed to initialize resource cache, will check resources on demand:', error);
+      // Continue without cache - not critical
+    }
   }
 
   /**
@@ -69,13 +113,18 @@ export class DockerService {
     try {
       logger.info(`Creating container ${containerName} for instance ${instanceId}`);
 
-      // 1. Pull image if not exists
+      // Initialize cache if not already done (lazy initialization)
+      if (!this.cacheInitialized) {
+        await this.initializeCache();
+      }
+
+      // 1. Pull image if not exists (optimized with cache)
       await this.pullImageIfNeeded(this.DEFAULT_IMAGE);
 
-      // 2. Create network if not exists
+      // 2. Create network if not exists (optimized with cache)
       await this.createNetworkIfNeeded(networkName);
 
-      // 3. Create volume if not exists
+      // 3. Create volume if not exists (optimized with cache)
       await this.createVolumeIfNeeded(volumeName);
 
       // 4. Create container
@@ -121,7 +170,7 @@ export class DockerService {
         Env: envArray,
         HostConfig: {
           Memory: containerConfig.resources.memoryLimit,
-          NanoCpus: containerConfig.resources.cpuQuota,
+          CpuQuota: containerConfig.resources.cpuQuota,
           CpuPeriod: containerConfig.resources.cpuPeriod,
           CpuShares: containerConfig.resources.cpuShares,
           Binds: containerConfig.volumes?.map(
@@ -271,6 +320,9 @@ export class DockerService {
           const volume = this.docker.getVolume(volumeName);
           await volume.remove();
           logger.info(`Volume ${volumeName} removed`);
+
+          // Update cache
+          this.volumeCache.delete(volumeName);
         } catch (error) {
           logger.warn(`Failed to remove volume ${volumeName}: ${error instanceof Error ? error.message : String(error)}`);
         }
@@ -281,6 +333,9 @@ export class DockerService {
         const network = this.docker.getNetwork(networkName);
         await network.remove();
         logger.info(`Network ${networkName} removed`);
+
+        // Update cache
+        this.networkCache.delete(networkName);
       } catch (error) {
         logger.warn(`Failed to remove network ${networkName}: ${error instanceof Error ? error.message : String(error)}`);
       }
@@ -585,22 +640,34 @@ export class DockerService {
   }
 
   /**
-   * Pull Docker image if not exists locally
+   * Pull Docker image if not exists locally (optimized with cache)
    * @param image - Image name with tag
    */
   private async pullImageIfNeeded(image: string): Promise<void> {
     try {
+      // Check cache first (fast path)
+      if (this.imageCache.has(image) || this.imageCache.has(`${image}:latest`)) {
+        logger.info(`Image ${image} found in cache (exists locally)`);
+        return;
+      }
+
+      // Fallback to Docker API if cache not initialized or miss
       const images = await this.docker.listImages();
       const exists = images.some((img: any) =>
         img.RepoTags?.some((tag: any) => tag === image || tag === `${image}:latest`)
       );
 
       if (exists) {
-        logger.info(`Image ${image} already exists locally`);
+        // Update cache
+        this.imageCache.add(image);
+        this.imageCache.add(`${image}:latest`);
+        logger.info(`Image ${image} already exists locally (cache updated)`);
         return;
       }
 
       logger.info(`Pulling image ${image}...`);
+      const pullStart = Date.now();
+
       await new Promise<void>((resolve, reject) => {
         this.docker.pull(image, (err: Error, stream: NodeJS.ReadableStream) => {
           if (err) {
@@ -618,7 +685,12 @@ export class DockerService {
         });
       });
 
-      logger.info(`Image ${image} pulled successfully`);
+      const pullDuration = Date.now() - pullStart;
+      logger.info(`Image ${image} pulled successfully in ${pullDuration}ms`);
+
+      // Update cache after successful pull
+      this.imageCache.add(image);
+      this.imageCache.add(`${image}:latest`);
     } catch (error) {
       logger.error(`Failed to pull image ${image}:`, error);
       throw new AppError(
@@ -631,27 +703,72 @@ export class DockerService {
   }
 
   /**
-   * Create network if not exists
+   * Create network if not exists (optimized with cache)
    * @param networkName - Network name
    */
   private async createNetworkIfNeeded(networkName: string): Promise<void> {
     try {
+      // Check cache first (fast path)
+      if (this.networkCache.has(networkName)) {
+        logger.info(`Network ${networkName} found in cache (exists)`);
+        return;
+      }
+
+      // Fallback to Docker API if cache not initialized or miss
       const networks = await this.docker.listNetworks();
       const exists = networks.some((n: any) => n.Name === networkName);
 
       if (exists) {
-        logger.info(`Network ${networkName} already exists`);
+        // Update cache
+        this.networkCache.add(networkName);
+        logger.info(`Network ${networkName} already exists (cache updated)`);
         return;
       }
 
       logger.info(`Creating network ${networkName}...`);
-      await this.docker.createNetwork({
+      const createStart = Date.now();
+
+      // Detect test networks more comprehensively
+      const isTestNetwork =
+        networkName.includes('test') ||
+        networkName.includes('integration') ||
+        networkName.includes('preset') ||
+        networkName.match(/test-\d+/);
+
+      const networkConfig: any = {
         Name: networkName,
         Driver: 'bridge',
         Internal: false,
-      });
+      };
 
-      logger.info(`Network ${networkName} created`);
+      // For test networks, let Docker auto-assign subnets to avoid conflicts
+      // For production networks, use a specific subnet
+      if (!isTestNetwork) {
+        networkConfig.IPAM = {
+          Driver: 'default',
+          Config: [
+            {
+              Subnet: '172.28.0.0/16',
+              IPRange: '172.28.0.0/24',
+              Gateway: '172.28.0.1',
+            },
+          ],
+        };
+      } else {
+        // For test networks, explicitly use default IPAM driver without subnet
+        // This lets Docker assign from its pool, avoiding conflicts
+        networkConfig.IPAM = {
+          Driver: 'default',
+        };
+      }
+
+      await this.docker.createNetwork(networkConfig);
+
+      const createDuration = Date.now() - createStart;
+      logger.info(`Network ${networkName} created in ${createDuration}ms`);
+
+      // Update cache after successful creation
+      this.networkCache.add(networkName);
     } catch (error) {
       logger.error(`Failed to create network ${networkName}:`, error);
       throw new AppError(
@@ -664,26 +781,41 @@ export class DockerService {
   }
 
   /**
-   * Create volume if not exists
+   * Create volume if not exists (optimized with cache)
    * @param volumeName - Volume name
    */
   private async createVolumeIfNeeded(volumeName: string): Promise<void> {
     try {
+      // Check cache first (fast path)
+      if (this.volumeCache.has(volumeName)) {
+        logger.info(`Volume ${volumeName} found in cache (exists)`);
+        return;
+      }
+
+      // Fallback to Docker API if cache not initialized or miss
       const volumes = await this.docker.listVolumes();
       const exists = volumes.Volumes?.some((v: any) => v.Name === volumeName);
 
       if (exists) {
-        logger.info(`Volume ${volumeName} already exists`);
+        // Update cache
+        this.volumeCache.add(volumeName);
+        logger.info(`Volume ${volumeName} already exists (cache updated)`);
         return;
       }
 
       logger.info(`Creating volume ${volumeName}...`);
+      const createStart = Date.now();
+
       await this.docker.createVolume({
         Name: volumeName,
         Driver: 'local',
       });
 
-      logger.info(`Volume ${volumeName} created`);
+      const createDuration = Date.now() - createStart;
+      logger.info(`Volume ${volumeName} created in ${createDuration}ms`);
+
+      // Update cache after successful creation
+      this.volumeCache.add(volumeName);
     } catch (error) {
       logger.error(`Failed to create volume ${volumeName}:`, error);
       throw new AppError(

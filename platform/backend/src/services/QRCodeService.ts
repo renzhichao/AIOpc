@@ -5,7 +5,7 @@ import { QRCodeRepository } from '../repositories/QRCodeRepository';
 import { logger } from '../config/logger';
 import { AppError, ErrorCodes } from '../utils/errors';
 
-interface QRCodeData {
+export interface QRCodeData {
   qr_code_url: string;
   expires_at: string;
 }

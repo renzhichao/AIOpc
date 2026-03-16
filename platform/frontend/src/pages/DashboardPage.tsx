@@ -2,7 +2,6 @@
  * 仪表板页面 - 用户登录后的主页
  */
 
-import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 export default function DashboardPage() {

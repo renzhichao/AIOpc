@@ -53,7 +53,7 @@ describe('FeishuWebhookService', () => {
         content: 'Test response',
         msgType: 'text',
       }),
-    } as any;
+    } as unknown as jest.Mocked<MessageRouter>;
 
     // Register mock in container
     Container.set(MessageRouter, mockMessageRouter);
