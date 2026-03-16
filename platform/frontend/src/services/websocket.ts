@@ -59,7 +59,7 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
 
   let ws: WebSocket | null = null;
   let currentStatus: WebSocketStatus = 'disconnected';
-  let reconnectTimeout: NodeJS.Timeout | null = null;
+  let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
   let reconnectAttempts = 0;
   let messageQueue: string[] = [];
 

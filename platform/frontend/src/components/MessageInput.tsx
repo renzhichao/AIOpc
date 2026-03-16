@@ -5,7 +5,7 @@
  * This is a simplified version that will be enhanced in TASK-013.
  */
 
-import React, { useState, KeyboardEvent, ChangeEvent, FormEvent } from 'react';
+import { useState, type KeyboardEvent, type ChangeEvent, type FormEvent } from 'react';
 
 export interface MessageInputProps {
   onSend: (content: string) => void;

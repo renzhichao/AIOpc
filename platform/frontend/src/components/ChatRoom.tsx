@@ -11,19 +11,18 @@
  * the OpenClaw Assistant through real-time WebSocket communication.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useWebSocket } from '../hooks/useWebSocket';
 import { ConnectionStatus } from './ConnectionStatus';
 import { MessageList } from './MessageList';
 import { MessageInput } from './MessageInput';
-import type { WebSocketMessage, WebSocketStatus } from '../services/websocket';
+import type { WebSocketMessage } from '../services/websocket';
 
 export interface ChatRoomProps {
   className?: string;
-  wsUrl?: string;
 }
 
-export function ChatRoom({ className = '', wsUrl }: ChatRoomProps) {
+export function ChatRoom({ className = '' }: ChatRoomProps) {
   const [messages, setMessages] = useState<WebSocketMessage[]>([]);
   const webSocket = useWebSocket();
 
@@ -38,16 +37,12 @@ export function ChatRoom({ className = '', wsUrl }: ChatRoomProps) {
    * Initialize WebSocket connection on mount
    */
   useEffect(() => {
-    // Auto-connect on mount
-    webSocket.connect();
-
-    // Subscribe to messages
+    // Subscribe to messages (connection is auto-managed by useWebSocket)
     const unsubscribeMessage = webSocket.onMessage(handleMessage);
 
     // Cleanup on unmount
     return () => {
       unsubscribeMessage();
-      webSocket.disconnect();
     };
   }, [webSocket, handleMessage]);
 

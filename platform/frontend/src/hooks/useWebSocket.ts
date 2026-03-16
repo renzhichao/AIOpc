@@ -5,7 +5,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { createWebSocketService, WebSocketStatus, WebSocketMessage } from '../services/websocket';
+import { createWebSocketService, type WebSocketStatus, type WebSocketMessage } from '../services/websocket';
 
 export interface UseWebSocketReturn {
   status: WebSocketStatus;

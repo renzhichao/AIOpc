@@ -60,6 +60,7 @@ export const MessageList: React.FC<MessageListProps> = ({
     const isUserMessage = message.type === 'user_message';
     const isAssistantMessage = message.type === 'assistant_message';
     const isErrorMessage = message.type === 'error';
+    const isStatusMessage = message.type === 'status';
 
     const baseClasses = 'flex w-full mb-4';
     const alignmentClass = isUserMessage ? 'justify-end' : 'justify-start';
@@ -69,9 +70,36 @@ export const MessageList: React.FC<MessageListProps> = ({
       ? 'bg-green-500 text-white rounded-br-sm'
       : isAssistantMessage
       ? 'bg-white text-gray-800 rounded-bl-sm'
-      : 'bg-red-500 text-white';
+      : isErrorMessage
+      ? 'bg-red-500 text-white'
+      : 'bg-gray-200 text-gray-600';
 
     const metadataClasses = 'text-xs mt-1 opacity-70';
+
+    // Get content safely based on message type
+    const getContent = (): string => {
+      if (isUserMessage || isAssistantMessage) {
+        return message.content;
+      }
+      if (isErrorMessage) {
+        return message.error || '未知错误';
+      }
+      if (isStatusMessage) {
+        return message.message;
+      }
+      return '';
+    };
+
+    // Get timestamp safely
+    const getTimestamp = (): string | undefined => {
+      if (isUserMessage || isAssistantMessage || isErrorMessage) {
+        return message.timestamp;
+      }
+      return undefined;
+    };
+
+    const content = getContent();
+    const timestamp = getTimestamp();
 
     return (
       <div
@@ -82,18 +110,11 @@ export const MessageList: React.FC<MessageListProps> = ({
       >
         <div className="flex flex-col">
           <div className={`${bubbleBaseClasses} ${bubbleColorClasses}`}>
-            {isErrorMessage ? (
-              <div className="flex items-center gap-2">
-                <span>⚠️</span>
-                <span>{message.error || '未知错误'}</span>
-              </div>
-            ) : (
-              <p className="whitespace-pre-wrap break-words">{message.content}</p>
-            )}
+            <p className="whitespace-pre-wrap break-words">{content}</p>
           </div>
-          {!isErrorMessage && (
+          {timestamp !== undefined && (
             <div className={`${metadataClasses} ${isUserMessage ? 'text-right' : 'text-left'}`}>
-              {formatTimestamp(message.timestamp)}
+              {formatTimestamp(timestamp)}
             </div>
           )}
         </div>
