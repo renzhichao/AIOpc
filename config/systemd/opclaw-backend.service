@@ -1,0 +1,96 @@
+#==============================================================================
+# AIOpc Backend Service - Systemd Configuration
+#==============================================================================
+# Service: opclaw-backend
+# Description: AIOpc Cloud Platform Backend API
+#
+# Features:
+# - Auto-restart on failure
+# - Environment file support
+# - Logging configuration
+# - Resource limits
+# - User isolation
+#
+# Installation:
+#   1. Copy this file to /etc/systemd/system/opclaw-backend.service
+#   2. Run: systemctl daemon-reload
+#   3. Run: systemctl enable opclaw-backend
+#   4. Run: systemctl start opclaw-backend
+#
+# Management:
+#   Start:   systemctl start opclaw-backend
+#   Stop:    systemctl stop opclaw-backend
+#   Restart: systemctl restart opclaw-backend
+#   Status:  systemctl status opclaw-backend
+#   Logs:    journalctl -u opclaw-backend -f
+#==============================================================================
+
+[Unit]
+Description=AIOpc Cloud Platform Backend API
+Documentation=https://github.com/yourusername/AIOpc
+After=network.target postgresql.service redis-server.service nginx.service
+Wants=postgresql.service redis-server.service
+
+[Service]
+# User and group
+User=opclaw
+Group=opclaw
+
+# Working directory
+WorkingDirectory=/opt/opclaw/backend
+
+# Environment file
+EnvironmentFile=/etc/opclaw/.env
+
+# Node.js configuration
+Environment=NODE_ENV=production
+Environment=PORT=3000
+
+# ExecStart - Start the application via PM2
+ExecStart=/usr/bin/pm2 start /opt/opclaw/backend/ecosystem.config.js --no-daemon
+# Alternative: Start directly with Node.js (if not using PM2)
+# ExecStart=/usr/bin/node /opt/opclaw/backend/dist/app.js
+
+# ExecReload - Reload the application
+ExecReload=/usr/bin/pm2 reload opclaw-backend
+
+# ExecStop - Graceful shutdown via PM2
+ExecStop=/usr/bin/pm2 stop opclaw-backend
+
+# Kill mode
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# Auto-restart configuration
+Restart=always
+RestartSec=10
+StartLimitInterval=60
+StartLimitBurst=3
+
+# PID file (managed by PM2)
+PIDFile=/opt/opclaw/.pm2/pm2.pid
+
+# Logging (PM2 manages its own logs)
+StandardOutput=append:/var/log/opclaw/backend.log
+StandardError=append:/var/log/opclaw/backend-error.log
+SyslogIdentifier=opclaw-backend
+
+# PM2 process management
+Environment=PM2_HOME=/opt/opclaw/.pm2
+
+# Resource limits
+LimitNOFILE=65536
+LimitNPROC=4096
+MemoryMax=2G
+CPUQuota=200%
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/opclaw /var/log/opclaw /tmp
+
+[Install]
+WantedBy=multi-user.target

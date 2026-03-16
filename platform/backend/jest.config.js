@@ -36,5 +36,29 @@ module.exports = {
     'ts-jest': {
       isolatedModules: true
     }
-  }
+  },
+  // Performance test timeouts (TASK-054)
+  testTimeout: 30000, // Default 30s
+  projects: [
+    {
+      displayName: 'unit',
+      testMatch: ['<rootDir>/src/**/__tests__/**/*.test.ts'],
+      testTimeout: 10000, // 10s for unit tests
+    },
+    {
+      displayName: 'integration',
+      testMatch: ['<rootDir>/tests/integration/**/*.test.ts'],
+      testTimeout: 60000, // 60s for integration tests (Docker operations)
+    },
+    {
+      displayName: 'e2e',
+      testMatch: ['<rootDir>/tests/e2e/**/*.test.ts'],
+      testTimeout: 120000, // 120s for E2E tests
+    },
+    {
+      displayName: 'performance',
+      testMatch: ['<rootDir>/tests/performance/**/*.test.ts'],
+      testTimeout: 120000, // 120s for performance tests
+    }
+  ]
 };

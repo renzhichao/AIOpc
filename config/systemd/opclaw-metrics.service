@@ -1,0 +1,89 @@
+#==============================================================================
+# AIOpc Metrics Collection Service - Systemd Configuration
+#==============================================================================
+# Service: opclaw-metrics
+# Description: AIOpc Cloud Platform Metrics Collector
+#
+# Features:
+# - Periodic metrics collection
+# - Auto-restart on failure
+# - Environment file support
+# - Logging configuration
+#
+# Installation:
+#   1. Copy this file to /etc/systemd/system/opclaw-metrics.service
+#   2. Run: systemctl daemon-reload
+#   3. Run: systemctl enable opclaw-metrics
+#   4. Run: systemctl start opclaw-metrics
+#
+# Management:
+#   Start:   systemctl start opclaw-metrics
+#   Stop:    systemctl stop opclaw-metrics
+#   Restart: systemctl restart opclaw-metrics
+#   Status:  systemctl status opclaw-metrics
+#   Logs:    journalctl -u opclaw-metrics -f
+#==============================================================================
+
+[Unit]
+Description=AIOpc Cloud Platform Metrics Collector
+Documentation=https://github.com/yourusername/AIOpc
+After=network.target opclaw-backend.service
+Requires=opclaw-backend.service
+
+[Service]
+# User and group
+User=opclaw
+Group=opclaw
+
+# Working directory
+WorkingDirectory=/opt/opclaw/backend
+
+# Environment file
+EnvironmentFile=/etc/opclaw/.env
+
+# Node.js configuration
+Environment=NODE_ENV=production
+
+# ExecStart - Start the metrics collector
+ExecStart=/usr/bin/node /opt/opclaw/backend/dist/metrics/collector.js
+
+# ExecReload - Reload the collector
+ExecReload=/bin/kill -HUP $MAINPID
+
+# ExecStop - Graceful shutdown
+ExecStop=/bin/kill -SIGTERM $MAINPID
+
+# Kill mode
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=10
+
+# Auto-restart configuration
+Restart=on-failure
+RestartSec=30
+StartLimitInterval=300
+StartLimitBurst=5
+
+# PID file
+PIDFile=/var/run/opclaw-metrics.pid
+
+# Logging
+StandardOutput=append:/var/log/opclaw/metrics.log
+StandardError=append:/var/log/opclaw/metrics-error.log
+SyslogIdentifier=opclaw-metrics
+
+# Resource limits
+LimitNOFILE=4096
+LimitNPROC=2048
+MemoryMax=512M
+CPUQuota=50%
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/opclaw /var/log/opclaw /tmp
+
+[Install]
+WantedBy=multi-user.target
