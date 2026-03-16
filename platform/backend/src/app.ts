@@ -53,6 +53,7 @@ import { MetricsCollectionService } from './services/MetricsCollectionService';
 import { WebSocketGateway } from './services/WebSocketGateway';
 import { InstanceRegistry } from './services/InstanceRegistry';
 import { RemoteHeartbeatMonitorService } from './services/RemoteHeartbeatMonitor';
+import { RemoteInstanceWebSocketGateway } from './services/RemoteInstanceWebSocketGateway';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { sanitizeInput, preventSQLInjection } from './middleware/validate';
 import {
@@ -97,6 +98,9 @@ class Application {
 
     // Initialize WebSocket Gateway (TASK-006)
     await this.initializeWebSocketGateway();
+
+    // Initialize Remote Instance WebSocket Gateway
+    await this.initializeRemoteInstanceWebSocketGateway();
 
     // Initialize Instance Registry (TASK-007)
     this.initializeInstanceRegistry();
@@ -293,6 +297,34 @@ class Application {
         logger.warn('WebSocket Gateway failed to start, continuing without it');
       } else {
         logger.warn('WebSocket Gateway failed to start in development mode');
+      }
+    }
+  }
+
+  /**
+   * Initialize Remote Instance WebSocket Gateway
+   * Starts the WebSocket server on port 3002 for remote instance communication
+   */
+  private async initializeRemoteInstanceWebSocketGateway() {
+    try {
+      const remoteWsGateway = Container.get(RemoteInstanceWebSocketGateway);
+
+      // Check if remote WebSocket is enabled
+      const remoteWsEnabled = process.env.REMOTE_WS_ENABLED !== 'false';
+
+      if (remoteWsEnabled) {
+        await remoteWsGateway.start();
+        logger.info('Remote Instance WebSocket Gateway initialized successfully');
+      } else {
+        logger.info('Remote Instance WebSocket Gateway disabled');
+      }
+    } catch (error) {
+      logger.error('Failed to initialize Remote Instance WebSocket Gateway', error);
+      // Don't fail the entire application if WebSocket fails to start
+      if (process.env.NODE_ENV === 'production') {
+        logger.warn('Remote Instance WebSocket Gateway failed to start, continuing without it');
+      } else {
+        logger.warn('Remote Instance WebSocket Gateway failed to start in development mode');
       }
     }
   }

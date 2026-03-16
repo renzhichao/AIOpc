@@ -423,9 +423,9 @@ export class RemoteInstanceService {
   }
 
   /**
-   * Validate instance API key
+   * Validate instance API key (public method for WebSocket gateway)
    */
-  private async validateInstanceApiKey(
+  async validateInstanceApiKey(
     instanceId: string,
     platformApiKey: string
   ): Promise<Instance> {
@@ -456,6 +456,16 @@ export class RemoteInstanceService {
     }
 
     return instance;
+  }
+
+  /**
+   * Validate instance API key (private method for internal use)
+   */
+  private async validateInstanceApiKeyInternal(
+    instanceId: string,
+    platformApiKey: string
+  ): Promise<Instance> {
+    return this.validateInstanceApiKey(instanceId, platformApiKey);
   }
 
   /**
