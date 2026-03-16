@@ -124,6 +124,31 @@ export class DatabaseHelper {
   }
 
   /**
+   * Create a test QR code
+   */
+  static async createTestQRCode(
+    instanceId: string,
+    overrides?: Partial<QRCode>
+  ): Promise<QRCode> {
+    const qrCodeRepository = AppDataSource.getRepository(QRCode);
+
+    const qrCode = qrCodeRepository.create({
+      instance_id: instanceId,
+      token: `test-token-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      state: `test-state-${Date.now()}`,
+      expires_at: new Date(Date.now() + 24 * 3600 * 1000), // 24 hours
+      scan_count: 0,
+      claimed_at: null,
+      ...overrides,
+    });
+
+    await qrCodeRepository.save(qrCode);
+    console.log(`✓ Created test QR code: ${qrCode.token}`);
+
+    return qrCode;
+  }
+
+  /**
    * Create a test API key
    */
   static async createTestApiKey(

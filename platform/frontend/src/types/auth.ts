@@ -43,3 +43,29 @@ export interface ApiError {
   message: string;
   details?: unknown;
 }
+
+/**
+ * QR Code API Types
+ */
+
+export interface ClaimQRCode {
+  id: string;
+  token: string;
+  expires_at: string;
+  image_url: string;
+  scan_url: string;
+}
+
+export interface ClaimQRCodeResponse {
+  success: boolean;
+  already_has_instance: boolean;
+  qr_code?: ClaimQRCode;
+  instance?: InstanceInfo;
+  redirect_to?: string;
+}
+
+export interface InstanceInfo {
+  instance_id: string;
+  status?: string;
+  [key: string]: unknown;
+}

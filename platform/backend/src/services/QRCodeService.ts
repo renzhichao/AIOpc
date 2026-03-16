@@ -215,4 +215,259 @@ export class QRCodeService {
       return 0;
     }
   }
+
+  /**
+   * Generate claim QR code for a user
+   * TASK-003: Creates a QR code that allows claiming an unassigned instance
+   *
+   * @param userId - The user ID requesting the QR code
+   * @returns QR code data with token and expiration
+   */
+  async generateClaimQRCode(userId: number): Promise<{
+    id: string;
+    token: string;
+    expires_at: Date;
+    type: string;
+    scan_url: string;
+  }> {
+    try {
+      // Generate token
+      const token = this.generateToken();
+      const signature = this.generateSignature(token);
+
+      // Create scan URL for frontend
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const scanUrl = `${frontendUrl}/claim/${token}`;
+
+      // Set expiration (5 minutes)
+      const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
+
+      // Save to database
+      // For claim QR codes, use a placeholder instance_id (will be updated when claimed)
+      const placeholderInstanceId = `claim_${userId}_${Date.now()}`;
+      const qrCode = await this.qrCodeRepository.create({
+        instance_id: placeholderInstanceId, // Temporary placeholder
+        token: token,
+        state: `${userId}:${token}:${signature}`,
+        expires_at: expiresAt,
+        scan_count: 0,
+        claimed_at: null,
+      });
+
+      logger.info(`Generated claim QR code for user: ${userId}`, {
+        qrCodeId: qrCode.id.toString(),
+        userId,
+      });
+
+      return {
+        id: qrCode.id.toString(), // Convert number ID to string
+        token: qrCode.token,
+        expires_at: expiresAt,
+        type: 'claim',
+        scan_url: scanUrl,
+      };
+    } catch (error) {
+      logger.error('Failed to generate claim QR code', error);
+      throw new AppError(
+        ErrorCodes.INTERNAL_ERROR.statusCode,
+        ErrorCodes.INTERNAL_ERROR.code,
+        'Failed to generate claim QR code'
+      );
+    }
+  }
+
+  /**
+   * Verify QR code and claim an instance for the user
+   * TASK-003: Verifies token and assigns an available instance to the user
+   *
+   * @param instanceId - The instance ID to claim
+   * @param token - The QR code token
+   * @returns Claimed instance data
+   */
+  async verifyAndClaim(
+    instanceId: string,
+    token: string
+  ): Promise<{
+    instance_id: string;
+    status: string;
+    owner_id: number;
+  }> {
+    try {
+      // Validate token
+      const isValid = await this.validateQRToken(token);
+      if (!isValid) {
+        throw new AppError(
+          ErrorCodes.VALIDATION_ERROR.statusCode,
+          ErrorCodes.VALIDATION_ERROR.code,
+          'Invalid or expired QR code token'
+        );
+      }
+
+      // Get QR code record to extract user ID
+      const qrRecord = await this.qrCodeRepository.findByToken(token);
+      if (!qrRecord) {
+        throw new AppError(
+          ErrorCodes.NOT_FOUND.statusCode,
+          ErrorCodes.NOT_FOUND.code,
+          'QR code not found'
+        );
+      }
+
+      // Extract user ID from state
+      const stateParts = qrRecord.state.split(':');
+      if (stateParts.length !== 3) {
+        throw new AppError(
+          ErrorCodes.VALIDATION_ERROR.statusCode,
+          ErrorCodes.VALIDATION_ERROR.code,
+          'Invalid QR code state format'
+        );
+      }
+
+      const userId = parseInt(stateParts[0], 10);
+      if (isNaN(userId)) {
+        throw new AppError(
+          ErrorCodes.VALIDATION_ERROR.statusCode,
+          ErrorCodes.VALIDATION_ERROR.code,
+          'Invalid user ID in QR code'
+        );
+      }
+
+      // Import InstanceRepository dynamically to avoid circular dependency
+      const { InstanceRepository } = await import('../repositories/InstanceRepository');
+      const instanceRepo = new InstanceRepository();
+
+      // Claim the instance
+      await instanceRepo.claimInstance(instanceId, userId);
+
+      // Mark QR code as claimed
+      await this.qrCodeRepository.markAsClaimed(token);
+
+      // Get the claimed instance
+      const instance = await instanceRepo.findByInstanceId(instanceId);
+      if (!instance) {
+        throw new AppError(
+          ErrorCodes.NOT_FOUND.statusCode,
+          ErrorCodes.NOT_FOUND.code,
+          'Instance not found after claiming'
+        );
+      }
+
+      logger.info(`Instance claimed successfully`, {
+        instanceId,
+        userId,
+        qrCodeId: qrRecord.id,
+      });
+
+      return {
+        instance_id: instance.instance_id,
+        status: instance.status,
+        owner_id: instance.owner_id || userId,
+      };
+    } catch (error) {
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      logger.error('Failed to verify and claim instance', {
+        instanceId,
+        token: token.substring(0, 10) + '...',
+        error: error instanceof Error ? error.message : String(error),
+      });
+
+      throw new AppError(
+        ErrorCodes.INTERNAL_ERROR.statusCode,
+        ErrorCodes.INTERNAL_ERROR.code,
+        'Failed to claim instance'
+      );
+    }
+  }
+
+  /**
+   * Get user's existing instance
+   * TASK-003: Checks if user already has an instance assigned
+   *
+   * @param userId - The user ID to check
+   * @returns User's instance or null if none exists
+   */
+  async getUserInstance(userId: number): Promise<{
+    instance_id: string;
+    name: string;
+    status: string;
+  } | null> {
+    try {
+      // Import InstanceRepository dynamically to avoid circular dependency
+      const { InstanceRepository } = await import('../repositories/InstanceRepository');
+      const instanceRepo = new InstanceRepository();
+
+      const instances = await instanceRepo.findByOwnerId(userId);
+
+      if (instances.length === 0) {
+        return null;
+      }
+
+      // Return the first (most recent) instance
+      const instance = instances[0];
+
+      return {
+        instance_id: instance.instance_id,
+        name: instance.name,
+        status: instance.status,
+      };
+    } catch (error) {
+      logger.error('Failed to get user instance', {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Find QR code by ID
+   * TASK-003: Retrieves QR code record for image generation
+   *
+   * @param id - The QR code ID (string representation of numeric ID)
+   * @returns QR code record or null
+   */
+  async findById(id: string): Promise<{
+    id: string;
+    token: string;
+    scan_url: string;
+    expires_at: Date;
+  } | null> {
+    try {
+      // The QRCode.id is a number, but we receive it as string
+      // Try to find by token first (since that's what we're passing as ID in the controller)
+      let qrCode = await this.qrCodeRepository.findByToken(id);
+
+      // If not found by token, try by numeric ID
+      if (!qrCode) {
+        const numericId = parseInt(id, 10);
+        if (!isNaN(numericId)) {
+          qrCode = await this.qrCodeRepository.findById(numericId) as any;
+        }
+      }
+
+      if (!qrCode) {
+        return null;
+      }
+
+      // Generate scan URL from token
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+      const scanUrl = `${frontendUrl}/claim/${qrCode.token}`;
+
+      return {
+        id: qrCode.id.toString(), // Convert number ID to string
+        token: qrCode.token,
+        scan_url: scanUrl,
+        expires_at: qrCode.expires_at,
+      };
+    } catch (error) {
+      logger.error('Failed to find QR code by ID', {
+        id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
 }

@@ -26,7 +26,7 @@ const synchronize = isDevelopment ? dbSyncEnabled : false;
 const logging = isDevelopment
   ? true
   : isProduction
-    ? ['error'] as const
+    ? (['error'] as any)
     : false;
 
 // Production-optimized connection pooling

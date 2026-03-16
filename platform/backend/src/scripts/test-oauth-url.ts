@@ -6,6 +6,7 @@
 
 import { OAuthService } from '../services/OAuthService';
 import { UserRepository } from '../repositories/UserRepository';
+import { InstanceRepository } from '../repositories/InstanceRepository';
 
 // Mock UserRepository for this test
 const mockUserRepository = {
@@ -17,6 +18,12 @@ const mockUserRepository = {
   updateLastLogin: async () => {}
 } as any;
 
+// Mock InstanceRepository for this test
+const mockInstanceRepository = {
+  findUnclaimed: async () => null,
+  claimInstance: async () => {}
+} as any;
+
 // Load environment variables from .env.development
 import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.development' });
@@ -25,7 +32,7 @@ async function testOAuthUrlGeneration() {
   console.log('=== OAuth URL Generation Manual Test ===\n');
 
   // Create OAuthService instance
-  const oauthService = new OAuthService(mockUserRepository);
+  const oauthService = new OAuthService(mockUserRepository, mockInstanceRepository);
 
   // Test 1: Check environment variables
   console.log('Test 1: Environment Variables Check');

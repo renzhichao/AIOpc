@@ -1,5 +1,5 @@
 import { Service } from 'typedi';
-import { Repository } from 'typeorm';
+import { Repository, IsNull } from 'typeorm';
 import { Instance } from '../entities/Instance.entity';
 import { BaseRepository } from './BaseRepository';
 import { AppDataSource } from '../config/database';
@@ -114,6 +114,21 @@ export class InstanceRepository extends BaseRepository<Instance> {
         claimed_at: new Date()
       } as any
     );
+  }
+
+  /**
+   * 查找未认领的实例
+   * 返回最老的未认领实例（按创建时间升序）
+   */
+  async findUnclaimed(): Promise<Instance | null> {
+    const result = await this.repository.findOne({
+      where: {
+        owner_id: IsNull(),
+        status: 'pending'
+      },
+      order: { created_at: 'ASC' }
+    });
+    return result || null;
   }
 
   /**

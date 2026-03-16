@@ -2,7 +2,7 @@
  * 认证服务 - 处理与后端 API 的交互
  */
 
-import type { LoginResponse, ApiError } from '../types/auth';
+import type { LoginResponse, ApiError, ClaimQRCodeResponse } from '../types/auth';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
@@ -93,6 +93,26 @@ export class AuthService {
 
     if (!response.ok) {
       throw new Error('获取用户信息失败');
+    }
+
+    return response.json();
+  }
+
+  /**
+   * 获取实例认领二维码
+   */
+  async getClaimQRCode(token: string): Promise<ClaimQRCodeResponse> {
+    const response = await fetch(`${this.baseUrl}/qrcode/claim`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      const error: ApiError = await response.json();
+      throw new Error(error.message || '获取认领二维码失败');
     }
 
     return response.json();
