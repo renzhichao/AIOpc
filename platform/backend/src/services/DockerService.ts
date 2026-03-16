@@ -33,7 +33,7 @@ import {
 @Service()
 export class DockerService {
   private docker: Docker;
-  private readonly DEFAULT_IMAGE = 'openclaw:latest';
+  private readonly DEFAULT_IMAGE = 'openclaw/agent:latest';
   private readonly DEFAULT_NETWORK_PREFIX = 'opclaw-network';
   private readonly DEFAULT_VOLUME_PREFIX = 'opclaw-data';
   private readonly DEFAULT_CONTAINER_PREFIX = 'opclaw';
@@ -121,7 +121,7 @@ export class DockerService {
         Env: envArray,
         HostConfig: {
           Memory: containerConfig.resources.memoryLimit,
-          NanoCpus: containerConfig.resources.cpuQuota,
+          CpuQuota: containerConfig.resources.cpuQuota,
           CpuPeriod: containerConfig.resources.cpuPeriod,
           CpuShares: containerConfig.resources.cpuShares,
           Binds: containerConfig.volumes?.map(
@@ -645,11 +645,42 @@ export class DockerService {
       }
 
       logger.info(`Creating network ${networkName}...`);
-      await this.docker.createNetwork({
+
+      // Detect test networks more comprehensively
+      const isTestNetwork =
+        networkName.includes('test') ||
+        networkName.includes('integration') ||
+        networkName.includes('preset') ||
+        networkName.match(/test-\d+/);
+
+      const networkConfig: any = {
         Name: networkName,
         Driver: 'bridge',
         Internal: false,
-      });
+      };
+
+      // For test networks, let Docker auto-assign subnets to avoid conflicts
+      // For production networks, use a specific subnet
+      if (!isTestNetwork) {
+        networkConfig.IPAM = {
+          Driver: 'default',
+          Config: [
+            {
+              Subnet: '172.28.0.0/16',
+              IPRange: '172.28.0.0/24',
+              Gateway: '172.28.0.1',
+            },
+          ],
+        };
+      } else {
+        // For test networks, explicitly use default IPAM driver without subnet
+        // This lets Docker assign from its pool, avoiding conflicts
+        networkConfig.IPAM = {
+          Driver: 'default',
+        };
+      }
+
+      await this.docker.createNetwork(networkConfig);
 
       logger.info(`Network ${networkName} created`);
     } catch (error) {

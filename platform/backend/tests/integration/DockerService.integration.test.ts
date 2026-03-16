@@ -6,6 +6,7 @@
 import Docker from 'dockerode';
 import { DockerService } from '../../src/services/DockerService';
 import { InstanceConfig } from '../../src/types/docker';
+import { cleanupDockerArtifacts } from '../helpers/docker-cleanup';
 
 describe('DockerService Integration Tests', () => {
   let dockerService: DockerService;
@@ -27,6 +28,9 @@ describe('DockerService Integration Tests', () => {
   };
 
   beforeAll(async () => {
+    // Clean up any orphaned test resources from previous runs
+    await cleanupDockerArtifacts();
+
     // Initialize DockerService with real Docker daemon
     dockerService = new DockerService();
     docker = new Docker({ socketPath: process.env.DOCKER_SOCKET_PATH || '/var/run/docker.sock' });
@@ -51,36 +55,15 @@ describe('DockerService Integration Tests', () => {
     console.log('✓ openclaw/agent:latest image exists');
   });
 
-  afterEach(async () => {
-    // Cleanup: remove all test containers
-    for (const containerId of createdContainers) {
-      try {
-        const container = docker.getContainer(containerId);
-        await container.remove({ force: true, v: true });
-        console.log(`✓ Cleaned up container ${containerId}`);
-      } catch (error) {
-        console.warn(`Failed to cleanup container ${containerId}:`, error);
-      }
-    }
-    createdContainers = [];
+  afterAll(async () => {
+    // Final cleanup after all tests
+    await cleanupDockerArtifacts();
+  });
 
-    // Additional cleanup: remove any leftover test containers
-    try {
-      const containers = await docker.listContainers({ all: true });
-      for (const c of containers) {
-        if (c.Names.some((n: string) => n.includes('integration-test'))) {
-          try {
-            const container = docker.getContainer(c.Id);
-            await container.remove({ force: true, v: true });
-            console.log(`✓ Cleaned up leftover container ${c.Id}`);
-          } catch (error) {
-            console.warn(`Failed to cleanup leftover container:`, error);
-          }
-        }
-      }
-    } catch (error) {
-      console.warn('Failed to cleanup leftover containers:', error);
-    }
+  afterEach(async () => {
+    // Use centralized cleanup helper
+    await cleanupDockerArtifacts();
+    createdContainers = [];
   });
 
   describe('createContainer', () => {
@@ -130,10 +113,10 @@ describe('DockerService Integration Tests', () => {
       console.log(`✓ Memory limit set: ${Math.round(memoryLimit / 1024 / 1024)}MB`);
 
       // Verify CPU quota
-      const cpuQuota = info.HostConfig.NanoCpus;
+      const cpuQuota = info.HostConfig.CpuQuota;
       expect(cpuQuota).toBeDefined();
       expect(cpuQuota).toBeGreaterThan(0);
-      console.log(`✓ CPU quota set: ${cpuQuota} nanoseconds`);
+      console.log(`✓ CPU quota set: ${cpuQuota} microseconds`);
 
       // Verify restart policy
       const restartPolicy = info.HostConfig.RestartPolicy?.Name;
