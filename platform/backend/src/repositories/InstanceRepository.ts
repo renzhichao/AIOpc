@@ -175,13 +175,16 @@ export class InstanceRepository extends BaseRepository<Instance> {
   }
 
   /**
-   * 查找第一个未认领的实例（TASK-009: Auto-claim）
-   * 返回第一个 owner_id IS NULL 且 status != 'terminated' 的实例
+   * 查找第一个未认领的在线实例（TASK-009: Auto-claim）
+   * 返回第一个 owner_id IS NULL 且 status = 'active' 的实例
+   *
+   * 修改原因：自动认领离线实例会导致用户无法使用（WebSocket连接失败）
    */
   async findFirstUnclaimedInstance(): Promise<Instance | null> {
     const result = await this.repository.findOne({
       where: {
-        owner_id: IsNull()
+        owner_id: IsNull(),
+        status: 'active'  // 只认领在线的实例
       },
       order: { created_at: 'ASC' }
     });
