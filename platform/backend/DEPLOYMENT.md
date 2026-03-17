@@ -2,25 +2,158 @@
 
 This guide provides comprehensive instructions for deploying the AIOpc Platform Backend to production environment.
 
-> **Last Updated**: 2026-03-16
-> **Version**: 1.0.0
+> **Last Updated**: 2026-03-17
+> **Version**: 1.1.0
 > **Environment**: Production
+
+---
+
+## Quick Reference - Server Access & Deployment
+
+### Production Servers
+
+#### Platform Server (118.25.0.190)
+```bash
+# SSH Access
+ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190
+
+# Project Location
+cd /opt/opclaw/platform
+
+# Docker Network
+opclaw_opclaw-network  # ⚠️ Use this exact network name
+
+# Container Status
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+```
+
+#### Remote Agent Server (101.34.254.52)
+```bash
+# SSH Access
+ssh -i ~/.ssh/aiopclaw_remote_agent root@101.34.254.52
+
+# Agent Location
+/opt/openclaw-agent/
+
+# Systemd Service
+systemctl status openclaw-agent
+systemctl restart openclaw-agent
+journalctl -u openclaw-agent -f
+```
+
+### Critical Docker Network Configuration
+
+**IMPORTANT**: The backend container MUST use `opclaw_opclaw-network` to connect to postgres and redis.
+
+```bash
+# ✅ CORRECT - Backend in same network as postgres/redis
+docker run -d \
+  --name opclaw-backend \
+  --network opclaw_opclaw-network \
+  -p 3000:3000 -p 3001:3001 -p 3002:3002 \
+  --env-file /opt/opclaw/platform/.env.production \
+  platform-backend
+
+# ❌ WRONG - Using different network causes connection failures
+docker run -d \
+  --name opclaw-backend \
+  --network platform_opclaw-network  # Empty network!
+  ...
+```
+
+### Network Verification
+
+Always verify network connectivity after container restart:
+
+```bash
+# Check which network postgres is in
+docker network inspect opclaw_opclaw-network --format '{{range .Containers}}{{.Name}}{{end}}'
+
+# Verify backend can reach postgres
+docker exec opclaw-backend ping -c 1 postgres
+
+# Check database connection
+docker logs opclaw-backend --tail 50 | grep -E "Database|postgres|connected"
+
+# Test health endpoint
+curl http://localhost:3000/health
+```
+
+### Quick Backend Recovery Script
+
+```bash
+#!/bin/bash
+# Quick backend container restart with verification
+
+echo "Step 1: Checking network..."
+NETWORK_NAME="opclaw_opclaw-network"
+if ! docker network inspect "$NETWORK_NAME" &>/dev/null; then
+    echo "❌ ERROR: Network $NETWORK_NAME not found"
+    exit 1
+fi
+
+echo "Step 2: Checking postgres in network..."
+if ! docker network inspect "$NETWORK_NAME" --format '{{range .Containers}}{{.Name}}{{end}}' | grep -q "opclaw-postgres"; then
+    echo "❌ ERROR: postgres not found in network $NETWORK_NAME"
+    exit 1
+fi
+
+echo "Step 3: Stopping old backend..."
+docker stop opclaw-backend 2>/dev/null || true
+docker rm opclaw-backend 2>/dev/null || true
+
+echo "Step 4: Starting new backend..."
+docker run -d \
+  --name opclaw-backend \
+  --network "$NETWORK_NAME" \
+  --restart unless-stopped \
+  -p 3000:3000 \
+  -p 3001:3001 \
+  -p 3002:3002 \
+  -v /var/run/docker.sock:/var/run/docker.sock:rw \
+  -v /opt/opclaw/platform/logs/backend:/app/logs \
+  --env-file /opt/opclaw/platform/.env.production \
+  platform-backend
+
+echo "Step 5: Waiting for startup..."
+sleep 10
+
+echo "Step 6: Verifying connectivity..."
+if docker exec opclaw-backend ping -c 1 postgres &>/dev/null; then
+    echo "✅ Postgres connectivity: OK"
+else
+    echo "❌ Postgres connectivity: FAILED"
+    docker logs opclaw-backend --tail 30
+    exit 1
+fi
+
+if curl -s http://localhost:3000/health > /dev/null; then
+    echo "✅ Health check: OK"
+else
+    echo "❌ Health check: FAILED"
+    exit 1
+fi
+
+echo "✅ Backend restarted successfully"
+```
 
 ---
 
 ## Table of Contents
 
-1. [Prerequisites](#prerequisites)
-2. [Environment Setup](#environment-setup)
-3. [Database Migration](#database-migration)
-4. [Build and Deploy](#build-and-deploy)
-5. [Nginx Configuration](#nginx-configuration)
-6. [SSL/TLS Setup](#ssltls-setup)
-7. [Health Checks](#health-checks)
-8. [Monitoring Setup](#monitoring-setup)
-9. [Backup Strategy](#backup-strategy)
-10. [Rollback Procedure](#rollback-procedure)
-11. [Troubleshooting](#troubleshooting)
+1. [Quick Reference - Server Access & Deployment](#quick-reference---server-access--deployment)
+2. [Prerequisites](#prerequisites)
+3. [Environment Setup](#environment-setup)
+4. [Database Migration](#database-migration)
+5. [Build and Deploy](#build-and-deploy)
+6. [Nginx Configuration](#nginx-configuration)
+7. [SSL/TLS Setup](#ssltls-setup)
+8. [Health Checks](#health-checks)
+9. [Monitoring Setup](#monitoring-setup)
+10. [Backup Strategy](#backup-strategy)
+11. [Rollback Procedure](#rollback-procedure)
+12. [Troubleshooting](#troubleshooting)
+13. [Network Configuration Guide](#network-configuration-guide)
 
 ---
 
