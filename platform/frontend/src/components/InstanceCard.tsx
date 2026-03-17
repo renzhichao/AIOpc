@@ -75,23 +75,54 @@ export default function InstanceCard({
   return (
     <div
       className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200 overflow-hidden cursor-pointer"
-      onClick={() => onClick(instance.id)}
+      onClick={() => onClick(String(instance.id))}
       data-testid="instance-card"
     >
       {/* 头部 */}
       <div className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1 min-w-0">
-            <h3 className="text-xl font-semibold text-gray-900 mb-1 truncate" data-testid="instance-name">
-              {instance.config.name || `实例 ${instance.id.slice(0, 8)}`}
-            </h3>
+            <div className="flex items-center gap-2 mb-2">
+              <h3 className="text-xl font-semibold text-gray-900 truncate" data-testid="instance-name">
+                {instance.config.name || `实例 ${String(instance.id).slice(0, 8)}`}
+              </h3>
+              {/* 部署类型徽章 */}
+              <span
+                className={`px-2 py-1 rounded text-xs font-medium ${
+                  instance.deployment_type === 'local'
+                    ? 'bg-blue-100 text-blue-800'
+                    : 'bg-purple-100 text-purple-800'
+                }`}
+                data-testid="deployment-type"
+              >
+                {instance.deployment_type === 'local' ? '本地' : '远程'}
+              </span>
+            </div>
             {instance.config.description && (
               <p className="text-sm text-gray-600 line-clamp-2">
                 {instance.config.description}
               </p>
             )}
           </div>
-          <StatusBadge status={instance.status} size="sm" />
+          <div className="flex items-center gap-2">
+            {/* 健康状态指示器 */}
+            {instance.health_status && (
+              <div
+                className={`px-2 py-1 rounded text-xs font-medium ${
+                  instance.health_status === 'healthy'
+                    ? 'bg-green-100 text-green-800'
+                    : instance.health_status === 'warning'
+                    ? 'bg-yellow-100 text-yellow-800'
+                    : 'bg-red-100 text-red-800'
+                }`}
+                data-testid="health-status"
+              >
+                {instance.health_status === 'healthy' ? '🟢' : instance.health_status === 'warning' ? '🟡' : '🔴'}{' '}
+                {instance.health_status === 'healthy' ? '健康' : instance.health_status === 'warning' ? '警告' : '不健康'}
+              </div>
+            )}
+            <StatusBadge status={instance.status} size="sm" />
+          </div>
         </div>
 
         {/* 元信息 */}
@@ -105,6 +136,28 @@ export default function InstanceCard({
             {formatDate(instance.created_at)}
           </span>
         </div>
+
+        {/* 远程实例信息 */}
+        {instance.deployment_type === 'remote' && (
+          <div className="mb-4 text-sm text-gray-600 space-y-1">
+            <div>
+              <span className="font-medium">远程地址: </span>
+              <span>{instance.remote_host}:{instance.remote_port}</span>
+            </div>
+            {instance.last_heartbeat_at && (
+              <div>
+                <span className="font-medium">最后心跳: </span>
+                <span>{formatDate(instance.last_heartbeat_at)}</span>
+              </div>
+            )}
+            {instance.remote_version && (
+              <div>
+                <span className="font-medium">版本: </span>
+                <span>{instance.remote_version}</span>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 资源使用率预览 */}
         {(cpuUsage !== undefined || memoryUsage !== undefined) && (
@@ -147,7 +200,7 @@ export default function InstanceCard({
         >
           {canStart && (
             <button
-              onClick={() => onStart(instance.id)}
+              onClick={() => onStart(String(instance.id))}
               disabled={loading}
               className="flex-1 py-2 px-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 text-sm font-medium"
               data-testid="start-button"
@@ -157,7 +210,7 @@ export default function InstanceCard({
           )}
           {canStop && (
             <button
-              onClick={() => onStop(instance.id)}
+              onClick={() => onStop(String(instance.id))}
               disabled={loading}
               className="flex-1 py-2 px-4 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 text-sm font-medium"
               data-testid="stop-button"
@@ -167,7 +220,7 @@ export default function InstanceCard({
           )}
           {canRestart && (
             <button
-              onClick={() => onRestart(instance.id)}
+              onClick={() => onRestart(String(instance.id))}
               disabled={loading}
               className="flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 text-sm font-medium"
               data-testid="restart-button"
@@ -177,8 +230,8 @@ export default function InstanceCard({
           )}
           <button
             onClick={() => {
-              if (confirm(`确定要删除实例 "${instance.config.name || instance.id.slice(0, 8)}" 吗？`)) {
-                onDelete(instance.id);
+              if (confirm(`确定要删除实例 "${instance.config.name || String(instance.id).slice(0, 8)}" 吗？`)) {
+                onDelete(String(instance.id));
               }
             }}
             disabled={loading}
