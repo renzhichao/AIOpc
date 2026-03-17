@@ -6,9 +6,9 @@ export class QRCode {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ name: 'instance_id', unique: true })
+  @Column({ name: 'instance_id', unique: true, type: 'integer' })
   @Index()
-  instance_id: string;
+  instance_id: number;
 
   @Column({ unique: true })
   @Index()

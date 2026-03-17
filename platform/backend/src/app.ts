@@ -48,6 +48,7 @@ import { FeishuWebhookController } from './controllers/FeishuWebhookController';
 import { MetricsController } from './controllers/MetricsController';
 import { ChatController } from './controllers/ChatController';
 import { RemoteInstanceController } from './controllers/RemoteInstanceController';
+import { QRCodeController } from './controllers/QRCodeController';
 import { ScheduledHealthCheckService } from './services/ScheduledHealthCheckService';
 import { MetricsCollectionService } from './services/MetricsCollectionService';
 import { WebSocketGateway } from './services/WebSocketGateway';
@@ -203,13 +204,14 @@ class Application {
         MetricsController,
         ChatController,
         RemoteInstanceController,
+        QRCodeController,
       ],
       middlewares: [],
       defaultErrorHandler: true, // Enable routing-controllers default error handling
       validation: true,
     });
 
-    logger.info('All controllers initialized (OAuth, Instance, User, Monitoring, ApiKey, HealthCheck, FeishuWebhook, Metrics, Chat, RemoteInstance)');
+    logger.info('All controllers initialized (OAuth, Instance, User, Monitoring, ApiKey, HealthCheck, FeishuWebhook, Metrics, Chat, RemoteInstance, QRCode)');
     logger.info('Routing-controllers routes registered successfully');
   }
 

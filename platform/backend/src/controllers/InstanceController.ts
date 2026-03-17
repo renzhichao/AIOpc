@@ -550,8 +550,8 @@ export class InstanceController {
         );
       }
 
-      // Generate or retrieve QR code
-      const qrData = await this.qrCodeService.generateQRCode(id);
+      // Generate or retrieve QR code (use instance.id which is the database primary key)
+      const qrData = await this.qrCodeService.generateQRCode(instance.id);
 
       return {
         success: true,

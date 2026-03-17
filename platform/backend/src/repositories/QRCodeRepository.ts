@@ -23,7 +23,7 @@ export class QRCodeRepository extends BaseRepository<QRCode> {
   /**
    * Find QR code by instance ID
    */
-  async findByInstanceId(instanceId: string): Promise<QRCode | null> {
+  async findByInstanceId(instanceId: number): Promise<QRCode | null> {
     const result = await this.repository.findOne({
       where: { instance_id: instanceId }
     });
@@ -69,7 +69,7 @@ export class QRCodeRepository extends BaseRepository<QRCode> {
   /**
    * Delete QR code by instance ID
    */
-  async deleteByInstanceId(instanceId: string): Promise<void> {
+  async deleteByInstanceId(instanceId: number): Promise<void> {
     await this.repository.delete({ instance_id: instanceId });
   }
 }
