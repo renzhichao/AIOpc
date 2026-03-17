@@ -11,6 +11,8 @@ import type {
   InstanceActionResponse,
   InstanceUsageStats,
   InstanceHealth,
+  UnclaimedInstance,
+  InstanceStats,
 } from '../types/instance';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
@@ -262,6 +264,94 @@ export class InstanceService {
 
     const result = await response.json();
     return result.data.config;
+  }
+
+  /**
+   * 获取未认领的远程实例
+   * GET /api/instances/unclaimed
+   */
+  async getUnclaimedInstances(params?: {
+    deployment_type?: 'remote';
+    status?: 'pending';
+  }): Promise<UnclaimedInstance[]> {
+    const queryParams = new URLSearchParams();
+    if (params?.deployment_type) queryParams.append('deployment_type', params.deployment_type);
+    if (params?.status) queryParams.append('status', params.status);
+
+    const response = await fetch(`${this.baseUrl}/instances/unclaimed?${queryParams.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      handleApiError(response);
+    }
+
+    const result: { success: boolean; data: UnclaimedInstance[] } = await response.json();
+    return result.data;
+  }
+
+  /**
+   * 认领实例
+   * POST /api/instances/:instanceId/claim
+   */
+  async claimInstance(instanceId: string): Promise<Instance> {
+    const response = await fetch(`${this.baseUrl}/instances/${instanceId}/claim`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      handleApiError(response);
+    }
+
+    const result: InstanceActionResponse = await response.json();
+    return result.data;
+  }
+
+  /**
+   * 释放实例
+   * DELETE /api/instances/:instanceId/claim
+   */
+  async releaseInstance(instanceId: string): Promise<void> {
+    const response = await fetch(`${this.baseUrl}/instances/${instanceId}/claim`, {
+      method: 'DELETE',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      handleApiError(response);
+    }
+  }
+
+  /**
+   * 获取实例统计
+   * GET /api/instances/stats
+   */
+  async getStats(): Promise<InstanceStats> {
+    const response = await fetch(`${this.baseUrl}/instances/stats`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${getToken()}`,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    if (!response.ok) {
+      handleApiError(response);
+    }
+
+    const result: { success: boolean; data: InstanceStats } = await response.json();
+    return result.data;
   }
 }
 
