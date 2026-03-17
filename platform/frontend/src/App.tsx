@@ -16,6 +16,7 @@ import InstanceDetailPage from './pages/InstanceDetailPage';
 import InstanceCreatePage from './pages/InstanceCreatePage';
 import InstanceConfigPage from './pages/InstanceConfigPage';
 import NotFoundPage from './pages/NotFoundPage';
+import ChatPage from './pages/ChatPage';
 import { ChatRoom } from './components/ChatRoom';
 
 // Use HashRouter for E2E testing to avoid React hydration issues
@@ -84,6 +85,16 @@ function App() {
             element={
               <ProtectedRoute>
                 <InstanceConfigPage />
+              </ProtectedRoute>
+            }
+          />
+
+          {/* 实例对话 */}
+          <Route
+            path="/instances/:id/chat"
+            element={
+              <ProtectedRoute>
+                <ChatPage />
               </ProtectedRoute>
             }
           />

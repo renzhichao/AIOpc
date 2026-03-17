@@ -96,7 +96,31 @@ export class QRCodeController {
         };
       }
 
-      // Generate claim QR code
+      // User doesn't have an instance, try to auto-claim the first available instance
+      const autoClaimedInstance = await this.qrCodeService.autoClaimFirstAvailableInstance(userId);
+
+      if (autoClaimedInstance) {
+        logger.info('Auto-claimed instance for user', {
+          userId,
+          instanceId: autoClaimedInstance.instance_id,
+        });
+
+        return {
+          success: true,
+          already_has_instance: true,
+          instance: {
+            id: autoClaimedInstance.instance_id,
+            name: autoClaimedInstance.name,
+            status: autoClaimedInstance.status,
+          },
+          redirect_to: '/chat',
+        };
+      }
+
+      // No available instances to auto-claim, generate claim QR code
+      // This handles the edge case where there are no unclaimed instances
+      logger.info('No available instances to auto-claim, generating QR code', { userId });
+
       const claimQRCode = await this.qrCodeService.generateClaimQRCode(userId);
 
       logger.info('Generated claim QR code', {

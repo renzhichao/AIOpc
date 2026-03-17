@@ -329,7 +329,7 @@ export default function InstanceDetailPage() {
             <div className="flex-1">
               <div className="flex items-center gap-4 mb-2">
                 <h1 className="text-3xl font-bold text-gray-900" data-testid="instance-name">
-                  {instance.config.name || `实例 ${instance.id.slice(0, 8)}`}
+                  {instance.config.name || `实例 ${String(instance.id).slice(0, 8)}`}
                 </h1>
                 <StatusBadge status={instance.status} size="md" />
               </div>

@@ -4,6 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { InstanceService } from './instance';
+import type { UnclaimedInstance, InstanceStats } from '../types/instance';
 
 // Mock fetch
 const mockFetch = vi.fn();
@@ -361,6 +362,204 @@ describe('InstanceService', () => {
         expect.any(Object)
       );
       expect(result).toEqual(mockHealth);
+    });
+  });
+
+  describe('getUnclaimedInstances', () => {
+    it('should fetch unclaimed instances successfully', async () => {
+      const mockUnclaimedInstances = [
+        {
+          instance_id: 'remote-1',
+          deployment_type: 'remote' as const,
+          status: 'pending' as const,
+          remote_host: '192.168.1.100',
+          remote_port: 3000,
+          remote_version: '1.0.0',
+          capabilities: ['chat', 'code'],
+          health_status: 'healthy' as const,
+          created_at: '2024-01-01T00:00:00Z',
+        },
+        {
+          instance_id: 'remote-2',
+          deployment_type: 'remote' as const,
+          status: 'pending' as const,
+          remote_host: '192.168.1.101',
+          remote_port: 3000,
+          remote_version: '1.0.0',
+          capabilities: ['chat'],
+          health_status: 'healthy' as const,
+          created_at: '2024-01-01T01:00:00Z',
+        },
+      ];
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: mockUnclaimedInstances,
+        }),
+      });
+
+      const result = await service.getUnclaimedInstances();
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/instances/unclaimed'),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: `Bearer ${mockToken}`,
+          }),
+        })
+      );
+      expect(result).toEqual(mockUnclaimedInstances);
+    });
+
+    it('should pass query parameters for filtering', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: [],
+        }),
+      });
+
+      await service.getUnclaimedInstances({
+        deployment_type: 'remote',
+        status: 'pending',
+      });
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('deployment_type=remote&status=pending'),
+        expect.any(Object)
+      );
+    });
+
+    it('should handle errors when fetching unclaimed instances', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+      });
+
+      await expect(service.getUnclaimedInstances()).rejects.toThrow('请求失败');
+    });
+  });
+
+  describe('claimInstance', () => {
+    it('should claim instance successfully', async () => {
+      const mockClaimedInstance = {
+        id: 1,
+        instance_id: 'remote-1',
+        owner_id: 1,
+        deployment_type: 'remote' as const,
+        status: 'active' as const,
+        config: {},
+        restart_attempts: 0,
+        created_at: '2024-01-01T00:00:00Z',
+        claimed_at: '2024-01-01T01:00:00Z',
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: mockClaimedInstance,
+          message: 'Instance claimed successfully',
+        }),
+      });
+
+      const result = await service.claimInstance('remote-1');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/instances/remote-1/claim'),
+        expect.objectContaining({
+          method: 'POST',
+          headers: expect.objectContaining({
+            Authorization: `Bearer ${mockToken}`,
+          }),
+        })
+      );
+      expect(result).toEqual(mockClaimedInstance);
+    });
+
+    it('should handle claim errors', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+      });
+
+      await expect(service.claimInstance('remote-1')).rejects.toThrow('请求失败');
+    });
+
+    it('should handle network errors during claim', async () => {
+      mockFetch.mockRejectedValueOnce(new Error('Network error'));
+
+      await expect(service.claimInstance('remote-1')).rejects.toThrow('Network error');
+    });
+  });
+
+  describe('releaseInstance', () => {
+    it('should release instance successfully', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+      });
+
+      await expect(service.releaseInstance('remote-1')).resolves.not.toThrow();
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/instances/remote-1/claim'),
+        expect.objectContaining({
+          method: 'DELETE',
+          headers: expect.objectContaining({
+            Authorization: `Bearer ${mockToken}`,
+          }),
+        })
+      );
+    });
+
+    it('should handle release errors', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+      });
+
+      await expect(service.releaseInstance('remote-1')).rejects.toThrow('请求失败');
+    });
+  });
+
+  describe('getStats', () => {
+    it('should fetch instance stats successfully', async () => {
+      const mockStats = {
+        total: 10,
+        local: 5,
+        remote: 5,
+        unclaimed: 2,
+        active: 7,
+        healthy: 9,
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          success: true,
+          data: mockStats,
+        }),
+      });
+
+      const result = await service.getStats();
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/instances/stats'),
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            Authorization: `Bearer ${mockToken}`,
+          }),
+        })
+      );
+      expect(result).toEqual(mockStats);
+    });
+
+    it('should handle stats fetch errors', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: false,
+      });
+
+      await expect(service.getStats()).rejects.toThrow('请求失败');
     });
   });
 

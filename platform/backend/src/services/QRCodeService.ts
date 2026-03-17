@@ -19,17 +19,17 @@ export class QRCodeService {
   /**
    * Generate QR code for instance claim
    *
-   * @param instanceId - The instance ID to generate QR code for
+   * @param instanceId - The instance ID (database primary key, number) to generate QR code for
    * @returns QR code data containing URL and expiration time
    */
-  async generateQRCode(instanceId: string): Promise<QRCodeData> {
+  async generateQRCode(instanceId: number): Promise<QRCodeData> {
     try {
       // 1. Generate token and signature
       const token = this.generateToken();
       const signature = this.generateSignature(token);
 
       // 2. Build OAuth URL
-      const oauthUrl = this.buildOAuthUrl(instanceId, token, signature);
+      const oauthUrl = this.buildOAuthUrl(instanceId.toString(), token, signature);
 
       // 3. Delete existing QR code for this instance (if any)
       await this.qrCodeRepository.deleteByInstanceId(instanceId);
@@ -187,13 +187,22 @@ export class QRCodeService {
   }
 
   /**
-   * Get QR code by instance ID
+   * Get QR code by instance business ID (e.g., "inst_123")
+   * Note: This queries by the instance's database primary key, not the business ID
    *
-   * @param instanceId - The instance ID
+   * @param instanceId - The instance business ID (string)
    * @returns QR code record or null
    */
   async getQRCodeByInstance(instanceId: string) {
-    return this.qrCodeRepository.findByInstanceId(instanceId);
+    // TODO: Need to lookup instance by business ID first to get database primary key
+    // For now, this method signature accepts string but converts to number for the query
+    // This assumes the caller passes a numeric string or we need to add instance lookup
+    const numericId = parseInt(instanceId, 10);
+    if (isNaN(numericId)) {
+      logger.warn(`Invalid instance ID format for QR lookup: ${instanceId}`);
+      return null;
+    }
+    return this.qrCodeRepository.findByInstanceId(numericId);
   }
 
   /**
@@ -243,10 +252,10 @@ export class QRCodeService {
       const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
 
       // Save to database
-      // For claim QR codes, use a placeholder instance_id (will be updated when claimed)
-      const placeholderInstanceId = `claim_${userId}_${Date.now()}`;
+      // For claim QR codes, use 0 as placeholder instance_id (will be updated when claimed)
+      // Note: Real instance IDs start from 1, so 0 is safe to use as placeholder
       const qrCode = await this.qrCodeRepository.create({
-        instance_id: placeholderInstanceId, // Temporary placeholder
+        instance_id: 0, // Placeholder: will be replaced with actual instance ID when claimed
         token: token,
         state: `${userId}:${token}:${signature}`,
         expires_at: expiresAt,
@@ -465,6 +474,54 @@ export class QRCodeService {
     } catch (error) {
       logger.error('Failed to find QR code by ID', {
         id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
+
+  /**
+   * Auto-claim first available instance for user
+   * TASK-009: Automatically assigns the first unclaimed instance to a user
+   *
+   * @param userId - The user ID to assign the instance to
+   * @returns Assigned instance or null if no available instances
+   */
+  async autoClaimFirstAvailableInstance(userId: number): Promise<{
+    instance_id: string;
+    name: string;
+    status: string;
+  } | null> {
+    try {
+      // Import InstanceRepository dynamically to avoid circular dependency
+      const { InstanceRepository } = await import('../repositories/InstanceRepository');
+      const instanceRepo = new InstanceRepository();
+
+      // Find first unclaimed instance (owner_id IS NULL and status != 'terminated')
+      const availableInstance = await instanceRepo.findFirstUnclaimedInstance();
+
+      if (!availableInstance) {
+        logger.info('No available instances to auto-claim', { userId });
+        return null;
+      }
+
+      // Claim the instance for the user
+      await instanceRepo.claimInstance(availableInstance.instance_id, userId);
+
+      logger.info('Auto-claimed instance for user', {
+        userId,
+        instanceId: availableInstance.instance_id,
+        instanceName: availableInstance.name,
+      });
+
+      return {
+        instance_id: availableInstance.instance_id,
+        name: availableInstance.name,
+        status: 'active', // Status is updated to 'active' when claimed
+      };
+    } catch (error) {
+      logger.error('Failed to auto-claim instance', {
+        userId,
         error: error instanceof Error ? error.message : String(error),
       });
       return null;

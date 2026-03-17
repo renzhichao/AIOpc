@@ -658,11 +658,12 @@ export class InstanceService {
   }
 
   /**
-   * Release an instance (remove owner)
+   * Release an instance (remove owner) - backward compatible method
    *
    * @param instanceId - Instance ID
+   * @deprecated Use releaseInstance(instanceId, userId) for ownership validation
    */
-  async releaseInstance(instanceId: string): Promise<void> {
+  async releaseInstanceById(instanceId: string): Promise<void> {
     try {
       await this.instanceRepository.releaseInstance(instanceId);
 
@@ -875,6 +876,133 @@ export class InstanceService {
 
       throw this.errorService.createError('INSTANCE_UPDATE_FAILED', {
         instanceId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Get unclaimed instances (TASK-009-01)
+   *
+   * Returns instances that are not owned by any user (owner_id IS NULL).
+   * Used for remote instance claiming workflow.
+   *
+   * @param params - Optional filters (deployment_type, status)
+   * @returns List of unclaimed instances
+   */
+  async getUnclaimedInstances(params?: {
+    deployment_type?: 'remote';
+    status?: 'pending';
+  }): Promise<Instance[]> {
+    try {
+      logger.info('Getting unclaimed instances', { params });
+
+      const instances = await this.instanceRepository.findUnclaimedInstances(params);
+
+      logger.info('Retrieved unclaimed instances', {
+        count: instances.length,
+        params
+      });
+
+      return instances;
+    } catch (error) {
+      logger.error('Failed to get unclaimed instances', {
+        params,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      throw this.errorService.createError('INSTANCE_STATUS_FAILED', {
+        params,
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }
+
+  /**
+   * Release an instance with ownership validation (TASK-009-01)
+   *
+   * Releases an instance back to the unclaimed pool.
+   * Only the instance owner can release it.
+   *
+   * @param instanceId - Instance ID
+   * @param userId - User ID attempting to release
+   * @throws AppError if not found or not authorized
+   */
+  async releaseInstance(instanceId: string, userId: number): Promise<void> {
+    try {
+      logger.info('Releasing instance', { instanceId, userId });
+
+      const instance = await this.getInstanceById(instanceId);
+
+      // Check ownership
+      if (instance.owner_id !== userId) {
+        throw this.errorService.createError('FORBIDDEN', {
+          instanceId,
+          userId,
+          reason: 'Instance belongs to different user'
+        });
+      }
+
+      await this.instanceRepository.releaseInstance(instanceId);
+
+      logger.info('Instance released successfully', { instanceId, userId });
+    } catch (error) {
+      logger.error('Failed to release instance', {
+        instanceId,
+        userId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      throw error;
+    }
+  }
+
+  /**
+   * Get user instance statistics (TASK-009-01)
+   *
+   * Returns comprehensive statistics about instances for a specific user.
+   *
+   * @param userId - User ID
+   * @returns User instance statistics
+   */
+  async getUserInstanceStats(userId: number): Promise<{
+    total: number;
+    local: number;
+    remote: number;
+    unclaimed: number;
+    active: number;
+    healthy: number;
+  }> {
+    try {
+      logger.info('Getting user instance stats', { userId });
+
+      // Get user's instances
+      const userInstances = await this.instanceRepository.findByOwnerId(userId);
+
+      // Get unclaimed instances count
+      const unclaimedInstances = await this.instanceRepository.findUnclaimedInstances();
+
+      // Calculate statistics
+      const stats = {
+        total: userInstances.length,
+        local: userInstances.filter(i => i.deployment_type === 'local').length,
+        remote: userInstances.filter(i => i.deployment_type === 'remote').length,
+        unclaimed: unclaimedInstances.length,
+        active: userInstances.filter(i => i.status === 'active').length,
+        healthy: userInstances.filter(i => i.health_status === 'healthy').length
+      };
+
+      logger.info('User instance stats retrieved', { userId, stats });
+
+      return stats;
+    } catch (error) {
+      logger.error('Failed to get user instance stats', {
+        userId,
+        error: error instanceof Error ? error.message : String(error)
+      });
+
+      throw this.errorService.createError('INSTANCE_STATUS_FAILED', {
+        userId,
         error: error instanceof Error ? error.message : String(error)
       });
     }

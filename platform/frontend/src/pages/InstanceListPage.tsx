@@ -3,18 +3,25 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import InstanceCard from '../components/InstanceCard';
+import UnclaimedInstanceCard from '../components/UnclaimedInstanceCard';
 import CreateInstanceModal from '../components/CreateInstanceModal';
 import { instanceService } from '../services/instance';
-import type { Instance, InstanceTemplate } from '../types/instance';
+import type { Instance, InstanceTemplate, UnclaimedInstance } from '../types/instance';
 
 export default function InstanceListPage() {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [activeTab, setActiveTab] = useState<'claimed' | 'unclaimed'>(
+    (searchParams.get('tab') as 'claimed' | 'unclaimed') || 'claimed'
+  );
   const [instances, setInstances] = useState<Instance[]>([]);
-  const [filteredInstances, setFilteredInstances] = useState<Instance[]>([]);
+  const [unclaimedInstances, setUnclaimedInstances] = useState<UnclaimedInstance[]>([]);
+  const [filteredInstances, setFilteredInstances] = useState<Instance[] | UnclaimedInstance[]>([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [claimingId, setClaimingId] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -22,7 +29,7 @@ export default function InstanceListPage() {
   /**
    * 加载实例列表
    */
-  const loadInstances = useCallback(async () => {
+  const loadClaimedInstances = useCallback(async () => {
     try {
       setLoading(true);
       setError('');
@@ -38,31 +45,78 @@ export default function InstanceListPage() {
   }, []);
 
   /**
+   * 加载未认领的实例列表
+   */
+  const loadUnclaimedInstances = useCallback(async () => {
+    try {
+      setLoading(true);
+      setError('');
+      const data = await instanceService.getUnclaimedInstances();
+      setUnclaimedInstances(data);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '加载可用实例失败';
+      setError(message);
+      console.error('加载可用实例失败:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  /**
    * 组件挂载时加载实例列表
    */
   useEffect(() => {
-    loadInstances();
+    if (activeTab === 'claimed') {
+      loadClaimedInstances();
+    } else {
+      loadUnclaimedInstances();
+    }
+  }, [activeTab, loadClaimedInstances, loadUnclaimedInstances]);
 
-    // 设置定时刷新（每 10 秒）
-    const interval = setInterval(loadInstances, 10000);
+  /**
+   * 监听URL参数变化
+   */
+  useEffect(() => {
+    const tab = searchParams.get('tab') as 'claimed' | 'unclaimed' | null;
+    if (tab && (tab === 'claimed' || tab === 'unclaimed')) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
+
+  /**
+   * 设置定时刷新（每 10 秒）
+   */
+  useEffect(() => {
+    const loadFn = activeTab === 'claimed' ? loadClaimedInstances : loadUnclaimedInstances;
+    const interval = setInterval(loadFn, 10000);
     return () => clearInterval(interval);
-  }, [loadInstances]);
+  }, [activeTab, loadClaimedInstances, loadUnclaimedInstances]);
 
   /**
    * 搜索过滤
    */
   useEffect(() => {
+    const data = activeTab === 'claimed' ? instances : unclaimedInstances;
+
     if (searchTerm.trim() === '') {
-      setFilteredInstances(instances);
+      setFilteredInstances(data);
     } else {
       const term = searchTerm.toLowerCase();
-      const filtered = instances.filter((instance) =>
-        instance.config.name?.toLowerCase().includes(term) ||
-        instance.config.description?.toLowerCase().includes(term)
-      );
-      setFilteredInstances(filtered);
+      if (activeTab === 'claimed') {
+        const filtered = (data as Instance[]).filter((instance) =>
+          instance.config.name?.toLowerCase().includes(term) ||
+          instance.config.description?.toLowerCase().includes(term)
+        );
+        setFilteredInstances(filtered);
+      } else {
+        const filtered = (data as UnclaimedInstance[]).filter((instance) =>
+          instance.instance_id.toLowerCase().includes(term) ||
+          instance.remote_host.toLowerCase().includes(term)
+        );
+        setFilteredInstances(filtered);
+      }
     }
-  }, [searchTerm, instances]);
+  }, [searchTerm, instances, unclaimedInstances, activeTab]);
 
   /**
    * 处理搜索输入
@@ -78,7 +132,7 @@ export default function InstanceListPage() {
     try {
       setActionLoading(true);
       await instanceService.startInstance(id);
-      await loadInstances();
+      await loadClaimedInstances();
     } catch (err) {
       const message = err instanceof Error ? err.message : '启动实例失败';
       alert(message);
@@ -95,7 +149,7 @@ export default function InstanceListPage() {
     try {
       setActionLoading(true);
       await instanceService.stopInstance(id);
-      await loadInstances();
+      await loadClaimedInstances();
     } catch (err) {
       const message = err instanceof Error ? err.message : '停止实例失败';
       alert(message);
@@ -112,7 +166,7 @@ export default function InstanceListPage() {
     try {
       setActionLoading(true);
       await instanceService.restartInstance(id);
-      await loadInstances();
+      await loadClaimedInstances();
     } catch (err) {
       const message = err instanceof Error ? err.message : '重启实例失败';
       alert(message);
@@ -129,7 +183,7 @@ export default function InstanceListPage() {
     try {
       setActionLoading(true);
       await instanceService.deleteInstance(id);
-      await loadInstances();
+      await loadClaimedInstances();
     } catch (err) {
       const message = err instanceof Error ? err.message : '删除实例失败';
       alert(message);
@@ -137,6 +191,33 @@ export default function InstanceListPage() {
     } finally {
       setActionLoading(false);
     }
+  };
+
+  /**
+   * 认领实例
+   */
+  const handleClaim = async (instanceId: string) => {
+    try {
+      setClaimingId(instanceId);
+      await instanceService.claimInstance(instanceId);
+      // 刷新未认领实例列表
+      await loadUnclaimedInstances();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '认领实例失败';
+      alert(message);
+      console.error('认领实例失败:', err);
+    } finally {
+      setClaimingId(null);
+    }
+  };
+
+  /**
+   * 切换标签页
+   */
+  const handleTabChange = (tab: 'claimed' | 'unclaimed') => {
+    setSearchParams({ tab });
+    setActiveTab(tab);
+    setSearchTerm(''); // 切换标签时清空搜索
   };
 
   /**
@@ -153,7 +234,9 @@ export default function InstanceListPage() {
       setActionLoading(true);
       await instanceService.createInstance(data);
       setIsCreateModalOpen(false);
-      await loadInstances();
+      if (activeTab === 'claimed') {
+        await loadClaimedInstances();
+      }
     } catch (err) {
       throw err;
     } finally {
@@ -175,7 +258,7 @@ export default function InstanceListPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900" data-testid="instances-title">我的实例</h1>
+              <h1 className="text-3xl font-bold text-gray-900" data-testid="instances-title">实例管理</h1>
               <p className="mt-1 text-sm text-gray-600" data-testid="instances-header">
                 管理您的 OpenClaw 智能体实例
               </p>
@@ -187,6 +270,34 @@ export default function InstanceListPage() {
             >
               + 创建新实例
             </button>
+          </div>
+
+          {/* 标签页导航 */}
+          <div className="mt-6 border-b border-gray-200">
+            <nav className="flex gap-8">
+              <button
+                onClick={() => handleTabChange('claimed')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                  activeTab === 'claimed'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+                data-testid="tab-claimed"
+              >
+                我的实例
+              </button>
+              <button
+                onClick={() => handleTabChange('unclaimed')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors duration-200 ${
+                  activeTab === 'unclaimed'
+                    ? 'border-indigo-600 text-indigo-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+                data-testid="tab-unclaimed"
+              >
+                可用实例
+              </button>
+            </nav>
           </div>
         </div>
       </div>
@@ -217,7 +328,7 @@ export default function InstanceListPage() {
 
           {/* 刷新按钮 */}
           <button
-            onClick={loadInstances}
+            onClick={() => activeTab === 'claimed' ? loadClaimedInstances() : loadUnclaimedInstances()}
             disabled={loading}
             className="px-4 py-2 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-700 disabled:text-gray-400 rounded-lg transition-colors duration-200 flex items-center gap-2"
             data-testid="refresh-button"
@@ -236,11 +347,11 @@ export default function InstanceListPage() {
 
         {/* 错误提示 */}
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg" data-testid="error-message">
             <div className="flex items-center justify-between">
               <p className="text-sm text-red-600">{error}</p>
               <button
-                onClick={loadInstances}
+                onClick={() => activeTab === 'claimed' ? loadClaimedInstances() : loadUnclaimedInstances()}
                 className="text-sm text-red-700 hover:text-red-800 underline"
               >
                 重试
@@ -250,15 +361,15 @@ export default function InstanceListPage() {
         )}
 
         {/* 加载状态 */}
-        {loading && instances.length === 0 && (
-          <div className="flex flex-col items-center justify-center py-12">
+        {loading && filteredInstances.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12" data-testid="loading-state">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
             <p className="text-gray-600">加载中...</p>
           </div>
         )}
 
-        {/* 空状态 */}
-        {!loading && filteredInstances.length === 0 && instances.length > 0 && (
+        {/* 空状态 - 搜索无结果 */}
+        {!loading && filteredInstances.length === 0 && searchTerm && (
           <div className="text-center py-12">
             <div className="text-6xl mb-4">🔍</div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
@@ -270,15 +381,15 @@ export default function InstanceListPage() {
           </div>
         )}
 
-        {/* 空状态 - 无实例 */}
-        {!loading && instances.length === 0 && !error && (
+        {/* 空状态 - 我的实例 */}
+        {!loading && activeTab === 'claimed' && instances.length === 0 && !error && (
           <div className="text-center py-12" data-testid="empty-state">
             <div className="text-6xl mb-4">🦞</div>
             <h3 className="text-xl font-semibold text-gray-900 mb-2">
               还没有实例
             </h3>
             <p className="text-gray-600 mb-6">
-              创建您的第一个 OpenClow 智能体实例开始使用
+              创建您的第一个 OpenClaw 智能体实例开始使用
             </p>
             <button
               onClick={() => navigate('/instances/create')}
@@ -289,36 +400,60 @@ export default function InstanceListPage() {
           </div>
         )}
 
+        {/* 空状态 - 可用实例 */}
+        {!loading && activeTab === 'unclaimed' && unclaimedInstances.length === 0 && !error && (
+          <div className="text-center py-12" data-testid="empty-state-unclaimed">
+            <div className="text-6xl mb-4">🔭</div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              暂无可用实例
+            </h3>
+            <p className="text-gray-600">
+              当前没有可认领的远程实例
+            </p>
+          </div>
+        )}
+
         {/* 实例列表 */}
         {!loading && filteredInstances.length > 0 && (
           <>
-            {/* 统计信息 */}
-            <div className="mb-6 flex items-center gap-6 text-sm text-gray-600">
-              <span>
-                总计: <strong className="text-gray-900">{filteredInstances.length}</strong> 个实例
-              </span>
-              <span>
-                运行中: <strong className="text-green-600">{filteredInstances.filter(i => i.status === 'active').length}</strong>
-              </span>
-              <span>
-                已停止: <strong className="text-gray-600">{filteredInstances.filter(i => i.status === 'stopped').length}</strong>
-              </span>
-            </div>
+            {/* 统计信息 - 仅在已认领标签页显示 */}
+            {activeTab === 'claimed' && (
+              <div className="mb-6 flex items-center gap-6 text-sm text-gray-600">
+                <span>
+                  总计: <strong className="text-gray-900">{filteredInstances.length}</strong> 个实例
+                </span>
+                <span>
+                  运行中: <strong className="text-green-600">{(filteredInstances as Instance[]).filter(i => i.status === 'active').length}</strong>
+                </span>
+                <span>
+                  已停止: <strong className="text-gray-600">{(filteredInstances as Instance[]).filter(i => i.status === 'stopped').length}</strong>
+                </span>
+              </div>
+            )}
 
             {/* 实例卡片网格 */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" data-testid="instance-list">
-              {filteredInstances.map((instance) => (
-                <InstanceCard
-                  key={instance.id}
-                  instance={instance}
-                  onStart={handleStart}
-                  onStop={handleStop}
-                  onRestart={handleRestart}
-                  onDelete={handleDelete}
-                  onClick={handleInstanceClick}
-                  loading={actionLoading}
-                />
-              ))}
+              {activeTab === 'claimed'
+                ? (filteredInstances as Instance[]).map((instance) => (
+                    <InstanceCard
+                      key={instance.id}
+                      instance={instance}
+                      onStart={handleStart}
+                      onStop={handleStop}
+                      onRestart={handleRestart}
+                      onDelete={handleDelete}
+                      onClick={handleInstanceClick}
+                      loading={actionLoading}
+                    />
+                  ))
+                : (filteredInstances as UnclaimedInstance[]).map((instance) => (
+                    <UnclaimedInstanceCard
+                      key={instance.instance_id}
+                      instance={instance}
+                      onClaim={handleClaim}
+                      loading={claimingId === instance.instance_id}
+                    />
+                  ))}
             </div>
           </>
         )}
