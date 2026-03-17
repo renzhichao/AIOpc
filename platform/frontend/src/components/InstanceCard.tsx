@@ -2,8 +2,11 @@
  * 实例卡片组件 - 显示单个实例的信息和操作按钮
  */
 
+import { Link } from 'react-router-dom';
 import type { Instance } from '../types/instance';
 import { StatusBadge } from './StatusBadge';
+import { InstanceTypeBadge } from './InstanceTypeBadge';
+import { HealthStatusBadge } from './HealthStatusBadge';
 
 interface InstanceCardProps {
   instance: Instance;
@@ -74,7 +77,9 @@ export default function InstanceCard({
 
   return (
     <div
-      className="bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200 overflow-hidden cursor-pointer"
+      className={`bg-white rounded-lg shadow-md hover:shadow-lg transition-all duration-200 overflow-hidden cursor-pointer ${
+        instance.deployment_type === 'remote' ? 'border-2 border-purple-200' : ''
+      }`}
       onClick={() => onClick(String(instance.id))}
       data-testid="instance-card"
     >
@@ -86,17 +91,7 @@ export default function InstanceCard({
               <h3 className="text-xl font-semibold text-gray-900 truncate" data-testid="instance-name">
                 {instance.config.name || `实例 ${String(instance.id).slice(0, 8)}`}
               </h3>
-              {/* 部署类型徽章 */}
-              <span
-                className={`px-2 py-1 rounded text-xs font-medium ${
-                  instance.deployment_type === 'local'
-                    ? 'bg-blue-100 text-blue-800'
-                    : 'bg-purple-100 text-purple-800'
-                }`}
-                data-testid="deployment-type"
-              >
-                {instance.deployment_type === 'local' ? '本地' : '远程'}
-              </span>
+              <InstanceTypeBadge type={instance.deployment_type} size="sm" />
             </div>
             {instance.config.description && (
               <p className="text-sm text-gray-600 line-clamp-2">
@@ -105,21 +100,8 @@ export default function InstanceCard({
             )}
           </div>
           <div className="flex items-center gap-2">
-            {/* 健康状态指示器 */}
             {instance.health_status && (
-              <div
-                className={`px-2 py-1 rounded text-xs font-medium ${
-                  instance.health_status === 'healthy'
-                    ? 'bg-green-100 text-green-800'
-                    : instance.health_status === 'warning'
-                    ? 'bg-yellow-100 text-yellow-800'
-                    : 'bg-red-100 text-red-800'
-                }`}
-                data-testid="health-status"
-              >
-                {instance.health_status === 'healthy' ? '🟢' : instance.health_status === 'warning' ? '🟡' : '🔴'}{' '}
-                {instance.health_status === 'healthy' ? '健康' : instance.health_status === 'warning' ? '警告' : '不健康'}
-              </div>
+              <HealthStatusBadge status={instance.health_status} />
             )}
             <StatusBadge status={instance.status} size="sm" />
           </div>
@@ -227,6 +209,16 @@ export default function InstanceCard({
             >
               {loading ? '重启中...' : '重启'}
             </button>
+          )}
+          {instance.status === 'active' && (
+            <Link
+              to={`/instances/${instance.id}/chat`}
+              onClick={(e) => e.stopPropagation()}
+              className="flex-1 py-2 px-4 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-300 text-white rounded-lg transition-colors duration-200 text-sm font-medium text-center"
+              data-testid="chat-button"
+            >
+              开始对话
+            </Link>
           )}
           <button
             onClick={() => {
