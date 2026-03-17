@@ -273,7 +273,7 @@ All critical user flows are well-tested and functioning correctly. The main gap 
 
 ## Git Commit
 
-**Commit Hash**: (to be added after commit)
+**Commit Hash**: `5c6c376784ef25afaab04478d8517e826b65a9b4`
 **Commit Message**: `test(TASK-009-12): Integration testing and bug fixes`
 
 ### Files Modified

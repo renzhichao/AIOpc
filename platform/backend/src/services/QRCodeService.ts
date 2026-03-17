@@ -479,4 +479,52 @@ export class QRCodeService {
       return null;
     }
   }
+
+  /**
+   * Auto-claim first available instance for user
+   * TASK-009: Automatically assigns the first unclaimed instance to a user
+   *
+   * @param userId - The user ID to assign the instance to
+   * @returns Assigned instance or null if no available instances
+   */
+  async autoClaimFirstAvailableInstance(userId: number): Promise<{
+    instance_id: string;
+    name: string;
+    status: string;
+  } | null> {
+    try {
+      // Import InstanceRepository dynamically to avoid circular dependency
+      const { InstanceRepository } = await import('../repositories/InstanceRepository');
+      const instanceRepo = new InstanceRepository();
+
+      // Find first unclaimed instance (owner_id IS NULL and status != 'terminated')
+      const availableInstance = await instanceRepo.findFirstUnclaimedInstance();
+
+      if (!availableInstance) {
+        logger.info('No available instances to auto-claim', { userId });
+        return null;
+      }
+
+      // Claim the instance for the user
+      await instanceRepo.claimInstance(availableInstance.instance_id, userId);
+
+      logger.info('Auto-claimed instance for user', {
+        userId,
+        instanceId: availableInstance.instance_id,
+        instanceName: availableInstance.name,
+      });
+
+      return {
+        instance_id: availableInstance.instance_id,
+        name: availableInstance.name,
+        status: 'active', // Status is updated to 'active' when claimed
+      };
+    } catch (error) {
+      logger.error('Failed to auto-claim instance', {
+        userId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }
+  }
 }

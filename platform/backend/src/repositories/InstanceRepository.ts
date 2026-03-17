@@ -175,6 +175,20 @@ export class InstanceRepository extends BaseRepository<Instance> {
   }
 
   /**
+   * 查找第一个未认领的实例（TASK-009: Auto-claim）
+   * 返回第一个 owner_id IS NULL 且 status != 'terminated' 的实例
+   */
+  async findFirstUnclaimedInstance(): Promise<Instance | null> {
+    const result = await this.repository.findOne({
+      where: {
+        owner_id: IsNull()
+      },
+      order: { created_at: 'ASC' }
+    });
+    return result || null;
+  }
+
+  /**
    * 释放实例
    */
   async releaseInstance(instanceId: string, userId?: number): Promise<void> {
