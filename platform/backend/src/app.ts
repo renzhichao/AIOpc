@@ -83,8 +83,7 @@ class Application {
     this.setupRoutingControllersContainer(); // Setup TypeDI for routing-controllers early
     this.initializeMiddlewares();
     this.initializeRoutes();
-    // Note: Error handlers are added by routing-controllers automatically
-    // We don't add custom error handlers to prevent double response issues
+    // Note: Error handlers will be added after controllers in initialize() method
   }
 
   private setupRoutingControllersContainer() {
@@ -103,6 +102,10 @@ class Application {
     // Initialize controllers AFTER database is ready
     // This is important because controllers depend on repositories
     this.initializeControllers();
+
+    // Initialize error handlers AFTER controllers
+    // This ensures our custom error handling is used instead of routing-controllers default
+    this.initializeErrorHandlers();
 
     // Initialize scheduled tasks
     this.initializeScheduledTasks();
@@ -239,6 +242,7 @@ class Application {
       routePrefix: '/api',
       controllers: [
         OAuthController,
+        MockOAuthController,
         InstanceController,
         UserController,
         MonitoringController,
@@ -252,11 +256,19 @@ class Application {
         QRCodeController,
       ],
       middlewares: [],
-      defaultErrorHandler: true, // Enable routing-controllers default error handling
+      defaultErrorHandler: false, // Use our custom error handler instead
       validation: true,
+      // Custom error handling for routing-controllers
+      errorOverridingMap: {
+        default: {
+          status: (error: any) => error.statusCode || 500,
+          message: (error: any) => error.userMessage || error.message || 'Internal server error',
+          code: (error: any) => error.code || 'INTERNAL_ERROR',
+        }
+      }
     });
 
-    logger.info('All controllers initialized (OAuth, Instance, User, Monitoring, ApiKey, HealthCheck, FeishuWebhook, Metrics, Chat, FileUpload, RemoteInstance, QRCode)');
+    logger.info('All controllers initialized (OAuth, MockOAuth, Instance, User, Monitoring, ApiKey, HealthCheck, FeishuWebhook, Metrics, Chat, FileUpload, RemoteInstance, QRCode)');
     logger.info('Routing-controllers routes registered successfully');
   }
 
