@@ -295,6 +295,194 @@ Based on `docs/requirements/core_req_001.md`:
 - Per-instance cost: ¥21-31/month
 - Target pricing: ¥49-299/month per instance
 
+## Production Deployment & Configuration Safety Rules
+
+**🔴 CRITICAL**: These rules MUST be followed for ANY production environment configuration changes to prevent regression and configuration loss.
+
+### Configuration Change Validation (CRITICAL)
+
+**MANDATORY PRE-CHANGE CHECKLIST**:
+1. **Backup Running Configuration First**:
+   ```bash
+   # MUST: Backup current container environment BEFORE any changes
+   docker inspect <container-name> --format='{{json .Config.Env}}' > /tmp/env_backup_$(date +%s).json
+   # OR
+   docker exec <container-name> printenv > /tmp/env_backup_$(date +%s).txt
+   ```
+
+2. **Validate Configuration Source**:
+   - NEVER assume the first `.env` file found is the correct one
+   - Check for multiple config files: `find /opt -name '.env*' -type f`
+   - Compare with running container's actual values
+   - Verify config file timestamps match deployment time
+
+3. **Placeholder Detection** (MANDATORY):
+   ```bash
+   # MUST: Check for placeholder values before applying config
+   grep -E 'cli_xxxxxxxxxxxxx|CHANGE_THIS|your_|placeholder' <config_file>
+   # If found: DO NOT APPLY - find the real config source
+   ```
+
+4. **Incremental Changes Only**:
+   - Only modify the specific environment variables that need to change
+   - Preserve ALL existing environment variables from running container
+   - Never use a clean slate approach with production containers
+
+### Server Configuration File Priority (Platform Server)
+
+**Known Configuration Locations** (118.25.0.190 platform server):
+- ✅ **PRIMARY**: `/opt/opclaw/platform/.env.production` (REAL production config)
+- ⚠️ **OBSOLETE**: `/opt/opclaw/.env.production` (Contains placeholders only)
+- 📄 **REFERENCE**: `/opt/opclaw/backend/.env.production.example` (Template only)
+
+**Key Production Secrets** (118.25.0.190):
+- `FEISHU_APP_ID=cli_a93ce5614ce11bd6`
+- `FEISHU_APP_SECRET=L0cHQDBbEiIys6AHW53miecONb1xA4qy`
+- `JWT_SECRET=suNsfjHj2nwpvIUT/gB4UZSETSaAnOVCnoylIp4Oo6HiVz/b0Yh/hRA1fQGa/a0U`
+
+### Server Access Information
+
+**🔴 CRITICAL**: All server SSH access is documented below. NEVER attempt to access servers without verifying correct SSH key.
+
+#### Platform Server (118.25.0.190)
+```bash
+# SSH Access
+ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190
+
+# Local SSH Key Location
+~/.ssh/rap001_opclaw (3.3K, created Mar 16 14:12)
+
+# Key Verification (Fingerprint)
+ssh-keygen -l -f ~/.ssh/rap001_opclaw
+# Expected: 4096 SHA256:M471M+QScAc+MZcNf5McOBlrDwLeWC1Gq97/OLwlz4A root@VM-4-12-ubuntu (RSA)
+```
+
+**Platform Server Configuration Files**:
+- ✅ **PRIMARY**: `/opt/opclaw/platform/.env.production` (REAL production config)
+- ⚠️ **OBSOLETE**: `/opt/opclaw/.env.production` (Contains placeholders only)
+- 📄 **REFERENCE**: `/opt/opclaw/backend/.env.production.example` (Template only)
+
+**Key Production Secrets** (118.25.0.190):
+- `FEISHU_APP_ID=cli_a93ce5614ce11bd6`
+- `FEISHU_APP_SECRET=L0cHQDBbEiIys6AHW53miecONb1xA4qy`
+- `JWT_SECRET=suNsfjHj2nwpvIUT/gB4UZSETSaAnOVCnoylIp4Oo6HiVz/b0Yh/hRA1fQGa/a0U`
+
+#### Remote Agent Server (101.34.254.52)
+```bash
+# SSH Access
+ssh -i ~/.ssh/aiopclaw_remote_agent root@101.34.254.52
+
+# Local SSH Key Location
+~/.ssh/aiopclaw_remote_agent (432B, created Mar 16 22:11)
+~/.ssh/aiopclaw_remote_agent.pub (117B, public key)
+
+# Key Verification (Fingerprint)
+ssh-keygen -l -f ~/.ssh/aiopclaw_remote_agent
+# Expected: 256 SHA256:uyWNpQAw7YIukmqXxiKz+NoemyM5RYIsQiBGP7Nis3k aiopclaw-remote-agent@101.34.254.52 (ED25519)
+
+# Quick Commands
+ssh -i ~/.ssh/aiopclaw_remote_agent root@101.34.254.52 "systemctl status openclaw-agent"
+ssh -i ~/.ssh/aiopclaw_remote_agent root@101.34.254.52 "tail -f /var/log/openclaw-agent.log"
+ssh -i ~/.ssh/aiopclaw_remote_agent root@101.34.254.52 "cat /etc/openclaw-agent/credentials.json"
+```
+
+**Remote Agent Configuration Files**:
+- Agent program: `/opt/openclaw-agent/agent.js`
+- Credentials: `/etc/openclaw-agent/credentials.json`
+- Systemd service: `/etc/systemd/system/openclaw-agent.service`
+- Log file: `/var/log/openclaw-agent.log`
+
+### Quick Reference Commands
+
+**Platform Operations** (118.25.0.190):
+```bash
+# Check backend container logs
+ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190 "docker logs opclaw-backend --tail 50"
+
+# Check all platform containers
+ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190 "docker ps | grep opclaw"
+
+# Restart backend service
+ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190 "docker restart opclaw-backend"
+```
+
+**Agent Operations** (101.34.254.52):
+```bash
+# View agent logs
+ssh -i ~/.ssh/aiopclaw_remote_agent root@101.34.254.52 "journalctl -u openclaw-agent -f"
+
+# Restart agent service
+ssh -i ~/.ssh/aiopclaw_remote_agent root@101.34.254.52 "systemctl restart openclaw-agent"
+
+# Force re-register (delete credentials)
+ssh -i ~/.ssh/aiopclaw_remote_agent root@101.34.254.52 "rm /etc/openclaw-agent/credentials.json && systemctl restart openclaw-agent"
+```
+
+### Environment Variable Change Pattern
+
+**CORRECT APPROACH**:
+```bash
+# 1. Backup running config
+docker exec opclaw-backend printenv > /tmp/backend_env_backup.txt
+
+# 2. Extract needed values from backup or source of truth
+# 3. Re-create container with ALL existing + new variables
+docker stop opclaw-backend && docker rm opclaw-backend
+docker run -d --name opclaw-backend \
+  --network opclaw_opclaw-network --restart unless-stopped \
+  [ALL EXISTING VARIABLES FROM BACKUP] \
+  [ONLY THE SPECIFIC VARIABLES BEING CHANGED] \
+  opclaw-backend:latest
+
+# 4. Verify applied config matches expectation
+docker exec opclaw-backend printenv | grep -E 'FEISHU|JWT|DB_'
+```
+
+**WRONG APPROACH** (NEVER DO THIS):
+```bash
+# ❌ Reading from unverified config file
+source /opt/opclaw/.env.production  # May contain placeholders!
+
+# ❌ Not backing up running config first
+# ❌ Using placeholder values
+# ❌ Not comparing with actual running values
+```
+
+### Regression Prevention
+
+**Before Applying Any Config Change**:
+1. ✅ Backup running container environment
+2. ✅ Verify config values are not placeholders
+3. ✅ Cross-reference with multiple sources if uncertain
+4. ✅ Apply only the specific delta (not full replacement)
+5. ✅ Verify after change (compare before/after)
+6. ✅ Keep backup until change is confirmed working
+
+**Post-Change Validation**:
+```bash
+# Verify critical services still work
+curl http://localhost:3000/health
+docker logs <container> --tail 50
+```
+
+### Incident Response: Configuration Restoration
+
+If configuration regression occurs:
+1. **STOP**: Do not make further changes
+2. **RESTORE**: Apply backup from `/tmp/env_backup_*`
+3. **VERIFY**: Confirm service health
+4. **ANALYZE**: Identify root cause before retry
+5. **DOCUMENT**: Update this file with lessons learned
+
+### Reference: Regression Incident (2026-03-17)
+
+**Issue**: OAuth configuration replaced with placeholders during troubleshooting
+**Root Cause**: Read from wrong config file (`/opt/opclaw/.env.production` instead of `/opt/opclaw/platform/.env.production`)
+**Resolution**: Restored from correct source file
+**Lesson Learned**: Always validate config source against running container's actual values
+
+---
+
 ## Task Automation Configuration
 
 The project uses `AUTO_TASK_CONFIG.md` for defining automated task execution patterns. This config:
