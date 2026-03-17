@@ -5,6 +5,7 @@ import { OAuthService } from './OAuthService';
 import { InstanceRepository } from '../repositories/InstanceRepository';
 import { Instance } from '../entities/Instance.entity';
 import { logger } from '../config/logger';
+import { MessageQueueService } from './MessageQueueService';
 import {
   WebSocketMessage,
   WebSocketConnection,
@@ -52,7 +53,8 @@ export class WebSocketGateway {
 
   constructor(
     private readonly oauthService: OAuthService,
-    private readonly instanceRepository: InstanceRepository
+    private readonly instanceRepository: InstanceRepository,
+    private readonly messageQueue: MessageQueueService
   ) {}
 
   /**
@@ -332,7 +334,12 @@ export class WebSocketGateway {
     const connection = this.clients.get(userId);
 
     if (!connection) {
-      logger.warn('Attempted to send to unknown connection', { userId });
+      // User not connected via WebSocket - queue message for HTTP polling
+      logger.debug('User not connected via WebSocket, queueing message', {
+        userId,
+        messageType: message.type,
+      });
+      this.messageQueue.queueMessage(userId, message);
       return;
     }
 
@@ -345,6 +352,8 @@ export class WebSocketGateway {
         });
       } else {
         logger.warn('Connection not open', { userId, readyState: connection.ws.readyState });
+        // Queue message for polling
+        this.messageQueue.queueMessage(userId, message);
       }
     } catch (error) {
       logger.error('Failed to send message to client', {

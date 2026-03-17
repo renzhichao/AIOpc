@@ -137,53 +137,93 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
       return; // Already connected
     }
 
-    // Try both token keys for compatibility with OAuth storage
-    const token = localStorage.getItem('access_token') || localStorage.getItem('auth_token');
+    // Try multiple storage methods for compatibility with WebView environments
+    // Priority: sessionStorage -> localStorage -> both auth_token keys
+    const token =
+      sessionStorage.getItem('access_token') ||
+      sessionStorage.getItem('auth_token') ||
+      localStorage.getItem('access_token') ||
+      localStorage.getItem('auth_token');
+
     if (!token) {
-      console.error('No access token found');
+      const errorMsg = '❌ No access token found in sessionStorage or localStorage';
+      console.error('[WS-DEBUG]', errorMsg);
+      console.error('[WS-DEBUG] sessionStorage keys:', Object.keys(sessionStorage));
+      console.error('[WS-DEBUG] localStorage keys:', Object.keys(localStorage));
       notifyStatus('error');
       return;
     }
 
     const wsUrl = `${finalConfig.wsUrl}?token=${token}`;
 
+    // Debug: Log connection attempt
+    const debugMsg = `[WS-DEBUG] 🔄 Connecting to: ${wsUrl.replace(token, token.substring(0, 10) + '...')}`;
+    console.log(debugMsg);
+    (window as any).__WS_DEBUG__ = (window as any).__WS_DEBUG__ || [];
+    (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: debugMsg });
+    (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: `Token source: ${sessionStorage.getItem('access_token') ? 'sessionStorage' : 'localStorage'}` });
+
     notifyStatus('connecting');
 
     try {
       ws = new WebSocket(wsUrl);
 
+      // Log WebSocket readyState changes for debugging
+      const checkReadyState = () => {
+        const states = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'];
+        const stateMsg = `WebSocket state: ${states[ws?.readyState || 3]} (${ws?.readyState})`;
+        console.log('[WS-DEBUG]', stateMsg);
+        (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: stateMsg });
+      };
+
+      // Check immediately after creation
+      setTimeout(checkReadyState, 100);
+      setTimeout(checkReadyState, 1000);
+      setTimeout(checkReadyState, 3000);
+
       ws.onopen = () => {
-        console.log('WebSocket connected');
+        const successMsg = '✅ WebSocket connected successfully';
+        console.log('[WS-DEBUG]', successMsg);
         reconnectAttempts = 0;
         notifyStatus('connected');
         flushMessageQueue();
+        (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: successMsg });
       };
 
       ws.onmessage = (event) => {
+        const msgMsg = `📨 Received: ${event.data.substring(0, 100)}...`;
+        console.log('[WS-DEBUG]', msgMsg);
+        (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: msgMsg });
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
           notifyMessage(message);
         } catch (error) {
-          console.error('Failed to parse message:', error);
+          console.error('[WS-DEBUG] ❌ Failed to parse message:', error);
         }
       };
 
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        const errorMsg = `❌ WebSocket error: ${JSON.stringify(error)}`;
+        console.error('[WS-DEBUG]', errorMsg);
         notifyStatus('error');
+        (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: errorMsg });
       };
 
       ws.onclose = (event) => {
-        console.log('WebSocket disconnected:', event.code, event.reason);
+        const closeMsg = `🔌 WebSocket closed: code=${event.code}, reason="${event.reason}"`;
+        console.log('[WS-DEBUG]', closeMsg);
         notifyStatus('disconnected');
+        (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: closeMsg });
 
         // Attempt to reconnect
         scheduleReconnect();
       };
 
     } catch (error) {
-      console.error('Failed to create WebSocket:', error);
+      const catchMsg = `❌ Failed to create WebSocket: ${error}`;
+      console.error('[WS-DEBUG]', catchMsg);
       notifyStatus('error');
+      (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: catchMsg });
     }
   }
 

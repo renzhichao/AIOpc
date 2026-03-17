@@ -94,19 +94,19 @@ export class RemoteHeartbeatMonitorService {
   private async markInstanceOffline(instance: any): Promise<void> {
     try {
       await this.instanceRepository.updateByInstanceId(instance.instance_id, {
-        status: 'offline',
+        status: 'error', // Changed from 'offline' to 'error' (valid enum value)
         health_status: 'unhealthy',
         health_reason: 'No heartbeat received within timeout period',
         updated_at: new Date()
       });
 
-      logger.warn('Remote instance marked as offline', {
+      logger.warn('Remote instance marked as error (no heartbeat)', {
         instance_id: instance.instance_id,
         remote_host: instance.remote_host,
         last_heartbeat: instance.last_heartbeat_at
       });
     } catch (error) {
-      logger.error('Failed to mark instance as offline', {
+      logger.error('Failed to mark instance as error', {
         instance_id: instance.instance_id,
         error: error instanceof Error ? error.message : String(error)
       });

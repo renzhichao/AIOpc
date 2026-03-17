@@ -4,7 +4,7 @@
  * Provides a React-friendly interface to the WebSocket service
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { createWebSocketService, type WebSocketStatus, type WebSocketMessage } from '../services/websocket';
 
 export interface UseWebSocketReturn {
@@ -15,6 +15,7 @@ export interface UseWebSocketReturn {
   onStatusChange: (handler: (status: WebSocketStatus) => void) => () => void;
   getStatus: () => WebSocketStatus;
   isConnected: boolean;
+  disconnect: () => void;
 }
 
 export function useWebSocket(): UseWebSocketReturn {
@@ -74,13 +75,19 @@ export function useWebSocket(): UseWebSocketReturn {
     return serviceRef.current?.getStatus() ?? 'disconnected';
   }, []);
 
-  return {
+  const disconnect = useCallback(() => {
+    serviceRef.current?.disconnect();
+  }, []);
+
+  // Use useMemo to ensure stable reference across renders
+  return useMemo(() => ({
     status,
     messages,
     sendMessage,
     onMessage,
     onStatusChange,
     getStatus,
-    isConnected: status === 'connected'
-  };
+    isConnected: status === 'connected',
+    disconnect
+  }), [status, messages, sendMessage, onMessage, onStatusChange, getStatus, disconnect]);
 }

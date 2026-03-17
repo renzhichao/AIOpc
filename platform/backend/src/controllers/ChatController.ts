@@ -3,6 +3,7 @@ import { JsonController, Post, Get, Body, Req, UseBefore } from 'routing-control
 import { AuthMiddleware, AuthRequest } from '../middleware/AuthMiddleware';
 import { WebSocketMessageRouter, MessageRouteResult } from '../services/WebSocketMessageRouter';
 import { InstanceRegistry, InstanceInfo } from '../services/InstanceRegistry';
+import { MessageQueueService } from '../services/MessageQueueService';
 import { logger } from '../config/logger';
 
 /**
@@ -24,7 +25,8 @@ import { logger } from '../config/logger';
 export class ChatController {
   constructor(
     private readonly messageRouter: WebSocketMessageRouter,
-    private readonly instanceRegistry: InstanceRegistry
+    private readonly instanceRegistry: InstanceRegistry,
+    private readonly messageQueue: MessageQueueService
   ) {}
 
   /**
@@ -235,6 +237,82 @@ export class ChatController {
       return {
         success: false,
         error: 'Failed to get instance status',
+      };
+    }
+  }
+
+  /**
+   * GET /chat/messages
+   *
+   * Get pending messages for HTTP polling clients.
+   *
+   * This endpoint is used by HTTP polling clients to retrieve messages
+   * that were sent by the AI instance while the client was not connected
+   * via WebSocket. Messages are returned and marked as consumed.
+   *
+   * @param req - Authenticated request with user information
+   * @returns Success response with messages array, or error response
+   *
+   * @example
+   * // Request
+   * GET /api/chat/messages
+   *
+   * // Response (Success - New messages available)
+   * {
+   *   "success": true,
+   *   "messages": [
+   *     {
+   *       "type": "assistant_message",
+   *       "content": "Hello! How can I help you?",
+   *       "timestamp": "2026-03-17T00:30:00.000Z",
+   *       "instance_id": "inst-xyz789"
+   *     }
+   *   ]
+   * }
+   *
+   * // Response (Success - No new messages)
+   * {
+   *   "success": true,
+   *   "messages": []
+   * }
+   */
+  @Get('/messages')
+  async getMessages(
+    @Req() req: AuthRequest
+  ): Promise<{
+    success: boolean;
+    messages: any[];
+    error?: string;
+  }> {
+    try {
+      logger.debug('Getting messages for polling client', {
+        userId: req.user?.userId,
+      });
+
+      // Get queued messages for user
+      const messages = this.messageQueue.getMessages(req.user!.userId);
+
+      logger.info('Messages retrieved for polling client', {
+        userId: req.user?.userId,
+        messageCount: messages.length,
+      });
+
+      return {
+        success: true,
+        messages,
+      };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      logger.error('Failed to get messages', {
+        userId: req.user?.userId,
+        error: errorMessage,
+      });
+
+      return {
+        success: false,
+        messages: [],
+        error: 'Failed to get messages',
       };
     }
   }
