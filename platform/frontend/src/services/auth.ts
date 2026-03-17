@@ -54,7 +54,9 @@ export class AuthService {
       throw new Error(error.message || '登录失败');
     }
 
-    return response.json();
+    const result = await response.json();
+    // 后端返回格式: { success: true, data: { access_token, user, ... } }
+    return result.data || result;
   }
 
   /**
