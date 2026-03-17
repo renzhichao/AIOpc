@@ -1,6 +1,7 @@
 import 'reflect-metadata';
 import dotenv from 'dotenv';
 import path from 'path';
+import multer from 'multer';
 
 // 加载环境变量 - 根据NODE_ENV选择不同的环境文件
 const NODE_ENV = process.env.NODE_ENV || 'development';
@@ -47,6 +48,7 @@ import { HealthCheckController } from './controllers/HealthCheckController';
 import { FeishuWebhookController } from './controllers/FeishuWebhookController';
 import { MetricsController } from './controllers/MetricsController';
 import { ChatController } from './controllers/ChatController';
+import { FileUploadController } from './controllers/FileUploadController';
 import { RemoteInstanceController } from './controllers/RemoteInstanceController';
 import { QRCodeController } from './controllers/QRCodeController';
 import { ScheduledHealthCheckService } from './services/ScheduledHealthCheckService';
@@ -67,6 +69,14 @@ import {
 
 class Application {
   public app: express.Application;
+
+  // Configure multer for file uploads
+  public upload = multer({
+    storage: multer.memoryStorage(),
+    limits: {
+      fileSize: 10 * 1024 * 1024, // 10MB
+    },
+  });
 
   constructor() {
     this.app = express();
@@ -182,6 +192,9 @@ class Application {
     this.app.use(express.json());
     this.app.use(express.urlencoded({ extended: true }));
 
+    // Multer file upload middleware (only for /api/chat/upload route)
+    this.app.use('/api/chat/upload', this.upload.single('file'));
+
     // Security validation
     this.app.use(sanitizeInput);
     this.app.use(preventSQLInjection);
@@ -234,6 +247,7 @@ class Application {
         FeishuWebhookController,
         MetricsController,
         ChatController,
+        FileUploadController,
         RemoteInstanceController,
         QRCodeController,
       ],
@@ -242,7 +256,7 @@ class Application {
       validation: true,
     });
 
-    logger.info('All controllers initialized (OAuth, Instance, User, Monitoring, ApiKey, HealthCheck, FeishuWebhook, Metrics, Chat, RemoteInstance, QRCode)');
+    logger.info('All controllers initialized (OAuth, Instance, User, Monitoring, ApiKey, HealthCheck, FeishuWebhook, Metrics, Chat, FileUpload, RemoteInstance, QRCode)');
     logger.info('Routing-controllers routes registered successfully');
   }
 

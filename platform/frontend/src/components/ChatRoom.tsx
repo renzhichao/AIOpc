@@ -26,12 +26,14 @@ export interface ChatRoomProps {
 export function ChatRoom({ className = '' }: ChatRoomProps) {
   const [messages, setMessages] = useState<WebSocketMessage[]>([]);
   const [debugLogs, setDebugLogs] = useState<Array<{time: string; message: string}>>([]);
-  const [showDebug, setShowDebug] = useState(true);
+  const [showDebug, setShowDebug] = useState(false);
   const [connectionMode, setConnectionMode] = useState<'websocket' | 'polling'>('websocket');
   const [copySuccess, setCopySuccess] = useState(false);
   const webSocket = useWebSocket();
   const pollingService = useRef(createPollingService());
   const debugEndRef = useRef<HTMLDivElement>(null);
+  const clickCountRef = useRef(0);
+  const clickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Get current connection status
   const getCurrentStatus = () => {
@@ -120,6 +122,62 @@ ${debugText}
   const handleMessage = useCallback((message: WebSocketMessage) => {
     setMessages((prev) => [...prev, message]);
   }, []);
+
+  /**
+   * Handle keyboard shortcut for debug panel (Ctrl+Shift+D / Cmd+Shift+D)
+   */
+  const handleKeyPress = useCallback((event: KeyboardEvent) => {
+    // Check for Ctrl+Shift+D or Cmd+Shift+D
+    if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key === 'D') {
+      event.preventDefault();
+      setShowDebug(prev => !prev);
+    }
+  }, []);
+
+  /**
+   * Handle multiple clicks on connection status (5 clicks within 2 seconds)
+   */
+  const handleStatusClick = useCallback(() => {
+    clickCountRef.current += 1;
+
+    // Clear existing timer
+    if (clickTimerRef.current) {
+      clearTimeout(clickTimerRef.current);
+    }
+
+    // Set new timer to reset click count after 2 seconds
+    clickTimerRef.current = setTimeout(() => {
+      clickCountRef.current = 0;
+    }, 2000);
+
+    // Toggle debug panel after 5 clicks
+    if (clickCountRef.current === 5) {
+      setShowDebug(prev => !prev);
+      clickCountRef.current = 0;
+    }
+  }, []);
+
+  /**
+   * Initialize WebSocket connection on mount
+   * Falls back to HTTP polling if WebSocket fails
+   */
+  useEffect(() => {
+    // Check URL parameter for debug mode
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('debug') === 'true') {
+      setShowDebug(true);
+    }
+
+    // Add keyboard shortcut listener
+    window.addEventListener('keydown', handleKeyPress);
+
+    return () => {
+      window.removeEventListener('keydown', handleKeyPress);
+      if (clickTimerRef.current) {
+        clearTimeout(clickTimerRef.current);
+      }
+    };
+  }, [handleKeyPress]);
 
   /**
    * Initialize WebSocket connection on mount
@@ -229,21 +287,22 @@ ${debugText}
    * Routes to WebSocket or HTTP polling based on current mode
    */
   const handleSendMessage = useCallback(
-    async (content: string) => {
+    async (content: string, files?: import('./MessageInput').UploadedFile[]) => {
       // Add user message to list immediately for better UX
       const userMessage: WebSocketMessage = {
         type: 'user_message',
         content,
         timestamp: new Date().toISOString(),
+        metadata: files && files.length > 0 ? { files } : undefined,
       };
 
       setMessages((prev) => [...prev, userMessage]);
 
       // Send via WebSocket or HTTP polling
       if (connectionMode === 'polling') {
-        await pollingService.current.sendMessage(content);
+        await pollingService.current.sendMessage(content, files);
       } else {
-        webSocket.sendMessage(content);
+        webSocket.sendMessage(content, files);
       }
     },
     [webSocket, connectionMode]
@@ -260,13 +319,21 @@ ${debugText}
       <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200">
         <h1 className="text-xl font-semibold text-gray-800">OpenClaw Assistant</h1>
         <div className="flex items-center gap-4">
-          <button
-            onClick={() => setShowDebug(!showDebug)}
-            className="text-sm text-blue-600 hover:text-blue-800 underline"
+          {showDebug && (
+            <button
+              onClick={() => setShowDebug(false)}
+              className="text-sm text-blue-600 hover:text-blue-800 underline"
+            >
+              隐藏调试信息
+            </button>
+          )}
+          <div
+            onClick={handleStatusClick}
+            className="cursor-pointer select-none"
+            title="点击5次可切换调试面板 (Ctrl+Shift+D 也可以)"
           >
-            {showDebug ? '隐藏' : '显示'}调试信息
-          </button>
-          <ConnectionStatus status={getCurrentStatus()} />
+            <ConnectionStatus status={getCurrentStatus()} />
+          </div>
         </div>
       </div>
 

@@ -440,13 +440,15 @@ export class RemoteInstanceWebSocketGateway {
    * @param userId - User ID who sent the message
    * @param content - Message content
    * @param messageId - Unique message ID
+   * @param files - Optional file metadata
    * @returns Promise that resolves with the response content
    */
   async sendUserMessage(
     instanceId: string,
     userId: number,
     content: string,
-    messageId: string
+    messageId: string,
+    files?: any[]
   ): Promise<{ content: string; timestamp: string } | null> {
     const connection = this.connections.get(instanceId);
 
@@ -469,6 +471,7 @@ export class RemoteInstanceWebSocketGateway {
             user_id: userId,
             content: content,
             timestamp: new Date().toISOString(),
+            metadata: files && files.length > 0 ? { files } : undefined,
           },
           created_at: new Date(),
         };
@@ -485,6 +488,8 @@ export class RemoteInstanceWebSocketGateway {
           userId,
           messageId,
           contentLength: content.length,
+          hasFiles: files && files.length > 0,
+          fileCount: files?.length || 0,
         });
 
         // Note: Response will be handled asynchronously via handleMessage

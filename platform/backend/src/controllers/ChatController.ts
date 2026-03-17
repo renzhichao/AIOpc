@@ -69,7 +69,7 @@ export class ChatController {
    */
   @Post('/send')
   async sendMessage(
-    @Body() body: { content: string },
+    @Body() body: { content: string; files?: any[] },
     @Req() req: AuthRequest
   ): Promise<{
     success: boolean;
@@ -95,12 +95,15 @@ export class ChatController {
       logger.info('Sending message to instance', {
         userId: req.user?.userId,
         contentLength: trimmedContent.length,
+        hasFiles: body.files && body.files.length > 0,
+        fileCount: body.files?.length || 0,
       });
 
       // Route message via MessageRouter
       const result: MessageRouteResult = await this.messageRouter.routeUserMessage(
         req.user!.userId,
-        trimmedContent
+        trimmedContent,
+        body.files
       );
 
       logger.info('Message sent successfully', {

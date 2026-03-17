@@ -32,7 +32,7 @@ export interface WebSocketService {
   disconnect(): void;
 
   // Send message to server
-  sendMessage(content: string): void;
+  sendMessage(content: string, files?: any[]): void;
 
   // Register message handler
   onMessage(handler: (message: WebSocketMessage) => void): () => void;
@@ -249,11 +249,12 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
     notifyStatus('disconnected');
   }
 
-  function sendMessage(content: string) {
+  function sendMessage(content: string, files?: any[]) {
     const message: WebSocketMessage = {
       type: 'user_message',
       content,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      metadata: files && files.length > 0 ? { files } : undefined,
     };
 
     const messageData = JSON.stringify(message);

@@ -41,6 +41,7 @@ export interface QueuedMessage {
   user_id: number;
   instance_id: string;
   content: string;
+  files?: any[];
   timestamp: number;
   retry_count: number;
   max_retries: number;
@@ -53,6 +54,9 @@ export interface InstanceMessageRequest {
   type: string;
   content: string;
   timestamp: string;
+  metadata?: {
+    files?: any[];
+  };
 }
 
 /**
@@ -99,10 +103,11 @@ export class WebSocketMessageRouter {
    *
    * @param userId - User ID
    * @param content - Message content
+   * @param files - Optional array of file metadata
    * @returns Message route result
    * @throws Error if user has no instance or instance is offline
    */
-  async routeUserMessage(userId: number, content: string): Promise<MessageRouteResult> {
+  async routeUserMessage(userId: number, content: string, files?: any[]): Promise<MessageRouteResult> {
     const messageId = this.generateMessageId();
     const timestamp = new Date().toISOString();
 
@@ -111,6 +116,8 @@ export class WebSocketMessageRouter {
         messageId,
         userId,
         contentLength: content.length,
+        hasFiles: files && files.length > 0,
+        fileCount: files?.length || 0,
       });
 
       // 1. Find user's instance
@@ -127,9 +134,9 @@ export class WebSocketMessageRouter {
 
       // 3. Route by connection type
       if (instanceInfo.connection_type === 'local') {
-        await this.sendToLocalInstance(instanceInfo, content, messageId);
+        await this.sendToLocalInstance(instanceInfo, content, messageId, files);
       } else {
-        await this.sendToRemoteInstance(instanceInfo, content, messageId);
+        await this.sendToRemoteInstance(instanceInfo, content, messageId, files);
       }
 
       logger.info('Message routed successfully', {
@@ -162,6 +169,7 @@ export class WebSocketMessageRouter {
             user_id: userId,
             instance_id: instanceInfo.instance_id,
             content,
+            files,
             timestamp: Date.now(),
             retry_count: 0,
             max_retries: this.config.maxRetries,
@@ -187,12 +195,14 @@ export class WebSocketMessageRouter {
    * @param instanceInfo - Instance information
    * @param content - Message content
    * @param messageId - Unique message ID
+   * @param files - Optional file metadata
    * @throws Error if HTTP request fails
    */
   private async sendToLocalInstance(
     instanceInfo: InstanceInfo,
     content: string,
-    messageId: string
+    messageId: string,
+    files?: any[]
   ): Promise<void> {
     // Use the correct endpoint: /chat (not /api/message) and port 3001
     const apiUrl = instanceInfo.api_endpoint.replace(':3000', ':3001');
@@ -204,12 +214,15 @@ export class WebSocketMessageRouter {
         messageId,
         instanceId: instanceInfo.instance_id,
         url,
+        hasFiles: files && files.length > 0,
+        fileCount: files?.length || 0,
       });
 
       const request: InstanceMessageRequest = {
         type: 'user_message',
         content,
         timestamp: new Date().toISOString(),
+        metadata: files && files.length > 0 ? { files } : undefined,
       };
 
       const response = await fetch(url, {
@@ -269,7 +282,8 @@ export class WebSocketMessageRouter {
   private async sendToRemoteInstance(
     instanceInfo: InstanceInfo,
     content: string,
-    messageId: string
+    messageId: string,
+    files?: any[]
   ): Promise<void> {
     const userId = instanceInfo.owner_id!;
 
@@ -277,6 +291,8 @@ export class WebSocketMessageRouter {
       messageId,
       instanceId: instanceInfo.instance_id,
       userId,
+      hasFiles: files && files.length > 0,
+      fileCount: files?.length || 0,
     });
 
     // Send via RemoteInstanceWebSocketGateway
@@ -286,7 +302,8 @@ export class WebSocketMessageRouter {
       instanceInfo.instance_id,
       userId,
       content,
-      messageId
+      messageId,
+      files
     );
 
     logger.info('Message sent to remote instance, awaiting async response', {

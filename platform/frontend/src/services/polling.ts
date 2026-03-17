@@ -24,7 +24,7 @@ export interface PollingService {
   stop(): void;
 
   // Send message via HTTP POST
-  sendMessage(content: string): Promise<void>;
+  sendMessage(content: string, files?: any[]): Promise<void>;
 
   // Register message handler
   onMessage(handler: (message: WebSocketMessage) => void): () => void;
@@ -240,13 +240,13 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
     notifyStatus('disconnected');
   }
 
-  async function sendMessage(content: string): Promise<void> {
+  async function sendMessage(content: string, files?: any[]): Promise<void> {
     const token = getToken();
     if (!token) {
       throw new Error('No authentication token found');
     }
 
-    console.log('[Polling] Sending message:', content.substring(0, 50) + '...');
+    console.log('[Polling] Sending message:', content.substring(0, 50) + '...', files ? `with ${files.length} file(s)` : '');
 
     const response = await fetch(`${finalConfig.apiUrl}/chat/send`, {
       method: 'POST',
@@ -254,7 +254,7 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ content }),
+      body: JSON.stringify({ content, files }),
     });
 
     if (!response.ok) {

@@ -10,7 +10,7 @@ import { createWebSocketService, type WebSocketStatus, type WebSocketMessage } f
 export interface UseWebSocketReturn {
   status: WebSocketStatus;
   messages: WebSocketMessage[];
-  sendMessage: (content: string) => void;
+  sendMessage: (content: string, files?: any[]) => void;
   onMessage: (handler: (message: WebSocketMessage) => void) => () => void;
   onStatusChange: (handler: (status: WebSocketStatus) => void) => () => void;
   getStatus: () => WebSocketStatus;
@@ -53,8 +53,8 @@ export function useWebSocket(): UseWebSocketReturn {
     };
   }, []);
 
-  const sendMessage = useCallback((content: string) => {
-    serviceRef.current?.sendMessage(content);
+  const sendMessage = useCallback((content: string, files?: any[]) => {
+    serviceRef.current?.sendMessage(content, files);
   }, []);
 
   const onMessage = useCallback((handler: (message: WebSocketMessage) => void) => {
