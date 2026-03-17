@@ -193,7 +193,8 @@ function connectWebSocket() {
   // Handle WebSocket ping frames to keep connection alive
   wsConnection.on('ping', (data) => {
     logger.debug('Received ping from platform, sending pong');
-    // ws library automatically responds with pong when ping handler is defined
+    // Explicitly send pong response (ws library doesn't auto-respond when ping handler is defined)
+    wsConnection.pong(data);
   });
 
   // Handle WebSocket pong frames
