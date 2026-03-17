@@ -1,4 +1,4 @@
-import { Service, Inject } from 'typedi';
+import { Service, Container } from 'typedi';
 import { WebSocketServer, WebSocket } from 'ws';
 import { URL } from 'url';
 import { OAuthService } from './OAuthService';
@@ -52,9 +52,15 @@ export class WebSocketGateway {
 
   constructor(
     private readonly oauthService: OAuthService,
-    private readonly instanceRepository: InstanceRepository,
-    @Inject(() => WebSocketMessageRouter) private readonly messageRouter: () => WebSocketMessageRouter
+    private readonly instanceRepository: InstanceRepository
   ) {}
+
+  /**
+   * Get message router from container (lazy loading to avoid circular dependency)
+   */
+  private getMessageRouter(): WebSocketMessageRouter {
+    return Container.get(WebSocketMessageRouter);
+  }
 
   /**
    * Start the WebSocket server
@@ -285,7 +291,7 @@ export class WebSocketGateway {
 
         // Route to MessageRouter (TASK-008)
         try {
-          const result = await this.messageRouter().routeUserMessage(userId, message.content);
+          const result = await this.getMessageRouter().routeUserMessage(userId, message.content);
 
           // Send acknowledgment
           this.sendToClient(userId, {
