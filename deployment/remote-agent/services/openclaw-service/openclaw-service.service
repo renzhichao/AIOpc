@@ -6,6 +6,7 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/opt/openclaw-service
+EnvironmentFile=/opt/openclaw-service/.env
 ExecStart=/usr/bin/node /opt/openclaw-service/src/index.js
 Restart=always
 RestartSec=10
