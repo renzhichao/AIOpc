@@ -882,4 +882,199 @@ export class InstanceController {
       );
     }
   }
+
+  /**
+   * Get unclaimed instances (TASK-009-01)
+   * GET /api/instances/unclaimed
+   *
+   * Returns all instances that are not owned by any user (owner_id IS NULL).
+   * Used for remote instance claiming workflow.
+   *
+   * Query params:
+   * - deployment_type: Filter by deployment type (e.g., 'remote')
+   * - status: Filter by status (e.g., 'pending')
+   */
+  @Get('/unclaimed')
+  async getUnclaimedInstances(
+    @Req() req: any,
+    @QueryParam('deployment_type') deploymentType?: string,
+    @QueryParam('status') status?: string
+  ) {
+    try {
+      const user = req.user;
+
+      if (!user || !user.id) {
+        throw new AppError(
+          ErrorCodes.UNAUTHORIZED.statusCode,
+          ErrorCodes.UNAUTHORIZED.code,
+          'User not authenticated'
+        );
+      }
+
+      // Build params object
+      const params: any = {};
+      if (deploymentType === 'remote') {
+        params.deployment_type = 'remote';
+      }
+      if (status === 'pending') {
+        params.status = 'pending';
+      }
+
+      const instances = await this.instanceService.getUnclaimedInstances(
+        Object.keys(params).length > 0 ? params : undefined
+      );
+
+      return {
+        success: true,
+        data: instances,
+        count: instances.length
+      };
+    } catch (error) {
+      logger.error('Failed to get unclaimed instances', error);
+
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      throw new AppError(
+        ErrorCodes.INTERNAL_ERROR.statusCode,
+        ErrorCodes.INTERNAL_ERROR.code,
+        'Failed to get unclaimed instances'
+      );
+    }
+  }
+
+  /**
+   * Claim an instance (TASK-009-01)
+   * POST /api/instances/:instanceId/claim
+   *
+   * Claims an unclaimed instance for the authenticated user.
+   * Sets owner_id, claimed_at, and status='active'.
+   */
+  @Post('/:instanceId/claim')
+  async claimInstance(@Param('instanceId') instanceId: string, @Req() req: any) {
+    try {
+      const user = req.user;
+
+      if (!user || !user.id) {
+        throw new AppError(
+          ErrorCodes.UNAUTHORIZED.statusCode,
+          ErrorCodes.UNAUTHORIZED.code,
+          'User not authenticated'
+        );
+      }
+
+      const instance = await this.instanceService.claimInstance(instanceId, user.id);
+
+      logger.info('Instance claimed successfully', {
+        instanceId,
+        userId: user.id
+      });
+
+      return {
+        success: true,
+        data: instance,
+        message: 'Instance claimed successfully'
+      };
+    } catch (error) {
+      logger.error('Failed to claim instance', error);
+
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      throw new AppError(
+        ErrorCodes.INTERNAL_ERROR.statusCode,
+        ErrorCodes.INTERNAL_ERROR.code,
+        'Failed to claim instance'
+      );
+    }
+  }
+
+  /**
+   * Release an instance (TASK-009-01)
+   * DELETE /api/instances/:instanceId/claim
+   *
+   * Releases an instance back to the unclaimed pool.
+   * Clears owner_id and sets status='stopped'.
+   * Only the instance owner can release it.
+   */
+  @Delete('/:instanceId/claim')
+  async releaseInstance(@Param('instanceId') instanceId: string, @Req() req: any) {
+    try {
+      const user = req.user;
+
+      if (!user || !user.id) {
+        throw new AppError(
+          ErrorCodes.UNAUTHORIZED.statusCode,
+          ErrorCodes.UNAUTHORIZED.code,
+          'User not authenticated'
+        );
+      }
+
+      await this.instanceService.releaseInstance(instanceId, user.id);
+
+      logger.info('Instance released successfully', {
+        instanceId,
+        userId: user.id
+      });
+
+      return {
+        success: true,
+        message: 'Instance released successfully'
+      };
+    } catch (error) {
+      logger.error('Failed to release instance', error);
+
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      throw new AppError(
+        ErrorCodes.INTERNAL_ERROR.statusCode,
+        ErrorCodes.INTERNAL_ERROR.code,
+        'Failed to release instance'
+      );
+    }
+  }
+
+  /**
+   * Get user instance statistics (TASK-009-01)
+   * GET /api/instances/stats
+   *
+   * Returns comprehensive statistics about instances for the authenticated user.
+   */
+  @Get('/stats')
+  async getUserInstanceStats(@Req() req: any) {
+    try {
+      const user = req.user;
+
+      if (!user || !user.id) {
+        throw new AppError(
+          ErrorCodes.UNAUTHORIZED.statusCode,
+          ErrorCodes.UNAUTHORIZED.code,
+          'User not authenticated'
+        );
+      }
+
+      const stats = await this.instanceService.getUserInstanceStats(user.id);
+
+      return {
+        success: true,
+        data: stats
+      };
+    } catch (error) {
+      logger.error('Failed to get user instance stats', error);
+
+      if (error instanceof AppError) {
+        throw error;
+      }
+
+      throw new AppError(
+        ErrorCodes.INTERNAL_ERROR.statusCode,
+        ErrorCodes.INTERNAL_ERROR.code,
+        'Failed to get instance statistics'
+      );
+    }
+  }
 }

@@ -142,9 +142,42 @@ export class InstanceRepository extends BaseRepository<Instance> {
   }
 
   /**
+   * 查找所有未认领的实例（TASK-009-01）
+   *
+   * @param params - Optional filters
+   * @returns List of unclaimed instances
+   */
+  async findUnclaimedInstances(params?: {
+    deployment_type?: 'remote';
+    status?: 'pending';
+  }): Promise<Instance[]> {
+    const whereConditions: any = {
+      owner_id: IsNull()
+    };
+
+    // Add optional filters
+    if (params?.deployment_type) {
+      whereConditions.deployment_type = params.deployment_type;
+    }
+
+    if (params?.status) {
+      whereConditions.status = params.status;
+    } else {
+      // Default to pending if no status specified
+      whereConditions.status = 'pending';
+    }
+
+    return this.repository.find({
+      where: whereConditions,
+      order: { created_at: 'ASC' },
+      relations: ['owner']
+    });
+  }
+
+  /**
    * 释放实例
    */
-  async releaseInstance(instanceId: string): Promise<void> {
+  async releaseInstance(instanceId: string, userId?: number): Promise<void> {
     await this.repository.update(
       { instance_id: instanceId },
       {
