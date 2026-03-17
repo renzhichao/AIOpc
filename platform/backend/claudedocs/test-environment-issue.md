@@ -1,8 +1,8 @@
 # Test Environment Issue
 
 **Date**: 2026-03-17
-**Status**: Open
-**Priority**: High (blocking TASK-009-02)
+**Status**: Resolved ✅
+**Priority**: High (was blocking TASK-009-02)
 
 ## Problem
 
@@ -65,3 +65,29 @@ TASK-009-01 implementation is complete and committed:
 - Business logic complete
 - Repository queries implemented
 - Tests written but cannot run due to environment issue
+
+---
+
+## Resolution ✅
+
+**Date**: 2026-03-17
+
+### Root Cause
+1. Version mismatch: `@jest/globals` v30.3.0 incompatible with Jest v29.7.0
+2. Jest `projects` configuration with `testTimeout` options caused Babel parser conflicts
+
+### Fix Applied
+1. Downgraded `@jest/globals` to v29.7.0
+2. Simplified Jest configuration:
+   - Removed complex `projects` array configuration
+   - Simplified transform to: `'^.+\\.tsx?: 'ts-jest'`
+   - Moved `testTimeout: 30000` to top level
+
+### Result
+- All tests now run successfully
+- TASK-009-02 completed with 12 remote instance management tests passing
+- Test environment is fully functional
+
+### Commits
+- `5f171ef`: Fixed Jest configuration issues
+- `6dbd316`: Added TASK-009-02 remote instance management tests
