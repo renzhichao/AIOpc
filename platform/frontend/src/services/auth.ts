@@ -117,7 +117,9 @@ export class AuthService {
       throw new Error(error.message || '获取认领二维码失败');
     }
 
-    return response.json();
+    const result = await response.json();
+    // 后端返回格式: { success: true, data: { ... } }
+    return result.data || result;
   }
 }
 
