@@ -32,6 +32,8 @@ enum RemoteMessageType {
   REGISTER = 'register',
   REGISTERED = 'registered',
   HEARTBEAT = 'heartbeat',
+  PING = 'ping',
+  PONG = 'pong',
   COMMAND = 'command',
   RESPONSE = 'response',
   ERROR = 'error',
@@ -210,6 +212,7 @@ export class RemoteInstanceWebSocketGateway {
               instanceId,
               apiKey: apiKey.substring(0, 10) + '...',
               totalConnections: this.connections.size,
+              isAlive: connection.isAlive,
             });
 
             // Register instance to InstanceRegistry for message routing
@@ -302,10 +305,32 @@ export class RemoteInstanceWebSocketGateway {
 
     // Pong handler (for heartbeat)
     ws.on('pong', () => {
+      const pongTime = new Date().toISOString();
       const connection = this.connections.get(instanceId);
+
+      logger.info('[HEARTBEAT] Pong frame received', {
+        instanceId,
+        timestamp: pongTime,
+        connectionFound: !!connection,
+      });
+
       if (connection) {
+        const wasAlive = connection.isAlive;
         connection.isAlive = true;
         connection.lastActivity = new Date();
+
+        logger.info('[HEARTBEAT] Set isAlive to true after pong', {
+          instanceId,
+          wasAlive,
+          isAliveNow: connection.isAlive,
+          connectionAgeMs: Date.now() - connection.connectedAt.getTime(),
+          timestamp: pongTime,
+        });
+      } else {
+        logger.warn('[HEARTBEAT] Pong received but connection not found', {
+          instanceId,
+          timestamp: pongTime,
+        });
       }
     });
   }
@@ -328,8 +353,18 @@ export class RemoteInstanceWebSocketGateway {
       const message: RemoteWSMessage = JSON.parse(data);
 
       switch (message.type) {
+        case RemoteMessageType.PONG:
+          // Pong response to our ping - set isAlive to true
+          connection.isAlive = true;
+          logger.info('[HEARTBEAT] Pong message received, isAlive set to true', {
+            instanceId,
+            timestamp: message.timestamp,
+          });
+          break;
+
         case RemoteMessageType.HEARTBEAT:
           // Heartbeat via WebSocket (alternative to HTTP)
+          connection.isAlive = true;
           logger.debug('Heartbeat received via WebSocket', { instanceId });
           break;
 
@@ -554,8 +589,15 @@ export class RemoteInstanceWebSocketGateway {
     // Clear heartbeat interval
     const interval = this.heartbeatIntervals.get(instanceId);
     if (interval) {
+      logger.info('[HEARTBEAT] Clearing heartbeat interval due to disconnect', { instanceId });
       clearInterval(interval);
       this.heartbeatIntervals.delete(instanceId);
+      logger.info('[HEARTBEAT] Heartbeat interval cleared', {
+        instanceId,
+        remainingIntervals: this.heartbeatIntervals.size,
+      });
+    } else {
+      logger.warn('[HEARTBEAT] No heartbeat interval found to clear', { instanceId });
     }
 
     // Remove connection
@@ -565,6 +607,7 @@ export class RemoteInstanceWebSocketGateway {
       instanceId,
       connectionDuration: Date.now() - connection.connectedAt.getTime(),
       remainingConnections: this.connections.size,
+      remainingHeartbeats: this.heartbeatIntervals.size,
     });
   }
 
@@ -574,24 +617,129 @@ export class RemoteInstanceWebSocketGateway {
   private startHeartbeat(ws: WebSocket, instanceId: string): void {
     const connection = this.connections.get(instanceId);
     if (!connection) {
+      logger.error('[HEARTBEAT] Cannot start: connection not found', { instanceId });
       return;
     }
 
+    // Clear any existing heartbeat interval for this instance
+    const existingInterval = this.heartbeatIntervals.get(instanceId);
+    if (existingInterval) {
+      logger.info('[HEARTBEAT] Clearing existing heartbeat interval', {
+        instanceId,
+        existingIntervalId: String(existingInterval),
+      });
+      clearInterval(existingInterval);
+      this.heartbeatIntervals.delete(instanceId);
+    }
+
+    // Double-check no intervals remain for this instance
+    const allIntervals = Array.from(this.heartbeatIntervals.entries());
+    const instanceIntervals = allIntervals.filter(([id]) => id === instanceId);
+    if (instanceIntervals.length > 0) {
+      logger.error('[HEARTBEAT] Found stale intervals for same instance, clearing all', {
+        instanceId,
+        count: instanceIntervals.length,
+      });
+      instanceIntervals.forEach(([id, interval]) => {
+        clearInterval(interval);
+        this.heartbeatIntervals.delete(id);
+      });
+    }
+
+    const startTime = Date.now();
+    const heartbeatInterval = this.config.heartbeatInterval;
+
+    logger.info('[HEARTBEAT] Starting heartbeat mechanism', {
+      instanceId,
+      configuredInterval: heartbeatInterval,
+      initialIsAliveState: connection.isAlive,
+      timestamp: new Date().toISOString(),
+    });
+
     const interval = setInterval(() => {
-      if (!connection.isAlive) {
-        logger.warn('Remote instance heartbeat timeout', { instanceId });
+      // Get the current connection (not the captured one) to handle reconnections
+      const currentConnection = this.connections.get(instanceId);
+
+      // If connection no longer exists, clear this interval
+      if (!currentConnection) {
+        logger.warn('[HEARTBEAT] Connection no longer exists, clearing interval', {
+          instanceId,
+        });
+        clearInterval(interval);
+        this.heartbeatIntervals.delete(instanceId);
+        return;
+      }
+
+      // If this WebSocket is not the current one for this instance, clear this interval
+      if (currentConnection.ws !== ws) {
+        logger.warn('[HEARTBEAT] WebSocket mismatch, clearing old interval', {
+          instanceId,
+        });
+        clearInterval(interval);
+        this.heartbeatIntervals.delete(instanceId);
+        return;
+      }
+
+      const elapsed = Date.now() - startTime;
+      const checkTime = new Date().toISOString();
+
+      logger.info('[HEARTBEAT] Interval check triggered', {
+        instanceId,
+        elapsedMs: elapsed,
+        elapsedSeconds: (elapsed / 1000).toFixed(2),
+        isAliveBeforeCheck: currentConnection.isAlive,
+        timestamp: checkTime,
+      });
+
+      if (!currentConnection.isAlive) {
+        logger.warn('[HEARTBEAT] Timeout: connection.isAlive is false', {
+          instanceId,
+          elapsedMs: elapsed,
+          elapsedSeconds: (elapsed / 1000).toFixed(2),
+          timestamp: checkTime,
+        });
         this.closeConnection(instanceId, 1000, 'Heartbeat timeout');
         return;
       }
 
-      connection.isAlive = false;
+      logger.info('[HEARTBEAT] Setting isAlive to false and sending ping', {
+        instanceId,
+        elapsedMs: elapsed,
+        timestamp: checkTime,
+      });
+
+      currentConnection.isAlive = false;
 
       if (ws.readyState === WebSocket.OPEN) {
-        ws.ping();
+        // Send JSON ping message instead of WebSocket ping frame
+        // This is more reliable and portable across different ws library versions
+        const pingMessage = JSON.stringify({
+          type: 'ping',
+          timestamp: new Date().toISOString(),
+        });
+        ws.send(pingMessage);
+        logger.info('[HEARTBEAT] Ping message sent', {
+          instanceId,
+          elapsedMs: elapsed,
+          timestamp: new Date().toISOString(),
+        });
+      } else {
+        logger.warn('[HEARTBEAT] Cannot send ping: WebSocket not open', {
+          instanceId,
+          readyState: ws.readyState,
+          elapsedMs: elapsed,
+        });
       }
-    }, this.config.heartbeatInterval);
+    }, heartbeatInterval);
 
     this.heartbeatIntervals.set(instanceId, interval);
+
+    logger.info('[HEARTBEAT] Interval timer registered', {
+      instanceId,
+      intervalId: String(interval),
+      heartbeatIntervalMs: heartbeatInterval,
+      heartbeatIntervalSeconds: (heartbeatInterval / 1000).toFixed(2),
+    });
   }
 
   /**
@@ -600,6 +748,14 @@ export class RemoteInstanceWebSocketGateway {
   private closeConnection(instanceId: string, code: number, reason: string): void {
     const connection = this.connections.get(instanceId);
     if (connection) {
+      // Clear heartbeat interval for this connection to prevent orphaned intervals
+      const interval = this.heartbeatIntervals.get(instanceId);
+      if (interval) {
+        logger.info('[HEARTBEAT] Clearing heartbeat interval in closeConnection', { instanceId, reason });
+        clearInterval(interval);
+        this.heartbeatIntervals.delete(instanceId);
+      }
+
       if (connection.ws.readyState === WebSocket.OPEN) {
         connection.ws.close(code, reason);
       }

@@ -144,7 +144,38 @@ class Application {
         hsts: false, // Disable HSTS until SSL certificate is configured
       })
     );
-    this.app.use(cors());
+
+    // CORS configuration - allow requests from frontend domain and direct IP access
+    const allowedOrigins = [
+      'http://renava.cn',
+      'http://118.25.0.190',
+      'http://118.25.0.190:3000',
+      'http://localhost:3000',
+      'http://localhost:5173', // Vite dev server
+    ];
+    this.app.use(cors({
+      origin: (origin, callback) => {
+        // Allow requests with no origin (like mobile apps or curl)
+        if (!origin) return callback(null, true);
+        // Allow requests from whitelisted origins
+        if (allowedOrigins.includes(origin)) {
+          return callback(null, true);
+        }
+        // Allow requests from same origin
+        if (origin.startsWith('http://118.25.0.190')) {
+          return callback(null, true);
+        }
+        // Allow requests from renava.cn subdomains
+        if (origin.endsWith('.renava.cn') || origin.startsWith('http://renava.cn')) {
+          return callback(null, true);
+        }
+        // Reject all other origins
+        return callback(new Error('CORS not allowed'), false);
+      },
+      credentials: true, // Allow cookies for authentication
+      methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID'],
+    }));
 
     // Body parsing
     this.app.use(compression());

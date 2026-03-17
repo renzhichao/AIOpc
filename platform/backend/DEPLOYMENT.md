@@ -81,60 +81,25 @@ curl http://localhost:3000/health
 
 ### Quick Backend Recovery Script
 
+**⚠️ IMPORTANT: Always use the standardized recovery script - NEVER manually construct docker run commands**
+
 ```bash
-#!/bin/bash
-# Quick backend container restart with verification
+# ✅ CORRECT - Use the standardized script
+bash /opt/opclaw/scripts/restart-backend.sh
 
-echo "Step 1: Checking network..."
-NETWORK_NAME="opclaw_opclaw-network"
-if ! docker network inspect "$NETWORK_NAME" &>/dev/null; then
-    echo "❌ ERROR: Network $NETWORK_NAME not found"
-    exit 1
-fi
+# ❌ WRONG - Manual construction (prone to missing env vars)
+docker run -d --name opclaw-backend --network opclaw_opclaw-network -e DB_HOST=...
+```
 
-echo "Step 2: Checking postgres in network..."
-if ! docker network inspect "$NETWORK_NAME" --format '{{range .Containers}}{{.Name}}{{end}}' | grep -q "opclaw-postgres"; then
-    echo "❌ ERROR: postgres not found in network $NETWORK_NAME"
-    exit 1
-fi
+The standardized script (`/opt/opclaw/scripts/restart-backend.sh`) automatically:
+- Verifies all 21 required environment variables
+- Checks network connectivity
+- Validates database, OAuth API, and health endpoints
+- Provides clear error messages with troubleshooting hints
 
-echo "Step 3: Stopping old backend..."
-docker stop opclaw-backend 2>/dev/null || true
-docker rm opclaw-backend 2>/dev/null || true
-
-echo "Step 4: Starting new backend..."
-docker run -d \
-  --name opclaw-backend \
-  --network "$NETWORK_NAME" \
-  --restart unless-stopped \
-  -p 3000:3000 \
-  -p 3001:3001 \
-  -p 3002:3002 \
-  -v /var/run/docker.sock:/var/run/docker.sock:rw \
-  -v /opt/opclaw/platform/logs/backend:/app/logs \
-  --env-file /opt/opclaw/platform/.env.production \
-  platform-backend
-
-echo "Step 5: Waiting for startup..."
-sleep 10
-
-echo "Step 6: Verifying connectivity..."
-if docker exec opclaw-backend ping -c 1 postgres &>/dev/null; then
-    echo "✅ Postgres connectivity: OK"
-else
-    echo "❌ Postgres connectivity: FAILED"
-    docker logs opclaw-backend --tail 30
-    exit 1
-fi
-
-if curl -s http://localhost:3000/health > /dev/null; then
-    echo "✅ Health check: OK"
-else
-    echo "❌ Health check: FAILED"
-    exit 1
-fi
-
-echo "✅ Backend restarted successfully"
+**To run the script remotely:**
+```bash
+ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190 "bash /opt/opclaw/scripts/restart-backend.sh"
 ```
 
 ---

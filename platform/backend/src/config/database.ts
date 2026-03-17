@@ -45,9 +45,10 @@ export const AppDataSource = new DataSource({
   synchronize,
   logging,
   entities: [User, Instance, ApiKey, Document, DocumentChunk, QRCode, InstanceRenewal, InstanceMetric],
-  // Use empty migrations array in development since we use synchronize
-  // In production, migrations should be compiled to dist/migrations/**/*.js
-  migrations: isDevelopment ? [] : [join(__dirname, '../migrations/**/*.js')],
+  // Migrations should be run explicitly via CLI, not loaded during app startup
+  // This prevents TypeDI container initialization issues
+  // Use: npm run db:migrate to run migrations
+  migrations: [],
   subscribers: [],
 
   // Production connection pool configuration
@@ -56,20 +57,24 @@ export const AppDataSource = new DataSource({
     max: maxConnections,
     min: minConnections,
 
-    // Timeouts
+    // Timeouts - increased to prevent premature disconnection
     connectionTimeoutMillis: connectionTimeout,
-    idleTimeoutMillis: idleTimeout,
-    statement_timeout: parseInt(process.env.DB_QUERY_TIMEOUT || '30000'),
+    idleTimeoutMillis: idleTimeout * 10, // 5 minutes instead of 30 seconds
+    statement_timeout: parseInt(process.env.DB_QUERY_TIMEOUT || '60000'),
 
-    // Connection validation
-    validateConnectionForEachUsage: isProduction,
+    // Connection validation - check before each use
+    validateConnectionForEachUsage: true,
+
+    // TCP Keepalive settings to prevent connection drops
+    keepAlive: true,
+    keepAliveInitialDelayMillis: 10000, // 10 seconds
 
     // Performance optimizations
     statement_cache_size: 100,
     query_cache_size: 100,
 
-    // Automatic reconnection
-    reconnectAttempts: 3,
-    reconnectDelayMilliseconds: 2000,
+    // Automatic reconnection with more attempts
+    reconnectAttempts: 10,
+    reconnectDelayMilliseconds: 3000,
   },
 });

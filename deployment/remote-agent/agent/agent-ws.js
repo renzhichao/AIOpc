@@ -190,12 +190,20 @@ function connectWebSocket() {
     }));
   });
 
-  // NOTE: We don't define ping/pong handlers here. When no ping handler is defined,
-  // the ws library automatically responds to ping frames with pong.
-  // This is required for the Platform's heartbeat mechanism to work correctly.
+  // Handle ping messages from Platform (heartbeat)
+  // IMPORTANT: This is required for the Platform's heartbeat mechanism to work
+  // We handle both WebSocket ping frames and JSON ping messages
+  wsConnection.on('ping', (data) => {
+    logger.info('WebSocket PING frame received from Platform', {
+      dataLength: data ? data.length : 0,
+      timestamp: new Date().toISOString()
+    });
+    wsConnection.pong(data);
+    logger.info('WebSocket PONG frame sent to Platform');
+  });
 
-  // Start proactive ping to keep connection alive
-  startProactivePing();
+  // NOTE: We do NOT use proactive ping here. The Platform manages the heartbeat
+  // by sending ping frames every 30 seconds, and we respond with pong.
 
   wsConnection.on('message', async (data) => {
     try {
@@ -211,38 +219,9 @@ function connectWebSocket() {
   });
   wsConnection.on('close', (code, reason) => {
     logger.warn('WebSocket connection closed', { code, reason: reason.toString() });
-    // Clear ping timer
-    if (pingTimer) {
-      clearInterval(pingTimer);
-      pingTimer = null;
-    }
     logger.info('Will retry connection in 10 seconds');
     setTimeout(connectWebSocket, 10000);
   });
-}
-
-/**
- * Start proactive ping to keep WebSocket connection alive
- */
-function startProactivePing() {
-  // Clear existing ping timer if any
-  if (pingTimer) {
-    clearInterval(pingTimer);
-  }
-
-  // Send ping every 30 seconds to keep connection alive
-  pingTimer = setInterval(() => {
-    if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
-      try {
-        wsConnection.ping();
-        logger.debug('Sent proactive ping to platform');
-      } catch (error) {
-        logger.error('Failed to send ping', { error: error.message });
-      }
-    }
-  }, 30000); // 30 seconds
-
-  logger.info('Started proactive ping timer', { interval: 30000 });
 }
 
 /**
@@ -309,12 +288,36 @@ function handlePlatformMessage(message) {
       logger.info('Registration confirmed by platform');
       startHeartbeat();
       break;
+    case 'ping':
+      // Respond to platform ping with pong
+      logger.info('JSON ping message received from Platform', {
+        timestamp: message.timestamp
+      });
+      sendPongMessage();
+      break;
     case 'command':
       handleCommand(message.data);
       break;
     default:
       logger.warn('Unknown message type', { type: message.type });
   }
+}
+
+/**
+ * Send pong message to platform
+ */
+function sendPongMessage() {
+  if (!wsConnection || wsConnection.readyState !== WebSocket.OPEN) {
+    logger.error('Cannot send pong: WebSocket not connected');
+    return;
+  }
+  const pongMessage = JSON.stringify({
+    type: 'pong',
+    instance_id: instanceId,
+    timestamp: new Date().toISOString()
+  });
+  wsConnection.send(pongMessage);
+  logger.info('PONG message sent to Platform');
 }
 
 /**

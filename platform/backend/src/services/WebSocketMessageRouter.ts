@@ -194,7 +194,9 @@ export class WebSocketMessageRouter {
     content: string,
     messageId: string
   ): Promise<void> {
-    const url = `${instanceInfo.api_endpoint}/api/message`;
+    // Use the correct endpoint: /chat (not /api/message) and port 3001
+    const apiUrl = instanceInfo.api_endpoint.replace(':3000', ':3001');
+    const url = `${apiUrl}/chat`;
     const userId = instanceInfo.owner_id!;
 
     try {
