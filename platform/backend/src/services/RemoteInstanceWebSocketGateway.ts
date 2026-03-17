@@ -22,6 +22,8 @@ import { URL } from 'url';
 import { logger } from '../config/logger';
 import { RemoteInstanceService } from './RemoteInstanceService';
 import { InstanceRegistry } from './InstanceRegistry';
+import { WebSocketGateway } from './WebSocketGateway';
+import { WebSocketMessageType, AssistantMessage } from '../types/websocket.types';
 
 /**
  * WebSocket message types for remote instances
@@ -92,7 +94,8 @@ export class RemoteInstanceWebSocketGateway {
 
   constructor(
     private readonly remoteInstanceService: RemoteInstanceService,
-    private readonly instanceRegistry: InstanceRegistry
+    private readonly instanceRegistry: InstanceRegistry,
+    private readonly webSocketGateway: WebSocketGateway
   ) {}
 
   /**
@@ -339,12 +342,34 @@ export class RemoteInstanceWebSocketGateway {
           break;
 
         case RemoteMessageType.RESPONSE:
-          // Response to a command
+          // Response to a command - check if it's a user message response
           logger.debug('Command response received', {
             instanceId,
             commandId: message.data.command_id,
+            responseType: message.data.type,
           });
-          // Handle command response if needed
+
+          // If this is a response to a user message, forward it to the user
+          if (message.data.type === 'message' && message.data.user_id) {
+            const userId = message.data.user_id;
+            const responseContent = message.data.content || '';
+
+            const assistantMessage: AssistantMessage = {
+              type: WebSocketMessageType.ASSISTANT_MESSAGE,
+              content: responseContent,
+              timestamp: message.data.timestamp || new Date().toISOString(),
+              instance_id: instanceId,
+            };
+
+            await this.webSocketGateway.sendToClient(userId, assistantMessage);
+
+            logger.info('User message response forwarded from remote instance', {
+              instanceId,
+              userId,
+              messageId: message.data.command_id,
+              contentLength: responseContent.length,
+            });
+          }
           break;
 
         default:
@@ -359,6 +384,85 @@ export class RemoteInstanceWebSocketGateway {
         instanceId,
         error: errorMessage,
       });
+    }
+  }
+
+  /**
+   * Send user message to remote instance
+   *
+   * This is used by WebSocketMessageRouter to deliver user messages to remote instances
+   * via WebSocket connection instead of HTTP fallback.
+   *
+   * @param instanceId - Instance ID
+   * @param userId - User ID who sent the message
+   * @param content - Message content
+   * @param messageId - Unique message ID
+   * @returns Promise that resolves with the response content
+   */
+  async sendUserMessage(
+    instanceId: string,
+    userId: number,
+    content: string,
+    messageId: string
+  ): Promise<{ content: string; timestamp: string } | null> {
+    const connection = this.connections.get(instanceId);
+
+    if (!connection) {
+      logger.warn('Cannot send user message: remote instance not connected', {
+        instanceId,
+        userId,
+        messageId,
+      });
+      return null;
+    }
+
+    try {
+      if (connection.ws.readyState === WebSocket.OPEN) {
+        // Send message as a command
+        const command: RemoteCommand = {
+          id: messageId,
+          type: 'message',
+          payload: {
+            user_id: userId,
+            content: content,
+            timestamp: new Date().toISOString(),
+          },
+          created_at: new Date(),
+        };
+
+        this.sendMessage(connection.ws, {
+          type: RemoteMessageType.COMMAND,
+          instance_id: instanceId,
+          timestamp: new Date().toISOString(),
+          data: command,
+        });
+
+        logger.info('User message sent to remote instance via WebSocket', {
+          instanceId,
+          userId,
+          messageId,
+          contentLength: content.length,
+        });
+
+        // Note: Response will be handled asynchronously via handleMessage
+        // when the remote instance sends back a RESPONSE message
+        return null;
+      } else {
+        logger.warn('Cannot send user message: WebSocket connection not ready', {
+          instanceId,
+          readyState: connection.ws.readyState,
+        });
+        return null;
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      logger.error('Failed to send user message to remote instance', {
+        instanceId,
+        userId,
+        messageId,
+        error: errorMessage,
+      });
+      return null;
     }
   }
 

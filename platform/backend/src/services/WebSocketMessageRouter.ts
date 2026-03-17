@@ -18,6 +18,7 @@
 import { Service } from 'typedi';
 import { InstanceRegistry, InstanceInfo } from './InstanceRegistry';
 import { WebSocketGateway } from './WebSocketGateway';
+import { RemoteInstanceWebSocketGateway } from './RemoteInstanceWebSocketGateway';
 import { logger } from '../config/logger';
 import { WebSocketMessageType, AssistantMessage } from '../types/websocket.types';
 
@@ -86,7 +87,8 @@ export class WebSocketMessageRouter {
 
   constructor(
     private readonly instanceRegistry: InstanceRegistry,
-    private readonly webSocketGateway: WebSocketGateway
+    private readonly webSocketGateway: WebSocketGateway,
+    private readonly remoteInstanceWSGateway: RemoteInstanceWebSocketGateway
   ) {}
 
   /**
@@ -252,28 +254,43 @@ export class WebSocketMessageRouter {
   }
 
   /**
-   * Send message to remote instance via Tunnel (placeholder)
+   * Send message to remote instance via WebSocket
    *
-   * TODO: Implement Tunnel communication in future task
+   * Uses RemoteInstanceWebSocketGateway to deliver messages to remote instances
+   * through their persistent WebSocket connection, avoiding HTTP fallback issues.
    *
    * @param instanceInfo - Instance information
    * @param content - Message content
    * @param messageId - Unique message ID
-   * @throws Error - Not implemented yet
+   * @throws Error if unable to send to remote instance
    */
   private async sendToRemoteInstance(
     instanceInfo: InstanceInfo,
     content: string,
     messageId: string
   ): Promise<void> {
-    // Placeholder for future Tunnel implementation
-    // For now, use the same HTTP mechanism as local instances
-    logger.warn('Remote instance routing not fully implemented, using HTTP fallback', {
+    const userId = instanceInfo.owner_id!;
+
+    logger.info('Sending message to remote instance via WebSocket', {
+      messageId,
+      instanceId: instanceInfo.instance_id,
+      userId,
+    });
+
+    // Send via RemoteInstanceWebSocketGateway
+    // Note: Response will be handled asynchronously via RemoteInstanceWebSocketGateway
+    // when the remote instance sends back a RESPONSE message
+    await this.remoteInstanceWSGateway.sendUserMessage(
+      instanceInfo.instance_id,
+      userId,
+      content,
+      messageId
+    );
+
+    logger.info('Message sent to remote instance, awaiting async response', {
       messageId,
       instanceId: instanceInfo.instance_id,
     });
-
-    await this.sendToLocalInstance(instanceInfo, content, messageId);
   }
 
   /**

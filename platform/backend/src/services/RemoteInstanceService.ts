@@ -15,6 +15,7 @@
 import { Service } from 'typedi';
 import { InstanceRepository } from '../repositories/InstanceRepository';
 import { Instance } from '../entities/Instance.entity';
+import { InstanceRegistry } from './InstanceRegistry';
 import { logger } from '../config/logger';
 import { AppError } from '../utils/errors/AppError';
 import { ErrorCodes } from '../utils/errors/ErrorCodes';
@@ -97,7 +98,8 @@ export class RemoteInstanceService {
   private readonly DEFAULT_HEARTBEAT_INTERVAL = 30000; // 30 seconds
 
   constructor(
-    private readonly instanceRepository: InstanceRepository
+    private readonly instanceRepository: InstanceRepository,
+    private readonly instanceRegistry: InstanceRegistry
   ) {}
 
   /**
@@ -238,7 +240,11 @@ export class RemoteInstanceService {
 
       await this.instanceRepository.updateByInstanceId(instanceId, statusUpdate);
 
-      // 5. Log heartbeat metrics
+      // 5. Update InstanceRegistry to keep in-memory status in sync
+      // This ensures that message routing can correctly determine if the instance is online
+      await this.instanceRegistry.updateHeartbeat(instanceId);
+
+      // 6. Log heartbeat metrics
       logger.debug('Heartbeat received', {
         instance_id: instanceId,
         status: heartbeat.status,
@@ -247,7 +253,7 @@ export class RemoteInstanceService {
         active_sessions: heartbeat.metrics.active_sessions
       });
 
-      // 6. Return response with commands (empty for now)
+      // 7. Return response with commands (empty for now)
       return {
         status: 'ok',
         server_time: Date.now(),
