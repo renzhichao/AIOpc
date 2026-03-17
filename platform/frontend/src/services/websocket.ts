@@ -137,7 +137,8 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
       return; // Already connected
     }
 
-    const token = localStorage.getItem('access_token');
+    // Try both token keys for compatibility with OAuth storage
+    const token = localStorage.getItem('access_token') || localStorage.getItem('auth_token');
     if (!token) {
       console.error('No access token found');
       notifyStatus('error');
