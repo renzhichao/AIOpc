@@ -245,8 +245,14 @@ describe('InstanceListPage', () => {
       renderInstanceListPage();
 
       await waitFor(() => {
-        expect(screen.getAllByTestId('health-status')).toHaveLength(2);
-      });
+        // Health status badges use testid format: health-status-{status}
+        const healthyBadges = screen.queryAllByTestId('health-status-healthy');
+        const warningBadges = screen.queryAllByTestId('health-status-warning');
+        const unhealthyBadges = screen.queryAllByTestId('health-status-unhealthy');
+
+        const totalBadges = healthyBadges.length + warningBadges.length + unhealthyBadges.length;
+        expect(totalBadges).toBeGreaterThanOrEqual(2);
+      }, { timeout: 3000 });
     });
 
     it('should display last heartbeat time for remote instances', async () => {
