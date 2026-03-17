@@ -5,7 +5,17 @@
 /**
  * 实例状态
  */
-export type InstanceStatus = 'pending' | 'active' | 'stopped' | 'error' | 'recovering';
+export type InstanceStatus = 'pending' | 'active' | 'stopped' | 'error' | 'recovering' | 'running';
+
+/**
+ * 部署类型
+ */
+export type DeploymentType = 'local' | 'remote';
+
+/**
+ * 健康状态
+ */
+export type HealthStatus = 'healthy' | 'warning' | 'unhealthy';
 
 /**
  * 实例模板
@@ -27,19 +37,45 @@ export interface InstanceConfig {
  * 实例信息
  */
 export interface Instance {
-  id: string;
-  owner_id: string;
-  name: string;
+  id: number;
+  instance_id: string;
+  owner_id?: number;
+  owner?: {
+    id: number;
+    username: string;
+  };
+  name?: string;
   description?: string;
-  template: InstanceTemplate;
+  template?: InstanceTemplate;
   config: InstanceConfig;
   status: InstanceStatus;
   docker_container_id?: string;
   restart_attempts: number;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
   last_active_at?: string;
   expires_at?: string;
+  claimed_at?: string;
+
+  // 健康状态相关
+  health_status?: HealthStatus;
+  health_reason?: string;
+  health_last_checked?: string;
+
+  // 部署类型相关
+  deployment_type: DeploymentType;
+
+  // 远程实例相关字段
+  remote_host?: string;
+  remote_port?: number;
+  remote_version?: string;
+  platform_api_key?: string;
+  capabilities?: string[];
+  remote_metadata?: Record<string, any>;
+
+  // 心跳相关
+  last_heartbeat_at?: string;
+  heartbeat_interval?: number;
 }
 
 /**
@@ -123,3 +159,31 @@ export interface ApiError {
   message: string;
   details?: unknown;
 }
+
+/**
+ * 未认领的远程实例
+ */
+export interface UnclaimedInstance {
+  instance_id: string;
+  deployment_type: 'remote';
+  status: 'pending';
+  remote_host: string;
+  remote_port: number;
+  remote_version: string;
+  capabilities: string[];
+  health_status: HealthStatus;
+  created_at: string;
+}
+
+/**
+ * 实例统计信息
+ */
+export interface InstanceStats {
+  total: number;
+  local: number;
+  remote: number;
+  unclaimed: number;
+  active: number;
+  healthy: number;
+}
+
