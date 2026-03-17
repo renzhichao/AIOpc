@@ -95,7 +95,8 @@ describe('InstanceService', () => {
       findExpiredInstances: jest.fn(),
       countByStatus: jest.fn(),
       countByUser: jest.fn(),
-      findRecoverableInstances: jest.fn()
+      findRecoverableInstances: jest.fn(),
+      findUnclaimedInstances: jest.fn()
     } as any;
 
     mockDockerService = {
@@ -841,6 +842,251 @@ describe('InstanceService', () => {
         const config = updateCall[1].config as InstanceConfig;
         expect(config.systemPrompt).toBe(expectedPrompt);
       }
+    });
+  });
+
+  /**
+   * TASK-009-02: Remote Instance Management Tests
+   *
+   * Tests for remote instance claiming, releasing, and querying:
+   * - getUnclaimedInstances: Get unclaimed remote instances
+   * - claimInstance: Claim an instance for a user
+   * - releaseInstance: Release an instance back to pool
+   * - getUserInstanceStats: Get user instance statistics
+   */
+  describe('Remote Instance Management (TASK-009-01)', () => {
+    const mockUnclaimedInstance: Instance = {
+      ...mockInstance,
+      id: 100,
+      instance_id: 'inst-unclaimed-001',
+      status: 'pending' as any,
+      deployment_type: 'remote',
+      name: 'Unclaimed Remote Instance',
+      owner_id: null as any,
+      owner: null as any,
+      claimed_at: null as any,
+      health_status: 'healthy' as any,
+      health_reason: null,
+      health_last_checked: null,
+      remote_host: '192.168.1.100',
+      remote_port: 3000,
+      remote_version: '1.0.0',
+      platform_api_key: 'test-api-key',
+      last_heartbeat_at: new Date(),
+      heartbeat_interval: 30000,
+      capabilities: 'chat,web_search',
+      remote_metadata: {}
+    };
+
+    const mockClaimedInstance: Instance = {
+      ...mockUnclaimedInstance,
+      id: 101,
+      instance_id: 'inst-claimed-001',
+      owner_id: mockUser.id,
+      owner: mockUser,
+      claimed_at: new Date(),
+      status: 'active' as any
+    };
+
+    describe('getUnclaimedInstances', () => {
+      it('should return only instances with owner_id IS NULL', async () => {
+        // Arrange
+        const mockInstances = [mockUnclaimedInstance];
+        (mockInstanceRepository.findUnclaimedInstances as jest.Mock).mockResolvedValue(mockInstances);
+
+        // Act
+        const result = await instanceService.getUnclaimedInstances();
+
+        // Assert
+        expect(result).toHaveLength(1);
+        expect(result[0].owner_id).toBeNull();
+        expect(result[0].instance_id).toBe('inst-unclaimed-001');
+        expect(mockInstanceRepository.findUnclaimedInstances).toHaveBeenCalledWith(undefined);
+      });
+
+      it('should filter by deployment_type="remote" when specified', async () => {
+        // Arrange
+        const mockInstances = [mockUnclaimedInstance];
+        (mockInstanceRepository.findUnclaimedInstances as jest.Mock).mockResolvedValue(mockInstances);
+
+        // Act
+        const result = await instanceService.getUnclaimedInstances({
+          deployment_type: 'remote'
+        });
+
+        // Assert
+        expect(result).toHaveLength(1);
+        expect(result[0].deployment_type).toBe('remote');
+        expect(mockInstanceRepository.findUnclaimedInstances).toHaveBeenCalledWith({
+          deployment_type: 'remote'
+        });
+      });
+
+      it('should filter by status="pending" when specified', async () => {
+        // Arrange
+        const mockInstances = [mockUnclaimedInstance];
+        (mockInstanceRepository.findUnclaimedInstances as jest.Mock).mockResolvedValue(mockInstances);
+
+        // Act
+        const result = await instanceService.getUnclaimedInstances({
+          status: 'pending'
+        });
+
+        // Assert
+        expect(result).toHaveLength(1);
+        expect(result[0].status).toBe('pending');
+        expect(mockInstanceRepository.findUnclaimedInstances).toHaveBeenCalledWith({
+          status: 'pending'
+        });
+      });
+
+      it('should return empty array when no unclaimed instances exist', async () => {
+        // Arrange
+        (mockInstanceRepository.findUnclaimedInstances as jest.Mock).mockResolvedValue([]);
+
+        // Act
+        const result = await instanceService.getUnclaimedInstances();
+
+        // Assert
+        expect(result).toEqual([]);
+        expect(result).toHaveLength(0);
+      });
+    });
+
+    describe('claimInstance (remote instances)', () => {
+      it('should successfully claim an unclaimed remote instance', async () => {
+        // Arrange
+        const claimedInstance = {
+          ...mockUnclaimedInstance,
+          owner_id: mockUser.id,
+          claimed_at: new Date()
+        };
+        mockInstanceRepository.findByInstanceId
+          .mockResolvedValueOnce(mockUnclaimedInstance) // First call: get instance to claim
+          .mockResolvedValueOnce(claimedInstance); // Second call: get updated instance
+        mockInstanceRepository.claimInstance.mockResolvedValue(undefined);
+
+        // Act
+        const result = await instanceService.claimInstance('inst-unclaimed-001', mockUser.id);
+
+        // Assert
+        expect(result.owner_id).toBe(mockUser.id);
+        expect(result.claimed_at).not.toBeNull();
+        expect(mockInstanceRepository.claimInstance).toHaveBeenCalledWith('inst-unclaimed-001', mockUser.id);
+      });
+
+      it('should throw error when claiming already claimed instance', async () => {
+        // Arrange
+        mockInstanceRepository.findByInstanceId.mockResolvedValue(mockClaimedInstance);
+
+        // Act & Assert
+        await expect(
+          instanceService.claimInstance('inst-claimed-001', mockUser.id)
+        ).rejects.toThrow();
+
+        expect(mockErrorService.createError).toHaveBeenCalled();
+      });
+
+      it('should throw error when claiming non-existent instance', async () => {
+        // Arrange
+        mockInstanceRepository.findByInstanceId.mockResolvedValue(null);
+
+        // Act & Assert
+        await expect(
+          instanceService.claimInstance('non-existent', mockUser.id)
+        ).rejects.toThrow();
+      });
+    });
+
+    describe('releaseInstance (additional validation)', () => {
+      it('should throw error when trying to release instance owned by different user', async () => {
+        // Arrange
+        const otherUser: User = { ...mockUser, id: 999 };
+        mockInstanceRepository.findByInstanceId.mockResolvedValue(mockClaimedInstance);
+
+        // Act & Assert
+        await expect(
+          instanceService.releaseInstance('inst-claimed-001', otherUser.id)
+        ).rejects.toThrow();
+      });
+
+      it('should throw error when releasing non-existent instance', async () => {
+        // Arrange
+        mockInstanceRepository.findByInstanceId.mockResolvedValue(null);
+
+        // Act & Assert
+        await expect(
+          instanceService.releaseInstance('non-existent', mockUser.id)
+        ).rejects.toThrow();
+      });
+    });
+
+    describe('getUserInstanceStats', () => {
+      it('should return correct statistics for user with mixed instances', async () => {
+        // Arrange
+        const userInstances: Instance[] = [
+          { ...mockClaimedInstance, deployment_type: 'local', status: 'active' as any, health_status: 'healthy' as any },
+          { ...mockClaimedInstance, id: 102, instance_id: 'inst-002', deployment_type: 'remote', status: 'stopped' as any, health_status: null },
+          { ...mockClaimedInstance, id: 103, instance_id: 'inst-003', deployment_type: 'remote', status: 'active' as any, health_status: 'healthy' as any },
+        ];
+
+        mockInstanceRepository.findByOwnerId.mockResolvedValue(userInstances);
+        (mockInstanceRepository.findUnclaimedInstances as jest.Mock).mockResolvedValue([mockUnclaimedInstance]);
+
+        // Act
+        const result = await instanceService.getUserInstanceStats(mockUser.id);
+
+        // Assert
+        expect(result).toEqual({
+          total: 3,
+          local: 1,
+          remote: 2,
+          unclaimed: 1,
+          active: 2,
+          healthy: 2
+        });
+      });
+
+      it('should return zeros for user with no instances', async () => {
+        // Arrange
+        mockInstanceRepository.findByOwnerId.mockResolvedValue([]);
+        (mockInstanceRepository.findUnclaimedInstances as jest.Mock).mockResolvedValue([]);
+
+        // Act
+        const result = await instanceService.getUserInstanceStats(mockUser.id);
+
+        // Assert
+        expect(result).toEqual({
+          total: 0,
+          local: 0,
+          remote: 0,
+          unclaimed: 0,
+          active: 0,
+          healthy: 0
+        });
+      });
+
+      it('should count only active and healthy instances correctly', async () => {
+        // Arrange
+        const userInstances: Instance[] = [
+          { ...mockClaimedInstance, deployment_type: 'local', status: 'active' as any, health_status: 'healthy' as any },
+          { ...mockClaimedInstance, id: 104, instance_id: 'inst-002', deployment_type: 'remote', status: 'stopped' as any, health_status: 'warning' as any },
+          { ...mockClaimedInstance, id: 105, instance_id: 'inst-003', deployment_type: 'remote', status: 'error' as any, health_status: 'unhealthy' as any },
+        ];
+
+        mockInstanceRepository.findByOwnerId.mockResolvedValue(userInstances);
+        (mockInstanceRepository.findUnclaimedInstances as jest.Mock).mockResolvedValue([]);
+
+        // Act
+        const result = await instanceService.getUserInstanceStats(mockUser.id);
+
+        // Assert
+        expect(result.total).toBe(3);
+        expect(result.active).toBe(1); // Only first instance is active
+        expect(result.healthy).toBe(1); // Only first instance is healthy
+        expect(result.local).toBe(1);
+        expect(result.remote).toBe(2);
+      });
     });
   });
 });
