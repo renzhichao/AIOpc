@@ -218,15 +218,26 @@ export class RemoteInstanceService {
         updated_at: new Date()
       });
 
-      // 3. Update health status based on heartbeat
+      // 3. Determine health status based on heartbeat
       const healthStatus = this.determineHealthStatus(heartbeat);
-      await this.instanceRepository.updateByInstanceId(instanceId, {
+
+      // 4. Update health status and recover instance status if needed
+      // If instance is offline but heartbeat is received, recover it to active status
+      const statusUpdate: any = {
         health_status: healthStatus,
         health_reason: `Heartbeat received: ${heartbeat.status}`,
         updated_at: new Date()
-      });
+      };
 
-      // 4. Log heartbeat metrics
+      if (instance.status === 'offline' && healthStatus === 'healthy') {
+        statusUpdate.status = 'active';
+        statusUpdate.health_reason = 'Instance recovered to active after successful heartbeat';
+        logger.info('Recovering offline instance to active', { instance_id: instanceId });
+      }
+
+      await this.instanceRepository.updateByInstanceId(instanceId, statusUpdate);
+
+      // 5. Log heartbeat metrics
       logger.debug('Heartbeat received', {
         instance_id: instanceId,
         status: heartbeat.status,
@@ -235,7 +246,7 @@ export class RemoteInstanceService {
         active_sessions: heartbeat.metrics.active_sessions
       });
 
-      // 5. Return response with commands (empty for now)
+      // 6. Return response with commands (empty for now)
       return {
         status: 'ok',
         server_time: Date.now(),

@@ -227,9 +227,11 @@ async function registerWithPlatform() {
  * Connect to platform via WebSocket
  */
 function connectWebSocket() {
-  const wsUrl = `ws://${PLATFORM_URL.replace('http://', '').replace('https://', '')}:${PLATFORM_WS_PORT}?api_key=${platformApiKey}`;
+  // Connect through nginx proxy on port 80 (path /ws) instead of direct port 3002
+  // Cloud security group blocks ports 3000-3002, only allows 80/443
+  const wsUrl = `ws://${PLATFORM_URL.replace('http://', '').replace('https://', '')}/ws?api_key=${platformApiKey}`;
 
-  logger.info('Connecting to platform WebSocket...', { wsUrl });
+  logger.info('Connecting to platform WebSocket through nginx proxy...', { wsUrl });
 
   wsConnection = new WebSocket(wsUrl);
 
