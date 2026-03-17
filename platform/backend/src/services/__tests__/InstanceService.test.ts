@@ -55,7 +55,18 @@ describe('InstanceService', () => {
     claimed_at: new Date(),
     docker_container_id: 'container-xyz789',
     restart_attempts: 0,
-    health_status: {}
+    health_status: 'healthy' as any,
+    health_reason: null,
+    health_last_checked: null,
+    deployment_type: 'local',
+    remote_host: null as any,
+    remote_port: null as any,
+    remote_version: null as any,
+    platform_api_key: null as any,
+    last_heartbeat_at: null as any,
+    heartbeat_interval: 30000,
+    capabilities: null as any,
+    remote_metadata: null as any
   };
 
   beforeEach(() => {
@@ -635,21 +646,23 @@ describe('InstanceService', () => {
   describe('releaseInstance', () => {
     it('should release an instance successfully', async () => {
       // Arrange
+      mockInstanceRepository.findByInstanceId.mockResolvedValue(mockInstance);
       mockInstanceRepository.releaseInstance.mockResolvedValue(undefined);
 
       // Act
-      await instanceService.releaseInstance(mockInstance.instance_id);
+      await instanceService.releaseInstance(mockInstance.instance_id, mockUser.id);
 
       // Assert
-      expect(mockInstanceRepository.releaseInstance).toHaveBeenCalledWith(mockInstance.instance_id);
+      expect(mockInstanceRepository.releaseInstance).toHaveBeenCalledWith(mockInstance.instance_id, mockUser.id);
     });
 
     it('should throw error on release failure', async () => {
       // Arrange
+      mockInstanceRepository.findByInstanceId.mockResolvedValue(mockInstance);
       mockInstanceRepository.releaseInstance.mockRejectedValue(new Error('Database error'));
 
       // Act & Assert
-      await expect(instanceService.releaseInstance(mockInstance.instance_id))
+      await expect(instanceService.releaseInstance(mockInstance.instance_id, mockUser.id))
         .rejects.toThrow();
 
       expect(mockErrorService.createError).toHaveBeenCalledWith(
