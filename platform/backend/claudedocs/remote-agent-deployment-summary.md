@@ -2,7 +2,499 @@
 
 ## 概述
 
-本文档总结了为 AIOpc 平台实现远程 OpenClaw Agent 部署和通信机制的工作。
+本文档总结了为 AIOpc 平台实现远程 OpenClaw Agent 部署和通信机制的工作，并包含了从生产环境中获得的关键经验和教训。
+
+## ⚠️ 关键警告 - 从生产问题中学到的教训
+
+本文档包含多个从实际部署问题中提取的"陷阱"和"解决方案"。在执行任何部署操作前，请务必阅读以下内容：
+
+### 严重事故历史
+1. **数据库完全丢失** - 错误删除 PostgreSQL volume，所有表和数据被删除
+2. **nginx 服务停止** - 容器意外退出，导致外部无法访问
+3. **环境变量缺失** - OAuth URL 配置丢失，OAuth 功能失效
+4. **网络配置错误** - 使用错误的 Docker 网络，backend 无法连接数据库
+5. **消息路由失败** - 远程实例未注册到 InstanceRegistry，导致消息无法路由
+
+**相关分析文档**：
+- [REGRESSION_PREVENTION_MEASURES.md](../REGRESSION_PREVENTION_MEASURES.md) - 防止回归重复发生的具体措施
+- [NETWORK_REGRESSION_ANALYSIS.md](../NETWORK_REGRESSION_ANALYSIS.md) - 网络配置事故分析报告
+
+---
+
+## 快速参考 - 服务器访问
+
+### SSH 访问密钥
+```bash
+# 平台服务器 (118.25.0.190)
+ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190
+
+# 远程 Agent 服务器 (101.34.254.52)
+ssh -i ~/.ssh/aiopclaw_remote_agent root@101.34.254.52
+```
+
+**重要提示**：
+- SSH 密钥位于本地 `~/.ssh/` 目录
+- `rap001_opclaw` 用于平台服务器
+- `aiopclaw_remote_agent` 用于远程 Agent 服务器
+- 不要将这些密钥提交到版本控制系统
+
+### 服务器关键路径
+
+#### 平台服务器 (118.25.0.190)
+```bash
+# 项目位置
+/opt/opclaw/platform/           # 平台代码
+/opt/opclaw/platform/backend/  # 后端代码
+
+# 配置文件
+/opt/opclaw/platform/.env.production  # 生产环境变量
+
+# Docker 容器
+opclaw-postgres    # PostgreSQL 数据库
+opclaw-redis       # Redis 缓存
+opclaw-backend     # 后端服务 (ports: 3000, 3001, 3002)
+opclaw-frontend    # Nginx 前端 (port: 80)
+
+# Docker 网络
+opclaw_opclaw-network  # ⚠️ 必须使用这个确切的网络名称
+```
+
+#### 远程 Agent 服务器 (101.34.254.52)
+```bash
+# Agent 位置
+/opt/openclaw-agent/           # Agent 主目录
+/opt/openclaw-agent/agent.js   # Agent 主脚本
+/opt/openclaw-agent/credentials.json  # ⚠️ 凭证文件（不是 /etc/openclaw-agent/）
+
+# 日志文件
+/var/log/openclaw-agent.log    # Agent 日志
+
+# systemd 服务
+openclaw-agent.service         # systemd 服务配置
+```
+
+---
+
+## 快速故障排查命令
+
+### 检查所有容器状态
+```bash
+ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190 "docker ps | grep opclaw"
+```
+
+### 检查 Docker 网络
+```bash
+# 查看 postgres 在哪个网络
+ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190 "docker network inspect opclaw_opclaw-network --format '{{range .Containers}}{{.Name}} {{end}}'"
+```
+
+### 检查数据库连接
+```bash
+# 在 backend 容器中检查数据库连接
+ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190 "docker logs opclaw-backend --tail 50 | grep -i 'postgres\|database\|error'"
+```
+
+### 检查 Agent 状态
+```bash
+ssh -i ~/.ssh/aiopclaw_remote_agent root@101.34.254.52 "systemctl status openclaw-agent"
+```
+
+### 查看 Agent 日志
+```bash
+ssh -i ~/.ssh/aiopclaw_remote_agent root@101.34.254.52 "tail -f /var/log/openclaw-agent.log"
+```
+
+---
+
+## 常见问题和解决方案
+
+### 问题 1: Backend 容器无法连接数据库
+
+**症状**：
+```
+getaddrinfo EAI_AGAIN postgres
+Environment: development
+No metadata for "Instance"
+```
+
+**根本原因**：Backend 容器使用了错误的 Docker 网络
+
+**解决方案**：
+```bash
+ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190 << 'EOF'
+# 停止并删除错误的容器
+docker stop opclaw-backend
+docker rm opclaw-backend
+
+# 使用正确的网络重新创建容器
+docker run -d \
+  --name opclaw-backend \
+  --network opclaw_opclaw-network \
+  --restart unless-stopped \
+  -p 3000:3000 \
+  -p 3001:3001 \
+  -p 3002:3002 \
+  -v /var/run/docker.sock:/var/run/docker.sock:rw \
+  -v /opt/opclaw/platform/logs/backend:/app/logs \
+  --env-file /opt/opclaw/platform/.env.production \
+  platform-backend
+
+# 验证连接
+sleep 5
+docker logs opclaw-backend --tail 20
+EOF
+```
+
+**验证步骤**：
+```bash
+# 1. 检查 backend 是否在正确的网络中
+ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190 "docker inspect opclaw-backend --format '{{range $net, $conf := .NetworkSettings.Networks}}{{$net}}{{end}}'"
+
+# 2. 检查 postgres 是否在同一网络
+ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190 "docker network inspect opclaw_opclaw-network --format '{{range .Containers}}{{.Name}} {{end}}' | grep postgres"
+
+# 3. 测试 DNS 解析
+ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190 "docker exec opclaw-backend ping -c 1 postgres"
+```
+
+### 问题 2: OAuth 502 Bad Gateway 错误
+
+**症状**：
+```
+GET http://renava.cn/api/oauth/authorize 502 (Bad Gateway)
+```
+
+**根本原因**：OAuth URL 环境变量缺失
+
+**解决方案**：
+```bash
+ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190 << 'EOF'
+# 1. 编辑 .env.production 文件
+cat >> /opt/opclaw/platform/.env.production << 'ENV'
+FEISHU_OAUTH_AUTHORIZE_URL=https://open.feishu.cn/open-apis/authen/v1/authorize
+FEISHU_OAUTH_TOKEN_URL=https://open.feishu.cn/open-apis/authen/v3/oidc/access_token
+FEISHU_USER_INFO_URL=https://open.feishu.cn/open-apis/authen/v1/user_info
+ENV
+
+# 2. 重新创建 backend 容器
+docker stop opclaw-backend
+docker rm opclaw-backend
+
+docker run -d \
+  --name opclaw-backend \
+  --network opclaw_opclaw-network \
+  --restart unless-stopped \
+  -p 3000:3000 \
+  -p 3001:3001 \
+  -p 3002:3002 \
+  -v /var/run/docker.sock:/var/run/docker.sock:rw \
+  -v /opt/opclaw/platform/logs/backend:/app/logs \
+  --env-file /opt/opclaw/platform/.env.production \
+  platform-backend
+
+# 3. 测试 OAuth 端点
+sleep 5
+curl -I http://localhost/api/oauth/authorize?redirect_uri=http://localhost/oauth/callback
+EOF
+```
+
+### 问题 3: 数据库表丢失
+
+**症状**：
+```
+relation "instances" does not exist
+```
+
+**根本原因**：PostgreSQL volume 被删除或数据库未同步
+
+**解决方案**：
+```bash
+ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190 << 'EOF'
+# 使用 sync-schema.js 同步数据库
+docker exec opclaw-backend node /app/dist/scripts/sync-schema.js
+
+# 验证表已创建
+docker exec opclaw-postgres psql -U opclaw -d opclaw -c "\dt"
+EOF
+```
+
+**预防措施**：
+```bash
+# 定期备份数据库（添加到 crontab）
+ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190 << 'EOF'
+cat > /opt/opclaw/scripts/backup-database.sh << 'SCRIPT'
+#!/bin/bash
+BACKUP_DIR="/backup/opclaw/database"
+DATE=$(date +%Y%m%d_%H%M%S)
+mkdir -p $BACKUP_DIR
+
+# 备份数据库
+docker exec opclaw-postgres pg_dump -U opclaw opclaw | gzip > $BACKUP_DIR/opclaw_$DATE.sql.gz
+
+# 保留最近7天的备份
+find $BACKUP_DIR -name "opclaw_*.sql.gz" -mtime +7 -delete
+
+echo "Backup completed: opclaw_$DATE.sql.gz"
+SCRIPT
+
+chmod +x /opt/opclaw/scripts/backup-database.sh
+
+# 添加到 crontab（每天凌晨2点）
+(crontab -l 2>/dev/null; echo "0 2 * * * /opt/opclaw/scripts/backup-database.sh") | crontab -
+EOF
+```
+
+### 问题 4: 消息路由失败 - "No instance found for user X"
+
+**症状**：
+```
+Failed to route message: No instance found for user 1
+```
+
+**根本原因**：远程实例连接后未注册到 InstanceRegistry 的 userInstanceMap
+
+**解决方案**：确保 RemoteInstanceWebSocketGateway 调用 InstanceRegistry.registerInstance()
+
+```typescript
+// src/services/RemoteInstanceWebSocketGateway.ts
+// 在 handleConnection 方法中，成功连接后添加：
+
+try {
+  await this.instanceRegistry.registerInstance(instanceId, {
+    connection_type: 'remote',
+    api_endpoint: `http://${instanceInfo.remote_host}:3000`,
+    metadata: {
+      platform_api_key: apiKey,
+      remote_host: instanceInfo.remote_host,
+    },
+  });
+  logger.info('Remote instance registered to InstanceRegistry', { instanceId });
+} catch (error) {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  logger.error('Failed to register instance to InstanceRegistry', { instanceId, error: errorMessage });
+  // Don't fail the connection if registry registration fails
+}
+```
+
+**验证步骤**：
+```bash
+# 1. 重新构建 backend 镜像
+ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190 << 'EOF'
+cd /opt/opclaw/platform/backend
+docker build -t platform-backend .
+
+# 2. 重启 backend 容器
+docker stop opclaw-backend
+docker rm opclaw-backend
+
+docker run -d \
+  --name opclaw-backend \
+  --network opclaw_opclaw-network \
+  --restart unless-stopped \
+  -p 3000:3000 \
+  -p 3001:3001 \
+  -p 3002:3002 \
+  -v /var/run/docker.sock:/var/run/docker.sock:rw \
+  -v /opt/opclaw/platform/logs/backend:/app/logs \
+  --env-file /opt/opclaw/platform/.env.production \
+  platform-backend
+
+# 3. 检查远程实例是否重新连接
+docker logs opclaw-backend --tail 50 | grep -i "remote instance"
+EOF
+```
+
+### 问题 5: 远程 Agent 无法连接 WebSocket
+
+**症状**：
+```
+Agent 日志显示: WebSocket connection failed
+```
+
+**可能原因**：
+1. Backend 容器未暴露端口 3002
+2. 防火墙阻止了 3002 端口
+3. 平台服务器网络策略阻止连接
+
+**解决方案**：
+```bash
+ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190 << 'EOF'
+# 1. 检查 backend 容器端口映射
+docker port opclaw-backend
+
+# 如果没有 3002，重新创建容器
+if ! docker port opclaw-backend | grep -q "3002"; then
+  docker stop opclaw-backend
+  docker rm opclaw-backend
+
+  docker run -d \
+    --name opclaw-backend \
+    --network opclaw_opclaw-network \
+    --restart unless-stopped \
+    -p 3000:3000 \
+    -p 3001:3001 \
+    -p 3002:3002 \
+    -v /var/run/docker.sock:/var/run/docker.sock:rw \
+    -v /opt/opclaw/platform/logs/backend:/app/logs \
+    --env-file /opt/opclaw/platform/.env.production \
+    platform-backend
+fi
+
+# 2. 检查防火墙规则
+if command -v ufw &> /dev/null; then
+  ufw status | grep 3002 || ufw allow 3002/tcp
+elif command -v firewall-cmd &> /dev/null; then
+  firewall-cmd --list-ports | grep 3002 || firewall-cmd --permanent --add-port=3002/tcp
+  firewall-cmd --reload
+fi
+EOF
+```
+
+### 问题 6: Agent 凭证更新无效
+
+**症状**：更新了凭证文件但 Agent 仍使用旧凭证
+
+**根本原因**：更新了错误的文件位置
+
+**解决方案**：
+```bash
+ssh -i ~/.ssh/aiopclaw_remote_agent root@101.34.254.52 << 'EOF'
+# ⚠️ 注意：Agent 从 /opt/openclaw-agent/credentials.json 读取凭证
+# 不是从 /etc/openclaw-agent/credentials.json
+
+# 1. 更新正确的凭证文件
+cat > /opt/openclaw-agent/credentials.json << 'CREDS'
+{
+  "instanceId": "inst-remote-xxx",
+  "platformApiKey": "sk-remote-xxx",
+  "platformUrl": "http://118.25.0.190",
+  "registeredAt": "2026-03-17T00:00:00.000Z"
+}
+CREDS
+
+# 2. 重启 Agent
+systemctl restart openclaw-agent
+
+# 3. 验证凭证已加载
+sleep 3
+journalctl -u openclaw-agent --since "3 seconds ago" | grep -i "credentials\|registered"
+EOF
+```
+
+---
+
+## 部署检查清单
+
+### 部署前检查
+- [ ] 确认 SSH 密钥位置正确 (`~/.ssh/rap001_opclaw`, `~/.ssh/aiopclaw_remote_agent`)
+- [ ] 备份当前配置文件
+- [ ] 记录当前运行的容器状态 (`docker ps`)
+- [ ] 验证网络配置 (`docker network ls`)
+
+### 修改环境变量前
+- [ ] 更新 `.env.production` 文件
+- [ ] 更新 `docker-compose.yml` 文件
+- [ ] 验证变量引用正确
+- [ ] 更新相关文档
+
+### 重新创建容器前
+- [ ] 确认 Docker 网络名称 (`opclaw_opclaw-network`)
+- [ ] 确认端口映射 (3000, 3001, 3002)
+- [ ] 确认环境变量文件路径
+- [ ] 备份重要数据
+
+### 容器启动后验证
+- [ ] 容器成功启动 (`docker ps`)
+- [ ] 数据库连接正常 (检查日志)
+- [ ] 服务间通信测试 (ping, curl)
+- [ ] 健康检查通过 (`/health` 端点)
+- [ ] OAuth 端点工作 (测试登录)
+- [ ] 远程实例连接 (检查日志)
+
+---
+
+## 完整 Backend 恢复脚本
+
+当需要完全重新创建 backend 容器时使用：
+
+```bash
+#!/bin/bash
+# 完整的 backend 容器恢复脚本
+# 使用方法: ssh -i ~/.ssh/rap001_opclaw root@118.25.0.190 'bash -s' < recover-backend.sh
+
+set -e
+
+echo "=== Backend 容器恢复脚本 ==="
+
+# 1. 检查网络
+echo "步骤 1: 检查 Docker 网络..."
+if ! docker network inspect opclaw_opclaw-network &>/dev/null; then
+    echo "❌ 错误: 网络 opclaw_opclaw-network 不存在"
+    exit 1
+fi
+
+if ! docker network inspect opclaw_opclaw-network --format '{{range .Containers}}{{.Name}}{{end}}' | grep -q "opclaw-postgres"; then
+    echo "❌ 错误: postgres 不在网络 opclaw_opclaw-network 中"
+    exit 1
+fi
+
+echo "✅ 网络检查通过"
+
+# 2. 停止并删除旧容器
+echo "步骤 2: 停止并删除旧容器..."
+docker stop opclaw-backend 2>/dev/null || true
+docker rm opclaw-backend 2>/dev/null || true
+
+# 3. 启动新容器
+echo "步骤 3: 启动新的 backend 容器..."
+docker run -d \
+  --name opclaw-backend \
+  --network opclaw_opclaw-network \
+  --restart unless-stopped \
+  -p 3000:3000 \
+  -p 3001:3001 \
+  -p 3002:3002 \
+  -v /var/run/docker.sock:/var/run/docker.sock:rw \
+  -v /opt/opclaw/platform/logs/backend:/app/logs \
+  --env-file /opt/opclaw/platform/.env.production \
+  platform-backend
+
+# 4. 等待容器启动
+echo "步骤 4: 等待容器启动..."
+sleep 10
+
+# 5. 验证数据库连接
+echo "步骤 5: 验证数据库连接..."
+if docker logs opclaw-backend --tail 50 | grep -q "getaddrinfo EAI_AGAIN postgres"; then
+    echo "❌ 错误: 数据库连接失败"
+    docker logs opclaw-backend --tail 50
+    exit 1
+fi
+
+# 6. 验证健康检查
+echo "步骤 6: 验证健康检查..."
+if ! curl -f -s http://localhost:3000/health > /dev/null; then
+    echo "❌ 错误: 健康检查失败"
+    docker logs opclaw-backend --tail 50
+    exit 1
+fi
+
+# 7. 验证 OAuth 端点
+echo "步骤 7: 验证 OAuth 端点..."
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost/api/oauth/authorize?redirect_uri=http://localhost/oauth/callback)
+if [ "$HTTP_CODE" -ne 200 ]; then
+    echo "⚠️  警告: OAuth 端点返回 HTTP $HTTP_CODE (预期 200 或 302)"
+else
+    echo "✅ OAuth 端点正常"
+fi
+
+echo ""
+echo "=== 恢复完成 ==="
+echo "容器状态:"
+docker ps | grep opclaw-backend
+```
+
+---
 
 ## 已完成的工作
 

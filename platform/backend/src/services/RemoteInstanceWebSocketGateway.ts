@@ -21,6 +21,7 @@ import { WebSocketServer, WebSocket } from 'ws';
 import { URL } from 'url';
 import { logger } from '../config/logger';
 import { RemoteInstanceService } from './RemoteInstanceService';
+import { InstanceRegistry } from './InstanceRegistry';
 
 /**
  * WebSocket message types for remote instances
@@ -90,7 +91,8 @@ export class RemoteInstanceWebSocketGateway {
   };
 
   constructor(
-    private readonly remoteInstanceService: RemoteInstanceService
+    private readonly remoteInstanceService: RemoteInstanceService,
+    private readonly instanceRegistry: InstanceRegistry
   ) {}
 
   /**
@@ -206,6 +208,23 @@ export class RemoteInstanceWebSocketGateway {
               apiKey: apiKey.substring(0, 10) + '...',
               totalConnections: this.connections.size,
             });
+
+            // Register instance to InstanceRegistry for message routing
+            try {
+              await this.instanceRegistry.registerInstance(instanceId, {
+                connection_type: 'remote',
+                api_endpoint: `http://${instanceInfo.remote_host}:3000`,
+                metadata: {
+                  platform_api_key: apiKey,
+                  remote_host: instanceInfo.remote_host,
+                },
+              });
+              logger.info('Remote instance registered to InstanceRegistry', { instanceId });
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              logger.error('Failed to register instance to InstanceRegistry', { instanceId, error: errorMessage });
+              // Don't fail the connection if registry registration fails
+            }
 
             // Send registered confirmation
             this.sendMessage(ws, {
