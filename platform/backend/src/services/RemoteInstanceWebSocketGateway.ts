@@ -196,6 +196,14 @@ export class RemoteInstanceWebSocketGateway {
               instanceId = instanceInfo.instance_id;
             }
 
+            // Check for duplicate connection and clean up old one
+            const existingConnection = this.connections.get(instanceId);
+            if (existingConnection) {
+              logger.warn('Duplicate connection detected, closing old connection', { instanceId });
+              // Close old connection and clean up its heartbeat interval
+              this.closeConnection(instanceId, 1000, 'New connection established');
+            }
+
             // Store connection
             const connection: RemoteInstanceConnection = {
               instanceId,
