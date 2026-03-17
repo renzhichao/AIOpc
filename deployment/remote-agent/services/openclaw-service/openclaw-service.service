@@ -1,0 +1,17 @@
+[Unit]
+Description=OpenClaw AI Agent Service
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/openclaw-service
+ExecStart=/usr/bin/node /opt/openclaw-service/src/index.js
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=openclaw-service
+
+[Install]
+WantedBy=multi-user.target
