@@ -30,6 +30,7 @@ let instanceId = null;
 let platformApiKey = null;
 let wsConnection = null;
 let heartbeatTimer = null;
+let pingTimer = null;
 let isRegistered = false;
 
 /**
@@ -188,6 +189,21 @@ function connectWebSocket() {
       data: {}
     }));
   });
+
+  // Handle WebSocket ping frames to keep connection alive
+  wsConnection.on('ping', (data) => {
+    logger.debug('Received ping from platform, sending pong');
+    // ws library automatically responds with pong when ping handler is defined
+  });
+
+  // Handle WebSocket pong frames
+  wsConnection.on('pong', (data) => {
+    logger.debug('Received pong from platform');
+  });
+
+  // Start proactive ping to keep connection alive
+  startProactivePing();
+
   wsConnection.on('message', async (data) => {
     try {
       const message = JSON.parse(data.toString());
@@ -202,9 +218,38 @@ function connectWebSocket() {
   });
   wsConnection.on('close', (code, reason) => {
     logger.warn('WebSocket connection closed', { code, reason: reason.toString() });
+    // Clear ping timer
+    if (pingTimer) {
+      clearInterval(pingTimer);
+      pingTimer = null;
+    }
     logger.info('Will retry connection in 10 seconds');
     setTimeout(connectWebSocket, 10000);
   });
+}
+
+/**
+ * Start proactive ping to keep WebSocket connection alive
+ */
+function startProactivePing() {
+  // Clear existing ping timer if any
+  if (pingTimer) {
+    clearInterval(pingTimer);
+  }
+
+  // Send ping every 30 seconds to keep connection alive
+  pingTimer = setInterval(() => {
+    if (wsConnection && wsConnection.readyState === WebSocket.OPEN) {
+      try {
+        wsConnection.ping();
+        logger.debug('Sent proactive ping to platform');
+      } catch (error) {
+        logger.error('Failed to send ping', { error: error.message });
+      }
+    }
+  }, 30000); // 30 seconds
+
+  logger.info('Started proactive ping timer', { interval: 30000 });
 }
 
 /**
@@ -365,6 +410,7 @@ async function start() {
 const shutdown = (signal) => {
   logger.info(`Received ${signal}, shutting down gracefully`);
   if (heartbeatTimer) clearInterval(heartbeatTimer);
+  if (pingTimer) clearInterval(pingTimer);
   if (wsConnection) wsConnection.close();
   process.exit(0);
 };
