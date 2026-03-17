@@ -5,7 +5,6 @@
  * Handles both claimed (Instance) and unclaimed (UnclaimedInstance) remote instances.
  */
 
-import React from 'react';
 import type { Instance, UnclaimedInstance } from '../types/instance';
 import { InstanceTypeBadge } from './InstanceTypeBadge';
 import { HealthStatusBadge } from './HealthStatusBadge';
@@ -110,7 +109,9 @@ export default function RemoteInstanceCard({
             <p className="text-sm text-gray-600">{getConnectionInfo()}</p>
           </div>
 
-          <HealthStatusBadge status={instance.health_status} />
+          {instance.health_status && (
+            <HealthStatusBadge status={instance.health_status} />
+          )}
         </div>
 
         {/* Connection Information */}
