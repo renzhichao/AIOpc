@@ -1,0 +1,504 @@
+name: CI Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+# Cancel in-progress runs for the same branch and workflow
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ##############################################################################
+  # Job 1: Lint - Check code quality with ESLint and Prettier
+  ##############################################################################
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        component: [backend, frontend]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        working-directory: platform/${{ matrix.component }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Run ESLint
+        working-directory: platform/${{ matrix.component }}
+        run: pnpm run lint
+
+      - name: Run Prettier check
+        working-directory: platform/${{ matrix.component }}
+        run: |
+          if grep -q '"format"' package.json; then
+            pnpm run format --check
+          else
+            echo "Prettier not configured, skipping"
+          fi
+
+  ##############################################################################
+  # Job 2: Test - Run unit tests with coverage
+  ##############################################################################
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        component: [backend, frontend]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        working-directory: platform/${{ matrix.component }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Run unit tests with coverage
+        working-directory: platform/${{ matrix.component }}
+        run: pnpm run test:coverage
+
+      - name: Check coverage threshold (≥80%)
+        working-directory: platform/${{ matrix.component }}
+        run: |
+          # Extract coverage percentage from Jest/Vitest output
+          if [ -f "coverage/coverage-summary.json" ]; then
+            COVERAGE=$(node -e "
+              const summary = require('./coverage/coverage-summary.json');
+              const total = summary.total;
+              const linesPct = total.lines.pct;
+              console.log(linesPct);
+            ")
+            echo "Current coverage: ${COVERAGE}%"
+            if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+              echo "::error::Coverage ${COVERAGE}% is below threshold 80%"
+              exit 1
+            fi
+          elif [ -f "coverage/coverage-final.json" ]; then
+            # Vitest format
+            COVERAGE=$(node -e "
+              const fs = require('fs');
+              const data = JSON.parse(fs.readFileSync('coverage/coverage-final.json', 'utf8'));
+              let totalLines = 0;
+              let coveredLines = 0;
+              Object.values(data).forEach(file => {
+                totalLines += (file.lines?.total || 0);
+                coveredLines += (file.lines?.covered || 0);
+              });
+              const coverage = totalLines > 0 ? (coveredLines / totalLines * 100).toFixed(2) : 0;
+              console.log(coverage);
+            ")
+            echo "Current coverage: ${COVERAGE}%"
+            if (( $(echo "$COVERAGE < 80" | bc -l) )); then
+              echo "::error::Coverage ${COVERAGE}% is below threshold 80%"
+              exit 1
+            fi
+          else
+            echo "::warning::Coverage file not found, skipping threshold check"
+          fi
+
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-${{ matrix.component }}
+          path: platform/${{ matrix.component }}/coverage/
+          retention-days: 7
+
+  ##############################################################################
+  # Job 3: Build - Verify backend and frontend build
+  ##############################################################################
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        component: [backend, frontend]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        working-directory: platform/${{ matrix.component }}
+        run: pnpm install --frozen-lockfile
+
+      - name: Build ${{ matrix.component }}
+        working-directory: platform/${{ matrix.component }}
+        run: pnpm run build
+
+      - name: Verify build output
+        working-directory: platform/${{ matrix.component }}
+        run: |
+          if [ "${{ matrix.component }}" = "backend" ]; then
+            if [ ! -d "dist" ]; then
+              echo "::error::Backend build output 'dist' directory not found"
+              exit 1
+            fi
+            echo "✅ Backend build output verified"
+          elif [ "${{ matrix.component }}" = "frontend" ]; then
+            if [ ! -d "dist" ]; then
+              echo "::error::Frontend build output 'dist' directory not found"
+              exit 1
+            fi
+            echo "✅ Frontend build output verified"
+          fi
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-${{ matrix.component }}
+          path: platform/${{ matrix.component }}/dist/
+          retention-days: 7
+
+  ##############################################################################
+  # Job 4: Verify Config - Check configuration files
+  ##############################################################################
+  verify-config:
+    name: Verify Config
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Check config file count
+        run: |
+          CONFIG_COUNT=$(find platform -name ".env.production" -not -path "*/node_modules/*" | wc -l | tr -d ' ')
+          echo "Found $CONFIG_COUNT .env.production file(s)"
+          if [ "$CONFIG_COUNT" -ne 1 ]; then
+            echo "::error::Expected exactly 1 .env.production file, found $CONFIG_COUNT"
+            exit 1
+          fi
+          echo "✅ Config file count check passed"
+
+      - name: Check placeholder values
+        run: |
+          if [ -f "platform/.env.production" ]; then
+            if grep -E "cli_xxxxxxxxxxxxx|CHANGE_THIS|your_|placeholder" platform/.env.production | grep -v "CONFIGURE_IN_PLATFORM_ADMIN_PANEL"; then
+              echo "::error::Invalid placeholder values found in platform/.env.production"
+              grep -n -E "cli_xxxxxxxxxxxxx|CHANGE_THIS|your_|placeholder" platform/.env.production | grep -v "CONFIGURE_IN_PLATFORM_ADMIN_PANEL"
+              exit 1
+            fi
+            echo "✅ No invalid placeholder values"
+          else
+            echo "::warning::platform/.env.production not found, skipping placeholder check"
+          fi
+
+      - name: Check required variables
+        run: |
+          if [ -f "platform/.env.production" ]; then
+            REQUIRED_VARS=(
+              "DB_HOST"
+              "DB_PORT"
+              "DB_NAME"
+              "DB_USER"
+              "DB_PASSWORD"
+              "REDIS_HOST"
+              "REDIS_PORT"
+              "JWT_SECRET"
+              "FEISHU_APP_ID"
+              "FEISHU_APP_SECRET"
+            )
+
+            MISSING_VARS=()
+            for var in "${REQUIRED_VARS[@]}"; do
+              if ! grep -q "^${var}=" platform/.env.production; then
+                MISSING_VARS+=("$var")
+              fi
+            done
+
+            if [ ${#MISSING_VARS[@]} -gt 0 ]; then
+              echo "::error::Missing required variables: ${MISSING_VARS[*]}"
+              exit 1
+            fi
+            echo "✅ All required variables present"
+          else
+            echo "::warning::platform/.env.production not found, skipping required variables check"
+          fi
+
+  ##############################################################################
+  # Job 5: E2E - Run end-to-end tests with Playwright
+  ##############################################################################
+  e2e:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: test
+
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+        shard: [1/4, 2/4, 3/4, 4/4]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Setup Playwright cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/package.json', '**/playwright.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      - name: Install E2E test dependencies
+        working-directory: platform/e2e
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: platform/e2e
+        run: pnpm exec playwright install --with-deps ${{ matrix.browser }}
+
+      - name: Run Playwright tests
+        working-directory: platform/e2e
+        env:
+          CI: true
+          BASE_URL: http://localhost:3000
+        run: pnpm exec playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}
+
+      - name: Upload Playwright report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-${{ matrix.browser }}-${{ matrix.shard }}
+          path: platform/e2e/playwright-report/
+          retention-days: 7
+
+      - name: Upload Playwright screenshots
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-screenshots-${{ matrix.browser }}-${{ matrix.shard }}
+          path: platform/e2e/test-results/
+          retention-days: 7
+
+  ##############################################################################
+  # Job 6: Quality Gate - Enforce quality standards
+  ##############################################################################
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    needs: [lint, test]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: |
+          pnpm install --frozen-lockfile
+          cd platform/backend && pnpm install --frozen-lockfile
+          cd ../frontend && pnpm install --frozen-lockfile
+
+      - name: Run quality gate script
+        run: |
+          chmod +x scripts/quality-gate.sh
+          ./scripts/quality-gate.sh
+        continue-on-error: false
+
+      - name: Generate quality report
+        if: always()
+        run: |
+          echo "## Quality Gate Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Job Status" >> $GITHUB_STEP_SUMMARY
+          echo "- Lint: ${{ needs.lint.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Test: ${{ needs.test.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Quality Metrics" >> $GITHUB_STEP_SUMMARY
+          echo "- ESLint Errors: 0 (required)" >> $GITHUB_STEP_SUMMARY
+          echo "- TypeScript Errors: 0 (required)" >> $GITHUB_STEP_SUMMARY
+          echo "- Test Coverage: ≥80% (required)" >> $GITHUB_STEP_SUMMARY
+          echo "- Security Vulnerabilities: 0 high/critical (required)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Overall Status" >> $GITHUB_STEP_SUMMARY
+          if [[ "${{ needs.lint.result }}" == "success" ]] && [[ "${{ needs.test.result }}" == "success" ]]; then
+            echo "✅ All quality gates passed!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Quality gate failed. Please fix the issues above." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+  ##############################################################################
+  # Performance Test - Run k6 performance tests (baseline and normal)
+  ##############################################################################
+  performance-test:
+    name: Performance Test
+    runs-on: ubuntu-latest
+    needs: test
+
+    strategy:
+      matrix:
+        scenario: [baseline, normal]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup k6
+        run: |
+          # Install k6
+          sudo gpg -k
+          sudo gpg --no-default-keyring --keyring /usr/share/keyrings/k6-archive-keyring.gpg --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+          echo "deb [signed-by=/usr/share/keyrings/k6-archive-keyring.gpg] https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+          sudo apt-get update
+          sudo apt-get install -y k6
+
+      - name: Setup k6 cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.config/k6
+          key: ${{ runner.os }}-k6-${{ hashFiles('**/k6.config.js') }}
+          restore-keys: |
+            ${{ runner.os }}-k6-
+
+      - name: Create results directory
+        run: mkdir -p platform/perf/results
+
+      - name: Run ${{ matrix.scenario }} performance test
+        working-directory: platform/perf
+        run: |
+          k6 run --env BASE_URL=http://localhost:3000 \
+                 --env ENVIRONMENT=ci \
+                 --out json=results/${{ matrix.scenario }}_result.json \
+                 scenarios/${{ matrix.scenario }}.js
+
+      - name: Upload performance test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: perf-results-${{ matrix.scenario }}
+          path: platform/perf/results/
+          retention-days: 7
