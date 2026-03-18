@@ -285,15 +285,20 @@ export class WebSocketGateway {
 
       // Handle user messages
       if (isUserMessage(message)) {
+        // Extract files from metadata
+        const files = message.metadata?.files as any[] | undefined;
+
         logger.debug('User message received', {
           userId,
           instanceId,
           content: message.content,
+          hasFiles: !!files,
+          fileCount: files?.length || 0,
         });
 
         // Route to MessageRouter (TASK-008)
         try {
-          const result = await this.getMessageRouter().routeUserMessage(userId, message.content);
+          const result = await this.getMessageRouter().routeUserMessage(userId, message.content, files);
 
           // Send acknowledgment
           this.sendToClient(userId, {
