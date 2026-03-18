@@ -129,7 +129,7 @@ app.get('/agent/status', (req, res) => {
     provider: API_PROVIDER,
     model: API_MODEL,
     tools: ['read', 'write', 'web_search', 'memory', 'exec', 'web_fetch', 'cron'],
-    skills: ['customer_service', 'data_analysis', 'knowledge_base', 'report_generation', 'task_management']
+    skills: ['customer_service', 'data_analysis', 'knowledge_base', 'report_generation', 'task_management', 'image_generation']
   });
 });
 
