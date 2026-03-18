@@ -128,6 +128,8 @@ services:
       LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
       - "${BACKEND_PORT:-3000}:3000"
+      - "${WS_PORT:-3001}:3001"
+      - "${REMOTE_WS_PORT:-3002}:3002"
     volumes:
       # 挂载 Docker socket 用于管理实例容器
       - /var/run/docker.sock:/var/run/docker.sock:rw
