@@ -13,6 +13,7 @@ import { Service } from 'typedi';
 import { InstanceRepository } from '../repositories/InstanceRepository';
 import { DockerService } from './DockerService';
 import { ApiKeyService } from './ApiKeyService';
+import { InstanceRegistry } from './InstanceRegistry';
 import { Instance } from '../entities/Instance.entity';
 import { User } from '../entities/User.entity';
 import { AppError } from '../utils/errors/AppError';
@@ -85,7 +86,8 @@ export class InstanceService {
     private readonly instanceRepository: InstanceRepository,
     private readonly dockerService: DockerService,
     private readonly apiKeyService: ApiKeyService,
-    private readonly errorService: ErrorService
+    private readonly errorService: ErrorService,
+    private readonly instanceRegistry: InstanceRegistry
   ) {}
 
   /**
@@ -640,8 +642,41 @@ export class InstanceService {
         });
       }
 
-      // Claim instance
+      // Claim instance in database
       await this.instanceRepository.claimInstance(instanceId, userId);
+
+      // Re-register instance to registry to update userInstanceMap
+      // This fixes the issue where getUserInstance() returns null after claiming
+      if (instance.deployment_type === 'remote') {
+        try {
+          // Construct API endpoint from remote_host and remote_port
+          const apiEndpoint = instance.remote_host && instance.remote_port
+            ? `http://${instance.remote_host}:${instance.remote_port}`
+            : '';
+
+          await this.instanceRegistry.registerInstance(instanceId, {
+            connection_type: 'remote',
+            api_endpoint: apiEndpoint,
+            metadata: {
+              hostname: instance.remote_host,
+              port: instance.remote_port
+            }
+          });
+
+          logger.info('Instance re-registered to registry after claim', {
+            instanceId,
+            userId,
+            deploymentType: 'remote'
+          });
+        } catch (registryError) {
+          // Log but don't fail - the database update is successful
+          logger.warn('Failed to re-register instance to registry, but claim was successful', {
+            instanceId,
+            userId,
+            error: registryError instanceof Error ? registryError.message : String(registryError)
+          });
+        }
+      }
 
       logger.info('Instance claimed', { instanceId, userId });
 
