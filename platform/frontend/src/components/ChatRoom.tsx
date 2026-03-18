@@ -29,6 +29,9 @@ export function ChatRoom({ className = '' }: ChatRoomProps) {
   const [showDebug, setShowDebug] = useState(false);
   const [connectionMode, setConnectionMode] = useState<'websocket' | 'polling'>('websocket');
   const [copySuccess, setCopySuccess] = useState(false);
+  const [instanceId, setInstanceId] = useState<string | undefined>();
+  const [lastConnected, setLastConnected] = useState<Date | undefined>();
+  const [connectionError, setConnectionError] = useState<string | undefined>();
   const webSocket = useWebSocket();
   const pollingService = useRef(createPollingService());
   const debugEndRef = useRef<HTMLDivElement>(null);
@@ -118,10 +121,45 @@ ${debugText}
 
   /**
    * Handle incoming messages from WebSocket
+   * Filter out status and error messages to avoid notification clutter
+   * Extract instance information for connection status display
    */
   const handleMessage = useCallback((message: WebSocketMessage) => {
+    // Extract instance ID from status or assistant messages
+    if (message.type === 'status' && message.instance_id) {
+      setInstanceId(message.instance_id);
+      setLastConnected(new Date());
+      console.log('[ChatRoom] Status message received (not displaying in chat):', message.message);
+      return;
+    }
+
+    // Handle error messages - show in banner instead of chat
+    if (message.type === 'error') {
+      console.log('[ChatRoom] Error message received (showing in banner):', message.error);
+      setConnectionError(message.error);
+      // Auto-clear error after 5 seconds
+      setTimeout(() => setConnectionError(undefined), 5000);
+      return;
+    }
+
+    if (message.type === 'assistant_message' && message.instance_id) {
+      // Update instance ID from assistant messages
+      if (!instanceId) {
+        setInstanceId(message.instance_id);
+      }
+      setLastConnected(new Date());
+      // Clear any connection error when successfully connected
+      setConnectionError(undefined);
+    }
+
+    // Filter out status messages - they will be shown in the connection status indicator instead
+    if (message.type === 'status') {
+      console.log('[ChatRoom] Status message received (not displaying in chat):', message.message);
+      return;
+    }
+
     setMessages((prev) => [...prev, message]);
-  }, []);
+  }, [instanceId]);
 
   /**
    * Handle keyboard shortcut for debug panel (Ctrl+Shift+D / Cmd+Shift+D)
@@ -341,15 +379,15 @@ ${debugText}
       aria-label="聊天室"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200">
-        <h1 className="text-base font-semibold text-gray-800">OpenClaw Assistant</h1>
-        <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-white border-b border-gray-200">
+        <h1 className="text-sm font-semibold text-gray-800">OpenClaw Assistant</h1>
+        <div className="flex items-center gap-2">
           {showDebug && (
             <button
               onClick={() => setShowDebug(false)}
               className="text-xs text-blue-600 hover:text-blue-800 underline"
             >
-              隐藏调试信息
+              隐藏调试
             </button>
           )}
           <div
@@ -357,7 +395,12 @@ ${debugText}
             className="cursor-pointer select-none"
             title="点击5次可切换调试面板 (Ctrl+Shift+D 也可以)"
           >
-            <ConnectionStatus status={getCurrentStatus()} />
+            <ConnectionStatus
+              status={getCurrentStatus()}
+              instanceId={instanceId}
+              lastConnected={lastConnected}
+              connectionError={connectionError}
+            />
           </div>
         </div>
       </div>

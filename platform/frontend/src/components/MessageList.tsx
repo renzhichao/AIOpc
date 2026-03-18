@@ -163,7 +163,9 @@ export const MessageList: React.FC<MessageListProps> = ({
             <p className="text-center">开始与 OpenClaw Assistant 对话...</p>
           </div>
         ) : (
-          messages.map((message, index) => renderMessage(message, index))
+          messages
+            .filter(message => message.type !== 'status' && message.type !== 'error') // Filter out status and error messages (shown in banner)
+            .map((message, index) => renderMessage(message, index))
         )}
         <div ref={messagesEndRef} />
       </div>

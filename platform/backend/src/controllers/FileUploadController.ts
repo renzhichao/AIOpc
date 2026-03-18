@@ -85,23 +85,87 @@ export class FileUploadController {
    */
   @Post('/upload')
   async uploadFile(@Req() req: AuthRequest): Promise<UploadResponse> {
+    const startTime = Date.now();
+
     try {
       const userId = req.user!.userId;
 
       // Check if file data exists
       if (!req.file || !req.file.buffer) {
+        logger.warn('File upload failed: No file data received', {
+          userId,
+          hasFile: !!req.file,
+          hasBuffer: !!req.file?.buffer,
+          headers: req.headers,
+        });
+
         return {
           success: false,
           error: 'No file data received',
         };
       }
 
-      const { originalname, mimetype, buffer } = req.file;
+      const { originalname, mimetype, buffer, size } = req.file;
 
       logger.info('File upload requested', {
         userId,
         originalname,
         mimetype,
+        size: buffer.length,
+        encoding: req.file.encoding,
+        fieldName: req.file.fieldname,
+        clientIp: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+
+      // Validate file size
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (buffer.length > maxSize) {
+        logger.warn('File upload failed: File too large', {
+          userId,
+          originalname,
+          size: buffer.length,
+          maxSize,
+        });
+
+        return {
+          success: false,
+          error: 'File size exceeds maximum of 10MB',
+        };
+      }
+
+      // Validate file type
+      const allowedTypes = [
+        'image/',
+        'application/pdf',
+        'text/',
+        'application/json',
+        'text/csv',
+        'application/vnd.ms-excel',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'application/xml',
+        'text/xml',
+        'text/markdown',
+      ];
+
+      const isAllowed = allowedTypes.some(type => mimetype.startsWith(type));
+      if (!isAllowed) {
+        logger.warn('File upload failed: Invalid file type', {
+          userId,
+          originalname,
+          mimetype,
+          allowedTypes,
+        });
+
+        return {
+          success: false,
+          error: `File type ${mimetype} is not allowed`,
+        };
+      }
+
+      logger.info('File validation passed, storing file', {
+        userId,
+        originalname,
         size: buffer.length,
       });
 
@@ -113,11 +177,15 @@ export class FileUploadController {
         buffer
       );
 
+      const uploadTime = Date.now() - startTime;
+
       logger.info('File uploaded successfully', {
         fileId: metadata.fileId,
         userId,
         originalName: metadata.originalName,
         size: metadata.size,
+        uploadTimeMs: uploadTime,
+        clientIp: req.ip,
       });
 
       return {
@@ -125,16 +193,46 @@ export class FileUploadController {
         file: metadata,
       };
     } catch (error) {
+      const uploadTime = Date.now() - startTime;
       const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorStack = error instanceof Error ? error.stack : undefined;
 
       logger.error('Failed to upload file', {
         userId: req.user?.userId,
         error: errorMessage,
+        stack: errorStack,
+        uploadTimeMs: uploadTime,
+        fileName: req.file?.originalname,
+        fileSize: req.file?.size,
+        clientIp: req.ip,
+        headers: req.headers,
       });
+
+      // Return specific error messages
+      if (errorMessage.includes('ENOENT') || errorMessage.includes('no such file')) {
+        return {
+          success: false,
+          error: 'Server storage error: Upload directory not available',
+        };
+      }
+
+      if (errorMessage.includes('EACCES') || errorMessage.includes('permission')) {
+        return {
+          success: false,
+          error: 'Server storage error: Permission denied',
+        };
+      }
+
+      if (errorMessage.includes('ENOSPC')) {
+        return {
+          success: false,
+          error: 'Server storage error: No space available',
+        };
+      }
 
       return {
         success: false,
-        error: errorMessage,
+        error: errorMessage || 'Failed to upload file',
       };
     }
   }
