@@ -1,0 +1,116 @@
+version: '3.8'
+
+services:
+  openclaw-service:
+    build:
+      context: ./services/openclaw-service
+      dockerfile: Dockerfile
+    container_name: local-openclaw-service
+    ports:
+      - "3001:3001"
+    environment:
+      - PORT=3001
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-sk-test}
+      - DEEPSEEK_API_BASE=${DEEPSEEK_API_BASE:-https://api.deepseek.com}
+      - DEEPSEEK_API_MODEL=${DEEPSEEK_API_MODEL:-deepseek-chat}
+      - NODE_ENV=production
+    volumes:
+      - openclaw-service-logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - openclaw-local
+
+  # Ngrok tunnel service - exposes local agent to public internet
+  # This allows the platform server (118.25.0.190) to connect to your local agent
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: local-openclaw-ngrok
+    command:
+      - "http"
+      - "openclaw-agent:3000"
+      - "--log"
+      - "stdout"
+      - "--domain=${NGROK_DOMAIN:-}"  # Optional: use custom domain if you have one
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN:-}
+    ports:
+      - "4040:4040"  # Ngrok web interface
+    depends_on:
+      - openclaw-agent
+    restart: unless-stopped
+    networks:
+      - openclaw-local
+
+  # Helper service to get ngrok public URL and update agent registration
+  ngrok-helper:
+    image: curlimages/curl:latest
+    container_name: local-openclaw-ngrok-helper
+    command: >
+      sh -c '
+        echo "Waiting for ngrok to start...";
+        sleep 5;
+        echo "Fetching ngrok public URL...";
+        while true; do
+          NGROK_URL=$$(curl -s http://ngrok:4040/api/tunnels | grep -o "\"public_url\":\"[^\"]*\"" | head -1 | cut -d"\"" -f4);
+          if [ -n "$$NGROK_URL" ]; then
+            echo "========================================";
+            echo "Ngrok Public URL: $$NGROK_URL";
+            echo "========================================";
+            echo "";
+            echo "IMPORTANT: Update the instance registration on the platform:";
+            echo "  UPDATE instances SET remote_host = \"$$(echo $$NGROK_URL | sed \"s|https://||\" | sed \"s|http://||\")\",";
+            echo "         remote_port = 443";
+            echo "  WHERE instance_id = \"<your-instance-id>\";";
+            echo "";
+            echo "Or use the agent health check at: $$NGROK_URL/health";
+            echo "========================================";
+            echo "";
+            echo "Monitoring ngrok status (Ctrl+C to exit)...";
+          fi;
+          sleep 30;
+        done
+      '
+    depends_on:
+      - ngrok
+    networks:
+      - openclaw-local
+
+  openclaw-agent:
+    build:
+      context: ./agent
+      dockerfile: Dockerfile
+    container_name: local-openclaw-agent
+    ports:
+      - "3010:3000"  # Map to host port 3010 to avoid conflict with platform backend
+    environment:
+      # Use ngrok URL for platform to reach us (will be set via DB update)
+      - PLATFORM_URL=http://118.25.0.190:3000
+      - AGENT_PORT=3000
+      - OPENCLAW_SERVICE_URL=http://openclaw-service:3001
+      - CREDENTIALS_PATH=/app/credentials/credentials.json
+      - LOG_PATH=/app/logs/agent.log
+      - NODE_ENV=production
+    volumes:
+      - openclaw-agent-credentials:/app/credentials
+      - openclaw-agent-logs:/app/logs
+    depends_on:
+      openclaw-service:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - openclaw-local
+
+volumes:
+  openclaw-service-logs:
+  openclaw-agent-credentials:
+  openclaw-agent-logs:
+
+networks:
+  openclaw-local:
+    driver: bridge

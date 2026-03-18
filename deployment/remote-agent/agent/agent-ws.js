@@ -3,12 +3,19 @@ const WebSocket = require('ws');
 const winston = require('winston');
 const os = require('os');
 const fs = require('fs');
+const http = require('http');
 
 // Configuration
 const PLATFORM_URL = process.env.PLATFORM_URL || 'http://118.25.0.190';
 const AGENT_PORT = process.env.AGENT_PORT || 3000;
 const HEARTBEAT_INTERVAL = 30000;
 const OPENCLAW_SERVICE_URL = process.env.OPENCLAW_SERVICE_URL || 'http://localhost:3001';
+// Remote WebSocket Gateway port (different from main backend port)
+const PLATFORM_WS_PORT = process.env.PLATFORM_WS_PORT || '3002';
+
+// Docker-aware paths
+const CREDENTIALS_PATH = process.env.CREDENTIALS_PATH || '/opt/openclaw-agent/credentials.json';
+const LOG_PATH = process.env.LOG_PATH || '/var/log/openclaw-agent.log';
 
 // Setup logging
 const logger = winston.createLogger({
@@ -18,7 +25,7 @@ const logger = winston.createLogger({
     winston.format.json()
   ),
   transports: [
-    new winston.transports.File({ filename: '/var/log/openclaw-agent.log' }),
+    new winston.transports.File({ filename: LOG_PATH }),
     new winston.transports.Console({
       format: winston.format.simple()
     })
@@ -52,19 +59,19 @@ function getNetworkIP() {
  * Load existing credentials
  */
 function loadCredentials() {
-  const credFile = '/opt/openclaw-agent/credentials.json';
-  if (fs.existsSync(credFile)) {
+  if (fs.existsSync(CREDENTIALS_PATH)) {
     try {
-      const credentials = JSON.parse(fs.readFileSync(credFile, 'utf8'));
+      const credentials = JSON.parse(fs.readFileSync(CREDENTIALS_PATH, 'utf8'));
       instanceId = credentials.instanceId;
       platformApiKey = credentials.platformApiKey;
-      logger.info('Loaded existing credentials', { instanceId });
+      logger.info('Loaded existing credentials', { instanceId, path: CREDENTIALS_PATH });
       return true;
     } catch (error) {
-      logger.error('Failed to load credentials', { error: error.message });
+      logger.error('Failed to load credentials', { error: error.message, path: CREDENTIALS_PATH });
       return false;
     }
   }
+  logger.info('No existing credentials found', { path: CREDENTIALS_PATH });
   return false;
 }
 
@@ -72,15 +79,41 @@ function loadCredentials() {
  * Save credentials
  */
 function saveCredentials() {
-  const credFile = '/opt/openclaw-agent/credentials.json';
   const credentials = {
     instanceId,
     platformApiKey,
     platformUrl: PLATFORM_URL,
     registeredAt: new Date().toISOString()
   };
-  fs.writeFileSync(credFile, JSON.stringify(credentials, null, 2));
-  logger.info('Credentials saved', { instanceId });
+  fs.writeFileSync(CREDENTIALS_PATH, JSON.stringify(credentials, null, 2));
+  logger.info('Credentials saved', { instanceId, path: CREDENTIALS_PATH });
+}
+
+/**
+ * Start HTTP health check server
+ */
+function startHealthCheckServer() {
+  const server = http.createServer((req, res) => {
+    if (req.url === '/health') {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        status: 'ok',
+        instance_id: instanceId,
+        connected: wsConnection?.readyState === WebSocket.OPEN,
+        platform_url: PLATFORM_URL,
+        timestamp: new Date().toISOString()
+      }));
+    } else {
+      res.writeHead(404);
+      res.end('Not Found');
+    }
+  });
+
+  server.listen(AGENT_PORT, () => {
+    logger.info(`Health check server listening on port ${AGENT_PORT}`);
+  });
+
+  return server;
 }
 
 /**
@@ -174,9 +207,10 @@ async function processUserMessage(content, userId) {
  * Connect to platform via WebSocket
  */
 function connectWebSocket() {
-  const host = PLATFORM_URL.replace('http://', '').replace('https://', '');
-  const wsUrl = `ws://${host}/remote-ws?api_key=${platformApiKey}`;
-  logger.info('Connecting to platform WebSocket...', { wsUrl });
+  // Extract hostname from PLATFORM_URL and use PLATFORM_WS_PORT for WebSocket
+  const platformHost = PLATFORM_URL.replace('http://', '').replace('https://', '').split(':')[0];
+  const wsUrl = `ws://${platformHost}:${PLATFORM_WS_PORT}/remote-ws?api_key=${platformApiKey}`;
+  logger.info('Connecting to platform WebSocket...', { wsUrl, platformHost, wsPort: PLATFORM_WS_PORT });
   wsConnection = new WebSocket(wsUrl, {
     headers: { 'X-Platform-API-Key': platformApiKey }
   });
@@ -392,10 +426,17 @@ async function start() {
     openclawServiceUrl: OPENCLAW_SERVICE_URL
   });
   try {
+    // Start health check server first
+    startHealthCheckServer();
+
+    // Load or register credentials
     if (!loadCredentials()) {
       await registerWithPlatform();
     }
+
+    // Connect to platform via WebSocket
     connectWebSocket();
+
     logger.info('Agent started successfully');
   } catch (error) {
     logger.error('Failed to start agent', { error: error.message });
