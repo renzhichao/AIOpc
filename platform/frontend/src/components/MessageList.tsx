@@ -54,6 +54,27 @@ export const MessageList: React.FC<MessageListProps> = ({
   };
 
   /**
+   * Render message status indicator
+   */
+  const renderMessageStatus = (message: WebSocketMessage) => {
+    if (message.type !== 'user_message') return null;
+
+    const sendStatus = message.sendStatus;
+    if (!sendStatus || sendStatus === 'sent') return null;
+
+    return (
+      <span className="ml-2 text-xs opacity-70">
+        {sendStatus === 'sending' && (
+          <span className="text-gray-400">发送中...</span>
+        )}
+        {sendStatus === 'failed' && (
+          <span className="text-red-400">发送失败</span>
+        )}
+      </span>
+    );
+  };
+
+  /**
    * Render a single message
    */
   const renderMessage = (message: WebSocketMessage, index: number) => {
@@ -112,11 +133,13 @@ export const MessageList: React.FC<MessageListProps> = ({
           <div className={`${bubbleBaseClasses} ${bubbleColorClasses}`}>
             <p className="whitespace-pre-wrap break-words">{content}</p>
           </div>
-          {timestamp !== undefined && (
-            <div className={`${metadataClasses} ${isUserMessage ? 'text-right' : 'text-left'}`}>
-              {formatTimestamp(timestamp)}
-            </div>
-          )}
+          <div className={`${metadataClasses} ${isUserMessage ? 'text-right' : 'text-left'} flex items-center justify-end gap-1`}>
+            {timestamp !== undefined && formatTimestamp(timestamp)}
+            {isUserMessage && message.sendStatus === 'sent' && (
+              <span className="text-xs opacity-70 ml-1">已发送</span>
+            )}
+            {renderMessageStatus(message)}
+          </div>
         </div>
       </div>
     );

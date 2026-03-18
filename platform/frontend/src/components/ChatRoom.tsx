@@ -288,21 +288,46 @@ ${debugText}
    */
   const handleSendMessage = useCallback(
     async (content: string, files?: import('./MessageInput').UploadedFile[]) => {
-      // Add user message to list immediately for better UX
+      // Add user message to list immediately with 'sending' status
+      const tempId = `temp-${Date.now()}`;
       const userMessage: WebSocketMessage = {
         type: 'user_message',
         content,
         timestamp: new Date().toISOString(),
+        message_id: tempId,
+        sendStatus: 'sending',
         metadata: files && files.length > 0 ? { files } : undefined,
       };
 
       setMessages((prev) => [...prev, userMessage]);
 
-      // Send via WebSocket or HTTP polling
-      if (connectionMode === 'polling') {
-        await pollingService.current.sendMessage(content, files);
-      } else {
-        webSocket.sendMessage(content, files);
+      try {
+        // Send via WebSocket or HTTP polling
+        if (connectionMode === 'polling') {
+          await pollingService.current.sendMessage(content, files);
+        } else {
+          webSocket.sendMessage(content, files);
+        }
+
+        // Update message status to 'sent' after successful send
+        setMessages((prev) =>
+          prev.map((msg) => {
+            if (msg.type === 'user_message' && msg.message_id === tempId) {
+              return { ...msg, sendStatus: 'sent' as const };
+            }
+            return msg;
+          })
+        );
+      } catch (error) {
+        // Update message status to 'failed' on error
+        setMessages((prev) =>
+          prev.map((msg) => {
+            if (msg.type === 'user_message' && msg.message_id === tempId) {
+              return { ...msg, sendStatus: 'failed' as const };
+            }
+            return msg;
+          })
+        );
       }
     },
     [webSocket, connectionMode]
@@ -316,13 +341,13 @@ ${debugText}
       aria-label="聊天室"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200">
-        <h1 className="text-xl font-semibold text-gray-800">OpenClaw Assistant</h1>
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200">
+        <h1 className="text-base font-semibold text-gray-800">OpenClaw Assistant</h1>
+        <div className="flex items-center gap-3">
           {showDebug && (
             <button
               onClick={() => setShowDebug(false)}
-              className="text-sm text-blue-600 hover:text-blue-800 underline"
+              className="text-xs text-blue-600 hover:text-blue-800 underline"
             >
               隐藏调试信息
             </button>
