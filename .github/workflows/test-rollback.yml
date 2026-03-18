@@ -1,0 +1,356 @@
+name: 回滚验证测试 (Rollback Verification Test)
+
+#==============================================================================
+# 回滚功能自动化测试工作流
+# (Automated Rollback Testing Workflow)
+#
+# 功能 (Features):
+# - 定期执行回滚测试 (Scheduled rollback testing)
+# - 验证回滚机制可靠性 (Verify rollback mechanism reliability)
+# - 测试报告归档 (Test report archiving)
+# - 失败通知 (Failure notification)
+#
+# 触发条件 (Triggers):
+# - 每周日凌晨 3 点自动执行 (Weekly Sunday 3 AM)
+# - 手动触发 (Manual trigger)
+#
+# 环境 (Environment):
+# - ⚠️ 仅在 Staging 环境执行
+# - ⚠️ NEVER run on production
+#
+#==============================================================================
+
+on:
+  # 定时执行 - 每周日凌晨 3 点
+  schedule:
+    - cron: '0 3 * * 0'
+
+  # 手动触发
+  workflow_dispatch:
+    inputs:
+      component:
+        description: '测试组件 (Test component)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - backend
+          - frontend
+          - database
+      dry_run:
+        description: '模拟运行 (Dry run)'
+        required: false
+        default: true
+        type: boolean
+
+env:
+  ENVIRONMENT: staging
+  DEPLOY_HOST: 118.25.0.190
+  DEPLOY_USER: root
+
+jobs:
+  #==========================================================================
+  # 回滚测试作业 (Rollback Test Job)
+  #==========================================================================
+  test-rollback:
+    name: 回滚测试 (Rollback Test)
+    runs-on: ubuntu-latest
+
+    # 安全检查 - 确保不在生产环境运行
+    steps:
+      - name: ⚠️ 安全警告 (Safety Warning)
+        run: |
+          echo "=============================================================================="
+          echo "⚠️  安全警告 (Safety Warning)"
+          echo "=============================================================================="
+          echo ""
+          echo "此工作流仅在 Staging 环境执行回滚测试"
+          echo "This workflow ONLY runs rollback tests on Staging environment"
+          echo ""
+          echo "环境 (Environment): ${{ env.ENVIRONMENT }}"
+          echo "组件 (Component): ${{ github.event.inputs.component || 'all' }}"
+          echo "模拟运行 (Dry Run): ${{ github.event.inputs.dry_run || 'true' }}"
+          echo ""
+          echo "=============================================================================="
+
+      #------------------------------------------------------------------------
+      # 检出代码 (Checkout Code)
+      #------------------------------------------------------------------------
+      - name: 📥 检出代码 (Checkout Code)
+        uses: actions/checkout@v4
+
+      #------------------------------------------------------------------------
+      # 设置环境 (Setup Environment)
+      #------------------------------------------------------------------------
+      - name: 🔧 设置测试环境 (Setup Test Environment)
+        run: |
+          echo "创建测试报告目录..."
+          mkdir -p test-reports/rollback
+
+          echo "配置 SSH 密钥..."
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          # 从 GitHub Secrets 导入 SSH 密钥
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/rap001_opclaw
+          chmod 600 ~/.ssh/rap001_opclaw
+
+          # 添加主机到 known_hosts
+          ssh-keyscan -H ${{ env.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      #------------------------------------------------------------------------
+      # 验证环境 (Verify Environment)
+      #------------------------------------------------------------------------
+      - name: 🔍 验证测试环境 (Verify Test Environment)
+        run: |
+          echo "验证环境配置..."
+
+          # 检查环境变量
+          if [ "${{ env.ENVIRONMENT }}" != "staging" ]; then
+            echo "❌ 错误: 环境必须是 staging"
+            exit 1
+          fi
+
+          # 检查 SSH 连接
+          ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=10 \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "hostname && whoami" || {
+            echo "❌ SSH 连接失败"
+            exit 1
+          }
+
+          # 检查是否为生产环境
+          PROD_CHECK=$(ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "grep -q 'production' /etc/opclaw/.env 2>/dev/null && echo 'PROD' || echo 'STAGING'" || echo "STAGING")
+
+          if [ "$PROD_CHECK" = "PROD" ]; then
+            echo "❌ 错误: 检测到生产环境，停止执行"
+            exit 1
+          fi
+
+          echo "✅ 环境验证通过"
+
+      #------------------------------------------------------------------------
+      # 执行回滚测试 (Execute Rollback Test)
+      #------------------------------------------------------------------------
+      - name: 🧪 执行回滚测试 (Execute Rollback Test)
+        id: test
+        continue-on-error: true
+        run: |
+          echo "开始执行回滚测试..."
+
+          # 确定测试参数
+          COMPONENT="${{ github.event.inputs.component || 'all' }}"
+          DRY_RUN="${{ github.event.inputs.dry_run || 'true' }}"
+
+          echo "测试参数:"
+          echo "  环境: ${{ env.ENVIRONMENT }}"
+          echo "  组件: $COMPONENT"
+          echo "  模拟运行: $DRY_RUN"
+
+          # 执行测试脚本
+          if [ "$DRY_RUN" = "true" ]; then
+            ./scripts/test-rollback.sh \
+              --env ${{ env.ENVIRONMENT }} \
+              --component "$COMPONENT" \
+              --dry-run \
+              --verbose || true
+          else
+            ./scripts/test-rollback.sh \
+              --env ${{ env.ENVIRONMENT }} \
+              --component "$COMPONENT" \
+              --verbose || true
+          fi
+
+          # 检查最新测试报告
+          LATEST_REPORT=$(ls -t test-reports/rollback/rollback-test-report-*.json 2>/dev/null | head -n 1)
+
+          if [ -n "$LATEST_REPORT" ]; then
+            echo "测试报告: $LATEST_REPORT"
+
+            # 提取测试结果
+            PASSED=$(jq -r '.results.passed' "$LATEST_REPORT" || echo "0")
+            FAILED=$(jq -r '.results.failed' "$LATEST_REPORT" || echo "0")
+            TOTAL=$(jq -r '.results.total_tests' "$LATEST_REPORT" || echo "0")
+
+            echo "测试结果: $PASSED/$TOTAL passed, $FAILED failed"
+
+            # 设置输出
+            echo "passed=$PASSED" >> $GITHUB_OUTPUT
+            echo "failed=$FAILED" >> $GITHUB_OUTPUT
+            echo "total=$TOTAL" >> $GITHUB_OUTPUT
+            echo "report_path=$LATEST_REPORT" >> $GITHUB_OUTPUT
+
+            # 检查是否有失败的测试
+            if [ "$FAILED" -gt 0 ]; then
+              echo "❌ 测试失败"
+              exit 1
+            else
+              echo "✅ 所有测试通过"
+            fi
+          else
+            echo "⚠️ 未找到测试报告"
+            exit 1
+          fi
+
+      #------------------------------------------------------------------------
+      # 上传测试报告 (Upload Test Reports)
+      #------------------------------------------------------------------------
+      - name: 📊 上传测试报告 (Upload Test Reports)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rollback-test-report-${{ github.run_number }}
+          path: |
+            test-reports/rollback/*.log
+            test-reports/rollback/*.json
+            test-reports/rollback/*.txt
+          retention-days: 30
+          if-no-files-found: warn
+
+      #------------------------------------------------------------------------
+      # 生成测试摘要 (Generate Test Summary)
+      #------------------------------------------------------------------------
+      - name: 📋 生成测试摘要 (Generate Test Summary)
+        if: always()
+        run: |
+          echo "## 回滚测试摘要 (Rollback Test Summary)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**测试 ID (Test ID):** rollback-test-${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**环境 (Environment):** ${{ env.ENVIRONMENT }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**组件 (Component):** ${{ github.event.inputs.component || 'all' }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**执行时间 (Execution Time):** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # 添加测试结果
+          if [ -f "${{ steps.test.outputs.report_path }}" ]; then
+            echo "### 测试结果 (Test Results)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            jq -r '"- 总测试数 (Total): \(.results.total_tests)
+            - 通过 (Passed): \(.results.passed) ✅
+            - 失败 (Failed): \(.results.failed) ❌
+            - 通过率 (Pass Rate): \(.results.pass_rate)%"' "${{ steps.test.outputs.report_path }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # 添加时间统计
+            echo "### 时间统计 (Timing Statistics)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            jq -r '"- 回滚执行时间 (Rollback Execution): \(.timing.rollback_seconds)s
+            - 总时间 (Total Time): \(.timing.total_seconds)s"' "${{ steps.test.outputs.report_path }}" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # 添加 SLA 检查
+            echo "### SLA 合规性 (SLA Compliance)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            jq -r '"- 回滚时间 SLA (< 3分钟): \(if .sla_compliance.rollback_time_passed then "✅ 通过" else "❌ 失败" end)
+            - 总时间 SLA (< 10分钟): \(if .sla_compliance.total_time_passed then "✅ 通过" else "❌ 失败" end)"' "${{ steps.test.outputs.report_path }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      #------------------------------------------------------------------------
+      # 发送通知 (Send Notification)
+      #------------------------------------------------------------------------
+      - name: 📢 发送失败通知 (Send Failure Notification)
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue_number = context.issue.number;
+            const repo = context.repo;
+
+            // 发送注释到问题（如果有）
+            if (issue_number) {
+              github.rest.issues.createComment({
+                ...repo,
+                issue_number: issue_number,
+                body: `## ❌ 回滚测试失败 (Rollback Test Failed)
+
+              **工作流 (Workflow):** ${{ github.workflow }}
+              **运行 (Run):** ${{ github.run_number }}
+              **环境 (Environment):** ${{ env.ENVIRONMENT }}
+              **组件 (Component):** ${{ github.event.inputs.component || 'all' }}
+
+              请查看测试报告以获取详细信息。`
+              });
+            }
+
+            console.log('❌ 回滚测试失败，已发送通知');
+
+      #------------------------------------------------------------------------
+      # 清理 (Cleanup)
+      #------------------------------------------------------------------------
+      - name: 🧹 清理环境 (Cleanup Environment)
+        if: always()
+        run: |
+          echo "清理临时文件..."
+          rm -f ~/.ssh/rap001_opclaw
+          echo "清理完成"
+
+  #==========================================================================
+  # SLA 检查作业 (SLA Check Job)
+  #==========================================================================
+  check-sla:
+    name: SLA 检查 (SLA Check)
+    runs-on: ubuntu-latest
+    needs: test-rollback
+    if: always()
+
+    steps:
+      - name: 📥 下载测试报告 (Download Test Report)
+        uses: actions/download-artifact@v4
+        with:
+          name: rollback-test-report-${{ github.run_number }}
+          path: test-reports
+
+      - name: ✅ 检查 SLA 合规性 (Check SLA Compliance)
+        run: |
+          echo "检查 SLA 合规性..."
+
+          REPORT_FILE=$(ls test-reports/rollback-test-report-*.json 2>/dev/null | head -n 1)
+
+          if [ ! -f "$REPORT_FILE" ]; then
+            echo "❌ 未找到测试报告"
+            exit 1
+          fi
+
+          # 检查回滚时间 SLA
+          ROLLBACK_TIME=$(jq -r '.timing.rollback_seconds' "$REPORT_FILE")
+          ROLLBACK_PASSED=$(jq -r '.sla_compliance.rollback_time_passed' "$REPORT_FILE")
+
+          echo "回滚执行时间: ${ROLLBACK_TIME}s"
+          echo "SLA 目标: < 180s (3分钟)"
+
+          if [ "$ROLLBACK_PASSED" = "true" ]; then
+            echo "✅ 回滚时间 SLA 通过"
+          else
+            echo "❌ 回滚时间 SLA 失败"
+          fi
+
+          # 检查总时间 SLA
+          TOTAL_TIME=$(jq -r '.timing.total_seconds' "$REPORT_FILE")
+          TOTAL_PASSED=$(jq -r '.sla_compliance.total_time_passed' "$REPORT_FILE")
+
+          echo "总回滚时间: ${TOTAL_TIME}s"
+          echo "SLA 目标: < 600s (10分钟)"
+
+          if [ "$TOTAL_PASSED" = "true" ]; then
+            echo "✅ 总时间 SLA 通过"
+          else
+            echo "❌ 总时间 SLA 失败"
+          fi
+
+          # 汇总结果
+          if [ "$ROLLBACK_PASSED" = "true" ] && [ "$TOTAL_PASSED" = "true" ]; then
+            echo ""
+            echo "✅ 所有 SLA 检查通过"
+            exit 0
+          else
+            echo ""
+            echo "❌ 部分 SLA 检查失败"
+            exit 1
+          fi
