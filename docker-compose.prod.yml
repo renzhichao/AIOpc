@@ -120,7 +120,7 @@ services:
       DB_NAME: ${POSTGRES_DB:-opclaw}
       DB_USERNAME: ${POSTGRES_USER:-opclaw}
       DB_PASSWORD: ${POSTGRES_PASSWORD}
-      DB_SYNC: "false"
+      DB_SYNC: "true"
       DB_LOG_LEVEL: error
 
       # Redis配置
@@ -163,6 +163,7 @@ services:
 
     ports:
       - "3000:3000"
+      - "3002:3002"
 
     healthcheck:
       test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]

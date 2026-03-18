@@ -11,6 +11,11 @@ build/
 .env
 .env.local
 .env.*.local
+# Exception: Track production config files (per user requirement)
+!.env.production
+!docker-compose.prod.yml
+!platform/.env.production
+!platform/docker-compose.prod.yml
 
 # IDE
 .vscode/
