@@ -29,6 +29,9 @@ export function ChatRoom({ className = '' }: ChatRoomProps) {
   const [showDebug, setShowDebug] = useState(false);
   const [connectionMode, setConnectionMode] = useState<'websocket' | 'polling'>('websocket');
   const [copySuccess, setCopySuccess] = useState(false);
+  const [instanceId, setInstanceId] = useState<string | undefined>();
+  const [lastConnected, setLastConnected] = useState<Date | undefined>();
+  const [connectionError, setConnectionError] = useState<string | undefined>();
   const webSocket = useWebSocket();
   const pollingService = useRef(createPollingService());
   const debugEndRef = useRef<HTMLDivElement>(null);
@@ -118,10 +121,45 @@ ${debugText}
 
   /**
    * Handle incoming messages from WebSocket
+   * Filter out status and error messages to avoid notification clutter
+   * Extract instance information for connection status display
    */
   const handleMessage = useCallback((message: WebSocketMessage) => {
+    // Extract instance ID from status or assistant messages
+    if (message.type === 'status' && message.instance_id) {
+      setInstanceId(message.instance_id);
+      setLastConnected(new Date());
+      console.log('[ChatRoom] Status message received (not displaying in chat):', message.message);
+      return;
+    }
+
+    // Handle error messages - show in banner instead of chat
+    if (message.type === 'error') {
+      console.log('[ChatRoom] Error message received (showing in banner):', message.error);
+      setConnectionError(message.error);
+      // Auto-clear error after 5 seconds
+      setTimeout(() => setConnectionError(undefined), 5000);
+      return;
+    }
+
+    if (message.type === 'assistant_message' && message.instance_id) {
+      // Update instance ID from assistant messages
+      if (!instanceId) {
+        setInstanceId(message.instance_id);
+      }
+      setLastConnected(new Date());
+      // Clear any connection error when successfully connected
+      setConnectionError(undefined);
+    }
+
+    // Filter out status messages - they will be shown in the connection status indicator instead
+    if (message.type === 'status') {
+      console.log('[ChatRoom] Status message received (not displaying in chat):', message.message);
+      return;
+    }
+
     setMessages((prev) => [...prev, message]);
-  }, []);
+  }, [instanceId]);
 
   /**
    * Handle keyboard shortcut for debug panel (Ctrl+Shift+D / Cmd+Shift+D)
@@ -288,21 +326,46 @@ ${debugText}
    */
   const handleSendMessage = useCallback(
     async (content: string, files?: import('./MessageInput').UploadedFile[]) => {
-      // Add user message to list immediately for better UX
+      // Add user message to list immediately with 'sending' status
+      const tempId = `temp-${Date.now()}`;
       const userMessage: WebSocketMessage = {
         type: 'user_message',
         content,
         timestamp: new Date().toISOString(),
+        message_id: tempId,
+        sendStatus: 'sending',
         metadata: files && files.length > 0 ? { files } : undefined,
       };
 
       setMessages((prev) => [...prev, userMessage]);
 
-      // Send via WebSocket or HTTP polling
-      if (connectionMode === 'polling') {
-        await pollingService.current.sendMessage(content, files);
-      } else {
-        webSocket.sendMessage(content, files);
+      try {
+        // Send via WebSocket or HTTP polling
+        if (connectionMode === 'polling') {
+          await pollingService.current.sendMessage(content, files);
+        } else {
+          webSocket.sendMessage(content, files);
+        }
+
+        // Update message status to 'sent' after successful send
+        setMessages((prev) =>
+          prev.map((msg) => {
+            if (msg.type === 'user_message' && msg.message_id === tempId) {
+              return { ...msg, sendStatus: 'sent' as const };
+            }
+            return msg;
+          })
+        );
+      } catch (error) {
+        // Update message status to 'failed' on error
+        setMessages((prev) =>
+          prev.map((msg) => {
+            if (msg.type === 'user_message' && msg.message_id === tempId) {
+              return { ...msg, sendStatus: 'failed' as const };
+            }
+            return msg;
+          })
+        );
       }
     },
     [webSocket, connectionMode]
@@ -316,15 +379,15 @@ ${debugText}
       aria-label="聊天室"
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 bg-white border-b border-gray-200">
-        <h1 className="text-xl font-semibold text-gray-800">OpenClaw Assistant</h1>
-        <div className="flex items-center gap-4">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-white border-b border-gray-200">
+        <h1 className="text-sm font-semibold text-gray-800">OpenClaw Assistant</h1>
+        <div className="flex items-center gap-2">
           {showDebug && (
             <button
               onClick={() => setShowDebug(false)}
-              className="text-sm text-blue-600 hover:text-blue-800 underline"
+              className="text-xs text-blue-600 hover:text-blue-800 underline"
             >
-              隐藏调试信息
+              隐藏调试
             </button>
           )}
           <div
@@ -332,7 +395,12 @@ ${debugText}
             className="cursor-pointer select-none"
             title="点击5次可切换调试面板 (Ctrl+Shift+D 也可以)"
           >
-            <ConnectionStatus status={getCurrentStatus()} />
+            <ConnectionStatus
+              status={getCurrentStatus()}
+              instanceId={instanceId}
+              lastConnected={lastConnected}
+              connectionError={connectionError}
+            />
           </div>
         </div>
       </div>

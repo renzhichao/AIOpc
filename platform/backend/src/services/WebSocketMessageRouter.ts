@@ -19,8 +19,10 @@ import { Service } from 'typedi';
 import { InstanceRegistry, InstanceInfo } from './InstanceRegistry';
 import { WebSocketGateway } from './WebSocketGateway';
 import { RemoteInstanceWebSocketGateway } from './RemoteInstanceWebSocketGateway';
+import { FileStorageService } from './FileStorageService';
 import { logger } from '../config/logger';
 import { WebSocketMessageType, AssistantMessage } from '../types/websocket.types';
+import * as fs from 'fs/promises';
 
 /**
  * Message route result interface
@@ -92,7 +94,8 @@ export class WebSocketMessageRouter {
   constructor(
     private readonly instanceRegistry: InstanceRegistry,
     private readonly webSocketGateway: WebSocketGateway,
-    private readonly remoteInstanceWSGateway: RemoteInstanceWebSocketGateway
+    private readonly remoteInstanceWSGateway: RemoteInstanceWebSocketGateway,
+    private readonly fileStorageService: FileStorageService
   ) {}
 
   /**
@@ -269,6 +272,69 @@ export class WebSocketMessageRouter {
   }
 
   /**
+   * Embed file content as base64 for remote instances
+   *
+   * Remote instances cannot access platform server's file URLs,
+   * so we embed the actual file content as base64 in the message.
+   *
+   * @param files - Array of file metadata from upload
+   * @returns Array of files with embedded base64 content
+   */
+  private async embedFileContent(files: any[]): Promise<any[]> {
+    if (!files || files.length === 0) {
+      return [];
+    }
+
+    const embeddedFiles = await Promise.all(
+      files.map(async (file) => {
+        try {
+          // Read file content from storage
+          const buffer = await this.fileStorageService.getFileContent(file.id || file.fileId);
+
+          // Convert to base64
+          const base64 = buffer.toString('base64');
+
+          logger.debug('File content embedded for remote instance', {
+            fileId: file.id || file.fileId,
+            fileName: file.name || file.originalName,
+            originalSize: file.size,
+            base64Size: base64.length,
+          });
+
+          // Return file with embedded content
+          return {
+            id: file.id || file.fileId,
+            name: file.name || file.originalName,
+            type: file.type || file.mimeType,
+            size: file.size,
+            content: base64, // Embed base64 content
+            encoding: 'base64',
+          };
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+
+          logger.error('Failed to embed file content', {
+            fileId: file.id || file.fileId,
+            fileName: file.name || file.originalName,
+            error: errorMessage,
+          });
+
+          // Return file without content if reading fails
+          return {
+            id: file.id || file.fileId,
+            name: file.name || file.originalName,
+            type: file.type || file.mimeType,
+            size: file.size,
+            error: 'Failed to read file content',
+          };
+        }
+      })
+    );
+
+    return embeddedFiles;
+  }
+
+  /**
    * Send message to remote instance via WebSocket
    *
    * Uses RemoteInstanceWebSocketGateway to deliver messages to remote instances
@@ -295,6 +361,12 @@ export class WebSocketMessageRouter {
       fileCount: files?.length || 0,
     });
 
+    // Embed file content as base64 for remote instances
+    // Remote instances cannot access platform server's file URLs
+    const embeddedFiles = files && files.length > 0
+      ? await this.embedFileContent(files)
+      : undefined;
+
     // Send via RemoteInstanceWebSocketGateway
     // Note: Response will be handled asynchronously via RemoteInstanceWebSocketGateway
     // when the remote instance sends back a RESPONSE message
@@ -303,12 +375,13 @@ export class WebSocketMessageRouter {
       userId,
       content,
       messageId,
-      files
+      embeddedFiles // Use embedded files with base64 content
     );
 
     logger.info('Message sent to remote instance, awaiting async response', {
       messageId,
       instanceId: instanceInfo.instance_id,
+      filesEmbedded: embeddedFiles?.length || 0,
     });
   }
 

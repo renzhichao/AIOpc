@@ -7,6 +7,7 @@
  * - File upload via button or drag-and-drop
  * - File preview with removal option
  * - Upload progress indication
+ * - Comprehensive debugging for Feishu WebView
  */
 
 import { useState, useRef, type KeyboardEvent, type ChangeEvent, type FormEvent } from 'react';
@@ -22,6 +23,46 @@ export interface UploadedFile {
   url: string;
   preview?: string;
 }
+
+/**
+ * Debug log entry
+ */
+interface DebugLog {
+  time: string;
+  level: 'info' | 'warn' | 'error' | 'success';
+  message: string;
+  data?: any;
+}
+
+/**
+ * Initialize global debug storage for Feishu WebView
+ */
+const initDebugStorage = () => {
+  if (!(window as any).__UPLOAD_DEBUG__) {
+    (window as any).__UPLOAD_DEBUG__ = [] as DebugLog[];
+  }
+  return (window as any).__UPLOAD_DEBUG__ as DebugLog[];
+};
+
+/**
+ * Add debug log
+ */
+const addDebugLog = (level: DebugLog['level'], message: string, data?: any) => {
+  const logs = initDebugStorage();
+  const log: DebugLog = {
+    time: new Date().toISOString(),
+    level,
+    message,
+    data,
+  };
+  logs.push(log);
+  console.log(`[UploadDebug ${level.toUpperCase()}]`, message, data || '');
+
+  // Keep only last 100 logs
+  if (logs.length > 100) {
+    logs.shift();
+  }
+};
 
 export interface MessageInputProps {
   onSend: (content: string, files?: UploadedFile[]) => void;
@@ -53,88 +94,227 @@ export const MessageInput: React.FC<MessageInputProps> = ({
   const [uploadProgress, setUploadProgress] = useState<number>(0);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [showDebug, setShowDebug] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const uploadButtonClickCount = useRef(0);
+  const uploadButtonClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Initialize debug on mount
+  useState(() => {
+    addDebugLog('info', 'MessageInput component mounted');
+    addDebugLog('info', 'User Agent', navigator.userAgent);
+  });
 
   /**
    * Get API URL from environment
    */
   const getApiUrl = (): string => {
-    return import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '/api';
+    const apiUrl = import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '/api';
+    addDebugLog('info', 'API URL configured', { apiUrl });
+    return apiUrl;
   };
 
   /**
    * Get auth token
    */
   const getToken = (): string | null => {
-    return (
+    const token =
       sessionStorage.getItem('auth_token') ||
       sessionStorage.getItem('access_token') ||
       localStorage.getItem('auth_token') ||
-      localStorage.getItem('access_token')
-    );
+      localStorage.getItem('access_token');
+
+    if (token) {
+      addDebugLog('info', 'Token found', {
+        length: token.length,
+        prefix: token.substring(0, 20) + '...',
+      });
+    } else {
+      addDebugLog('error', 'No auth token found');
+    }
+
+    return token;
   };
 
   /**
-   * Upload file to backend
+   * Upload file to backend with comprehensive debugging
    */
   const uploadFile = async (file: File): Promise<UploadedFile> => {
+    const startTime = Date.now();
     const apiUrl = getApiUrl();
     const token = getToken();
 
-    if (!token) {
-      throw new Error('No authentication token found');
-    }
-
-    const formData = new FormData();
-    formData.append('file', file);
-
-    const response = await fetch(`${apiUrl}/chat/upload`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-      body: formData,
+    addDebugLog('info', 'Starting file upload', {
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type,
+      apiUrl: `${apiUrl}/chat/upload`,
     });
 
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.error || 'Failed to upload file');
+    try {
+      // Validate token
+      if (!token) {
+        const error = 'No authentication token found';
+        addDebugLog('error', error);
+        throw new Error(error);
+      }
+
+      // Create form data
+      const formData = new FormData();
+      formData.append('file', file);
+
+      addDebugLog('info', 'FormData prepared', {
+        hasFile: formData.has('file'),
+        fileName: formData.get('file') instanceof File ? (formData.get('file') as File).name : 'unknown',
+      });
+
+      // Prepare fetch request
+      const uploadUrl = `${apiUrl}/chat/upload`;
+      addDebugLog('info', 'Initiating fetch request', { url: uploadUrl });
+
+      const response = await fetch(uploadUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          // Note: Don't set Content-Type for FormData - let browser set it with boundary
+        },
+        body: formData,
+      });
+
+      const elapsed = Date.now() - startTime;
+      addDebugLog('info', `Response received (${elapsed}ms)`, {
+        status: response.status,
+        statusText: response.statusText,
+        ok: response.ok,
+        headers: Object.fromEntries(response.headers.entries()),
+      });
+
+      // Check response status
+      if (!response.ok) {
+        // Try to parse error response
+        let errorData;
+        try {
+          errorData = await response.json();
+        } catch (e) {
+          errorData = { error: response.statusText };
+        }
+
+        const errorMessage = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+        addDebugLog('error', 'Upload request failed', {
+          status: response.status,
+          errorData,
+        });
+        throw new Error(errorMessage);
+      }
+
+      // Parse success response
+      const result = await response.json();
+      addDebugLog('info', 'Response body parsed', { result });
+
+      // Validate response structure
+      if (!result.success) {
+        const error = result.error || 'Upload failed';
+        addDebugLog('error', 'Upload unsuccessful', { result });
+        throw new Error(error);
+      }
+
+      if (!result.file) {
+        addDebugLog('error', 'No file data in response', { result });
+        throw new Error('Invalid response: missing file data');
+      }
+
+      const uploadTime = Date.now() - startTime;
+      addDebugLog('success', `File uploaded successfully in ${uploadTime}ms`, {
+        fileId: result.file.id,
+        fileName: result.file.name,
+      });
+
+      return result.file as UploadedFile;
+    } catch (error) {
+      const uploadTime = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      addDebugLog('error', `Upload failed after ${uploadTime}ms`, {
+        error: errorMessage,
+        errorType: error instanceof Error ? error.constructor.name : typeof error,
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+
+      throw error;
     }
-
-    const result = await response.json();
-
-    if (!result.success || !result.file) {
-      throw new Error('Upload failed');
-    }
-
-    return result.file as UploadedFile;
   };
 
   /**
-   * Handle file selection
+   * Handle file selection with error recovery
    */
   const handleFileSelect = async (files: FileList) => {
-    if (isUploading) return;
+    if (isUploading) {
+      addDebugLog('warn', 'Upload already in progress, ignoring new selection');
+      return;
+    }
+
+    addDebugLog('info', 'File selection started', {
+      fileCount: files.length,
+      fileNames: Array.from(files).map(f => f.name),
+    });
 
     setIsUploading(true);
     setUploadProgress(0);
+    setUploadError(null);
 
     try {
       const fileArray = Array.from(files);
       const totalFiles = fileArray.length;
       const uploadedFiles: UploadedFile[] = [];
 
+      addDebugLog('info', 'Starting batch upload', { totalFiles });
+
       for (let i = 0; i < totalFiles; i++) {
-        setUploadProgress(Math.round(((i + 1) / totalFiles) * 100));
-        const uploaded = await uploadFile(fileArray[i]);
-        uploadedFiles.push(uploaded);
+        const file = fileArray[i];
+        const progress = Math.round(((i + 1) / totalFiles) * 100);
+        setUploadProgress(progress);
+
+        addDebugLog('info', `Uploading file ${i + 1}/${totalFiles}`, {
+          fileName: file.name,
+          progress: `${progress}%`,
+        });
+
+        try {
+          const uploaded = await uploadFile(file);
+          uploadedFiles.push(uploaded);
+          addDebugLog('success', `File ${i + 1}/${totalFiles} uploaded successfully`);
+        } catch (error) {
+          // Continue with remaining files even if one fails
+          addDebugLog('error', `File ${i + 1}/${totalFiles} failed, continuing with remaining files`, {
+            fileName: file.name,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          // Show error but don't stop the batch
+          setUploadError(`文件 "${file.name}" 上传失败: ${error instanceof Error ? error.message : '未知错误'}`);
+        }
       }
 
-      setSelectedFiles(prev => [...prev, ...uploadedFiles]);
+      if (uploadedFiles.length > 0) {
+        setSelectedFiles(prev => [...prev, ...uploadedFiles]);
+        addDebugLog('success', `Batch upload completed: ${uploadedFiles.length}/${totalFiles} files succeeded`);
+      } else {
+        addDebugLog('error', 'All files failed to upload');
+        throw new Error('所有文件上传失败，请重试');
+      }
+
       setUploadProgress(100);
     } catch (error) {
-      console.error('File upload failed:', error);
-      alert(error instanceof Error ? error.message : 'Failed to upload file');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to upload file';
+      addDebugLog('error', 'File selection handler error', {
+        error: errorMessage,
+      });
+
+      // Show user-friendly error
+      setUploadError(errorMessage);
+
+      // Auto-clear error after 5 seconds
+      setTimeout(() => setUploadError(null), 5000);
     } finally {
       setIsUploading(false);
       setUploadProgress(0);
@@ -234,6 +414,33 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     handleSend();
   };
 
+  /**
+   * Handle upload button click (with debug toggle on 5 clicks)
+   */
+  const handleUploadButtonClick = () => {
+    uploadButtonClickCount.current += 1;
+
+    // Clear existing timer
+    if (uploadButtonClickTimer.current) {
+      clearTimeout(uploadButtonClickTimer.current);
+    }
+
+    // Set new timer to reset click count after 2 seconds
+    uploadButtonClickTimer.current = setTimeout(() => {
+      uploadButtonClickCount.current = 0;
+    }, 2000);
+
+    // Toggle debug panel after 5 clicks
+    if (uploadButtonClickCount.current === 5) {
+      setShowDebug(prev => !prev);
+      uploadButtonClickCount.current = 0;
+      addDebugLog('info', 'Debug panel toggled via 5 clicks');
+    }
+
+    // Trigger file input
+    fileInputRef.current?.click();
+  };
+
   const isSendDisabled = disabled || (!inputValue.trim() && selectedFiles.length === 0) || isUploading;
 
   return (
@@ -304,6 +511,86 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           </div>
         )}
 
+        {/* Upload error message */}
+        {uploadError && (
+          <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <svg className="w-5 h-5 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <div className="flex-1">
+                <p className="text-sm text-red-800">{uploadError}</p>
+                <p className="text-xs text-red-600 mt-1">部分文件可能上传失败，您可以重试或继续发送已上传的文件</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUploadError(null)}
+                className="p-1 hover:bg-red-100 rounded transition-colors"
+                aria-label="关闭错误提示"
+              >
+                <svg className="w-4 h-4 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Debug panel (shown via URL parameter ?upload_debug=true or click 5 times on upload button) */}
+        {(showDebug || new URLSearchParams(window.location.search).get('upload_debug') === 'true') && (
+          <div className="mb-3 p-3 bg-gray-900 rounded-lg text-xs font-mono">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-green-400 font-bold">🔍 文件上传调试信息</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const logs = initDebugStorage();
+                  const debugText = logs.map(log =>
+                    `[${log.time}] [${log.level.toUpperCase()}] ${log.message}${log.data ? ' ' + JSON.stringify(log.data) : ''}`
+                  ).join('\n');
+                  navigator.clipboard.writeText(debugText).then(() => {
+                    alert('调试日志已复制到剪贴板');
+                  }).catch(() => {
+                    // Fallback for older browsers
+                    const textArea = document.createElement('textarea');
+                    textArea.value = debugText;
+                    document.body.appendChild(textArea);
+                    textArea.select();
+                    document.execCommand('copy');
+                    document.body.removeChild(textArea);
+                    alert('调试日志已复制到剪贴板');
+                  });
+                }}
+                className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-xs"
+              >
+                📋 复制日志
+              </button>
+            </div>
+            <div className="max-h-48 overflow-y-auto text-green-300 space-y-1">
+              {initDebugStorage().length === 0 ? (
+                <div className="text-gray-500">等待上传操作...</div>
+              ) : (
+                initDebugStorage().map((log, index) => (
+                  <div key={index} className={`${
+                    log.level === 'error' ? 'text-red-400' :
+                    log.level === 'warn' ? 'text-yellow-400' :
+                    log.level === 'success' ? 'text-green-400' :
+                    'text-gray-300'
+                  }`}>
+                    <span className="text-gray-500">[{log.time}]</span>
+                    <span className="font-bold">[{log.level.toUpperCase()}]</span>
+                    {log.message}
+                    {log.data && <pre className="ml-4 text-gray-400 overflow-x-auto">{JSON.stringify(log.data, null, 2)}</pre>}
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="mt-2 text-gray-500 text-xs">
+              提示: 在控制台输入 <code className="bg-gray-800 px-1 rounded">window.__UPLOAD_DEBUG__</code> 查看完整日志
+            </div>
+          </div>
+        )}
+
         <div
           className={`flex items-end gap-3 ${isDragging ? 'ring-2 ring-green-500 rounded-lg' : ''}`}
           onDragOver={handleDragOver}
@@ -321,7 +608,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           />
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
+            onClick={handleUploadButtonClick}
             disabled={disabled || isUploading}
             className={`
               p-3 rounded-lg border-2 border-dashed transition-all
@@ -331,6 +618,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
               }
             `}
             aria-label="上传文件"
+            title="点击5次可切换调试面板"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />

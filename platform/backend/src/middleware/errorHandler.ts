@@ -24,6 +24,16 @@ export function errorHandler(
   res: Response,
   next: NextFunction
 ): void {
+  // Prevent double response error
+  if (res.headersSent) {
+    logger.warn('Response already sent, skipping error response', {
+      error: err.message,
+      path: req.path,
+      method: req.method
+    });
+    return;
+  }
+
   // Log error with context
   logger.error('Error occurred', {
     error: err.message,
