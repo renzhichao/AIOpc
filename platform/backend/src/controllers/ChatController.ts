@@ -97,6 +97,8 @@ export class ChatController {
         contentLength: trimmedContent.length,
         hasFiles: body.files && body.files.length > 0,
         fileCount: body.files?.length || 0,
+        files: body.files,
+        rawBody: JSON.stringify(body),
       });
 
       // Route message via MessageRouter
