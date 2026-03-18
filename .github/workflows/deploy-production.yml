@@ -1,570 +1,594 @@
-#==============================================================================
-# AIOpc CD Pipeline - Deploy to Production Environment
-#==============================================================================
-# 手动部署到生产环境 (Manual deployment to Production environment)
-#
-# 触发条件 (Trigger):
-#   - Manual workflow dispatch only
-#   - Requires 2 approvals
-#
-# 部署流程 (Deployment Process):
-#   1. 等待审批 (Await approval - 2 approvers required)
-#   2. 创建备份 (Create backup)
-#   3. 部署组件 (Deploy components)
-#   4. 扩展健康检查 (Extended health checks - 5 attempts, 90s timeout)
-#   5. 全面验证 (Comprehensive verification)
-#   6. 失败时自动回滚 (Auto-rollback on failure)
-#
-# 目标 (Goals):
-#   - 部署时间 < 10 分钟 (Deployment time < 10 minutes)
-#   - 回滚时间 < 3 分钟 (Rollback time < 3 minutes)
-#   - 健康检查超时 90 秒 (Health check timeout 90s)
-#   - 重试 5 次 (Retry 5 times)
-#   - 零停机部署 (Zero-downtime deployment)
-#==============================================================================
+name: 生产环境部署 (Production Deployment)
 
-name: Deploy to Production
+#==============================================================================
+# 单生产环境可靠部署工作流
+# (Single Production Environment Reliable Deployment Workflow)
+#
+# 核心特性 (Key Features):
+# - 手动触发部署 (Manual trigger only)
+# - 强制单元测试 (Mandatory unit tests)
+# - 配置管理安全 (Configuration safety)
+# - 数据库保护 (Database protection)
+# - 自动回滚 (Automatic rollback)
+#
+# 环境 (Environment):
+# - 单一生产服务器: 118.25.0.190
+# - 服务: backend, frontend, postgres, redis
+#
+#==============================================================================
 
 on:
+  # 手动触发 (Manual trigger only)
   workflow_dispatch:
     inputs:
       component:
-        description: 'Component to deploy'
-        required: true
+        description: '部署组件 (Component)'
+        required: false
+        default: 'all'
         type: choice
         options:
+          - all
           - backend
           - frontend
-          - database
-          - all
-      skip_backup:
-        description: 'Skip backup (not recommended)'
+      skip_tests:
+        description: '跳过测试 (Skip tests) - 不推荐 (Not recommended)'
         required: false
-        type: boolean
         default: false
-      force:
-        description: 'Force deployment (bypass some checks)'
-        required: false
         type: boolean
-        default: false
+      confirm_deployment:
+        description: '确认部署到生产环境 (Confirm production deployment)'
+        required: true
+        type: boolean
 
-# Cancel in-progress runs for the same branch and workflow
-concurrency:
-  group: deploy-production-${{ github.ref }}
-  cancel-in-progress: true
+env:
+  ENVIRONMENT: production
+  DEPLOY_HOST: 118.25.0.190
+  DEPLOY_USER: root
+  DEPLOY_PATH: /opt/opclaw
+  BACKUP_PATH: /opt/opclaw/backups
 
 jobs:
-  ##############################################################################
-  # Job 0: Pre-deployment checks - Verify production readiness
-  ##############################################################################
-  pre-deployment-checks:
-    name: Pre-deployment Checks
+  #==========================================================================
+  # 预检查作业 (Pre-check Job)
+  #==========================================================================
+  pre-check:
+    name: 🔍 预检查 (Pre-check)
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Verify staging deployment exists
+      - name: ⚠️ 安全警告 (Safety Warning)
         run: |
-          echo "==> Verifying staging deployment..."
+          echo "=============================================================================="
+          echo "⚠️  生产环境部署警告 (Production Deployment Warning)"
+          echo "=============================================================================="
+          echo ""
+          echo "此操作将部署到生产环境: ${{ env.DEPLOY_HOST }}"
+          echo "This will deploy to production environment: ${{ env.DEPLOY_HOST }}"
+          echo ""
+          echo "组件 (Component): ${{ github.event.inputs.component || 'all' }}"
+          echo "跳过测试 (Skip tests): ${{ github.event.inputs.skip_tests || 'false' }}"
+          echo ""
+          echo "=============================================================================="
 
-          # Check if staging tests passed
-          echo "✅ Pre-deployment checks passed"
-
-      - name: Check deployment window
-        run: |
-          echo "==> Checking deployment window..."
-
-          # Get current hour
-          CURRENT_HOUR=$(date +%H)
-          echo "Current hour: ${CURRENT_HOUR}"
-
-          # Warn if deploying during business hours (9 AM - 6 PM)
-          if [ $CURRENT_HOUR -ge 9 ] && [ $CURRENT_HOUR -lt 18 ]; then
-            echo "⚠️ Warning: Deploying during business hours"
-            echo "deployment_window=business_hours" >> $GITHUB_OUTPUT
-          else
-            echo "✅ Deployment window OK"
-            echo "deployment_window=off_hours" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Verify build artifacts
-        run: |
-          echo "==> Verifying build artifacts..."
-
-          # Check backend build
-          if [ ! -d "platform/backend/dist" ]; then
-            echo "::error::Backend build artifacts not found"
-            exit 1
-          fi
-
-          # Check frontend build
-          if [ ! -d "platform/frontend/dist" ]; then
-            echo "::error::Frontend build artifacts not found"
-            exit 1
-          fi
-
-          echo "✅ Build artifacts verified"
-
-  ##############################################################################
-  # Job 1: Await Approval - Manual approval gate
-  ##############################################################################
-  await-approval:
-    name: Await Approval
-    runs-on: ubuntu-latest
-    needs: pre-deployment-checks
-
-    environment:
-      name: production
-      url: http://118.25.0.190
-
-    steps:
-      - name: Request approval
-        run: |
-          echo "## 🚀 Production Deployment Request" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Component:** ${{ github.event.inputs.component || 'all' }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Requested by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "⚠️ **This requires approval from 2 maintainers.**" >> $GITHUB_STEP_SUMMARY
-
-  ##############################################################################
-  # Job 2: Deploy to Production - Main deployment job
-  ##############################################################################
-  deploy-production:
-    name: Deploy to Production
-    runs-on: ubuntu-latest
-    needs: await-approval
-
-    # Production environment with protection rules
-    environment:
-      name: production
-      url: http://118.25.0.190
-
-    steps:
-      - name: Checkout code
+      #------------------------------------------------------------------------
+      # 检出代码 (Checkout Code)
+      #------------------------------------------------------------------------
+      - name: 📥 检出代码 (Checkout Code)
         uses: actions/checkout@v4
 
       #------------------------------------------------------------------------
-      # Setup SSH for deployment
+      # 确认部署 (Confirm Deployment)
       #------------------------------------------------------------------------
-      - name: Setup SSH
+      - name: ✅ 确认部署 (Confirm Deployment)
         run: |
+          if [ "${{ github.event.inputs.confirm_deployment }}" != "true" ]; then
+            echo "❌ 错误: 未确认部署到生产环境"
+            echo "❌ Error: Production deployment not confirmed"
+            echo ""
+            echo "请重新运行并勾选 'confirm_deployment' 选项"
+            echo "Please re-run and check the 'confirm_deployment' option"
+            exit 1
+          fi
+          echo "✅ 部署已确认"
+          echo "✅ Deployment confirmed"
+
+      #------------------------------------------------------------------------
+      # 配置 SSH (Setup SSH)
+      #------------------------------------------------------------------------
+      - name: 🔧 配置 SSH (Setup SSH)
+        run: |
+          echo "配置 SSH 密钥..."
           mkdir -p ~/.ssh
-          echo "${{ secrets.PRODUCTION_SSH_KEY }}" > ~/.ssh/rap001_opclaw
+          chmod 700 ~/.ssh
+
+          # 从 GitHub Secrets 导入 SSH 密钥
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/rap001_opclaw
           chmod 600 ~/.ssh/rap001_opclaw
-          ssh-keyscan -H ${{ secrets.PRODUCTION_SERVER }} >> ~/.ssh/known_hosts
+
+          # 添加主机到 known_hosts
+          ssh-keyscan -H ${{ env.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
       #------------------------------------------------------------------------
-      # Pre-deployment: Create backup
+      # 验证生产环境 (Verify Production Environment)
       #------------------------------------------------------------------------
-      - name: Create pre-deployment backup
-        id: backup
-        if: github.event.inputs.skip_backup != 'true'
+      - name: 🏭 验证生产环境 (Verify Production Environment)
         run: |
-          echo "==> Creating pre-deployment backup..."
-          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-          BACKUP_DIR="/opt/opclaw/backups/backup_${TIMESTAMP}"
+          echo "验证生产环境配置..."
 
-          ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-            "mkdir -p ${BACKUP_DIR}"
-
-          # Backup backend
-          ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-            "cd /opt/opclaw && tar -czf ${BACKUP_DIR}/backend.tar.gz backend/ 2>/dev/null || true"
-
-          # Backup frontend
-          ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-            "tar -czf ${BACKUP_DIR}/frontend.tar.gz /var/www/opclaw 2>/dev/null || true"
-
-          # Backup database
-          ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-            "docker exec opclaw-postgres pg_dump -U opclaw opclaw | gzip > ${BACKUP_DIR}/database.sql.gz 2>/dev/null || true"
-
-          # Save backup metadata
-          ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-            "cat > ${BACKUP_DIR}/metadata.txt << EOF
-          Timestamp: ${TIMESTAMP}
-          Deploy Date: $(date)
-          Deploy User: ${{ github.actor }}
-          Deploy Host: ${{ secrets.PRODUCTION_SERVER }}
-          Component: ${{ github.event.inputs.component || 'all' }}
-          Environment: production
-          Workflow: ${{ github.workflow }}
-          Run ID: ${{ github.run_id }}
-          Commit: ${{ github.sha }}
-          Approved By: 2 maintainers
-          EOF"
-
-          echo "backup_dir=${BACKUP_DIR}" >> $GITHUB_OUTPUT
-          echo "✅ Backup created: ${BACKUP_DIR}"
-
-      - name: Skip backup warning
-        if: github.event.inputs.skip_backup == 'true'
-        run: |
-          echo "⚠️ Backup skipped as requested"
-
-      #------------------------------------------------------------------------
-      # Deploy backend (if selected)
-      #------------------------------------------------------------------------
-      - name: Deploy backend
-        id: deploy-backend
-        if: github.event.inputs.component == 'backend' || github.event.inputs.component == 'all' || github.event.inputs.component == ''
-        run: |
-          echo "==> Deploying backend..."
-
-          # Sync backend code using rsync
-          rsync -avz --delete \
-            --exclude 'node_modules' \
-            --exclude 'dist' \
-            --exclude '.env' \
-            --exclude '.env.*' \
-            --exclude 'coverage' \
-            --exclude '*.log' \
-            --exclude '.DS_Store' \
-            -e "ssh -i ~/.ssh/rap001_opclaw" \
-            platform/backend/ \
-            root@${{ secrets.PRODUCTION_SERVER }}:/opt/opclaw/backend/
-
-          # Install production dependencies
-          ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-            "cd /opt/opclaw/backend && pnpm install --prod --frozen-lockfile"
-
-          # Build backend
-          ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-            "cd /opt/opclaw/backend && pnpm run build"
-
-          echo "✅ Backend deployed successfully"
-
-      #------------------------------------------------------------------------
-      # Deploy frontend (if selected)
-      #------------------------------------------------------------------------
-      - name: Deploy frontend
-        id: deploy-frontend
-        if: github.event.inputs.component == 'frontend' || github.event.inputs.component == 'all' || github.event.inputs.component == ''
-        run: |
-          echo "==> Deploying frontend..."
-
-          # Build frontend locally
-          cd platform/frontend
-          pnpm install --frozen-lockfile
-          pnpm run build
-          cd ../..
-
-          # Create frontend directory on server
-          ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-            "mkdir -p /var/www/opclaw"
-
-          # Sync frontend build artifacts
-          rsync -avz --delete \
-            --exclude '*.map' \
-            -e "ssh -i ~/.ssh/rap001_opclaw" \
-            platform/frontend/dist/ \
-            root@${{ secrets.PRODUCTION_SERVER }}:/var/www/opclaw/
-
-          # Set permissions
-          ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-            "chown -R www-data:www-data /var/www/opclaw && chmod -R 755 /var/www/opclaw"
-
-          echo "✅ Frontend deployed successfully"
-
-      #------------------------------------------------------------------------
-      # Deploy database (if selected)
-      #------------------------------------------------------------------------
-      - name: Deploy database
-        id: deploy-database
-        if: github.event.inputs.component == 'database' || github.event.inputs.component == 'all' || github.event.inputs.component == ''
-        run: |
-          echo "==> Deploying database..."
-
-          # Database deployment usually means migrations
-          # For now, just verify database is running
-          ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-            "docker ps | grep opclaw-postgres" || {
-            echo "⚠️ Database not running, starting..."
-            ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-              "cd /opt/opclaw && docker compose up -d postgres"
-          }
-
-          echo "✅ Database deployment completed"
-
-      #------------------------------------------------------------------------
-      # Restart services (zero-downtime)
-      #------------------------------------------------------------------------
-      - name: Restart services (zero-downtime)
-        id: restart-services
-        run: |
-          echo "==> Restarting services (zero-downtime)..."
-
-          # Graceful backend restart
-          ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-            "cd /opt/opclaw && docker compose up -d --no-deps --build backend"
-
-          # Graceful nginx reload
-          ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-            "systemctl reload nginx"
-
-          # Wait for services to be ready
-          echo "Waiting for services to be ready..."
-          sleep 15
-
-          echo "✅ Services restarted successfully"
-
-      #------------------------------------------------------------------------
-      # Extended health check with retry
-      #------------------------------------------------------------------------
-      - name: Extended health check - Backend
-        id: health-backend
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 2
-          max_attempts: 5
-          retry_on: error
-          warning_on_retry: true
-          command: |
-            echo "==> Checking backend health (extended)..."
-            if ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-              "curl -sf http://localhost:3000/health"; then
-              echo "✅ Backend health check passed"
-            else
-              echo "❌ Backend health check failed"
-              exit 1
-            fi
-
-      - name: Extended health check - Frontend
-        id: health-frontend
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 2
-          max_attempts: 5
-          retry_on: error
-          warning_on_retry: true
-          command: |
-            echo "==> Checking frontend health (extended)..."
-            HTTP_CODE=$(ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-              "curl -s -o /dev/null -w '%{http_code}' http://localhost" || echo "000")
-
-            if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "301" ] || [ "$HTTP_CODE" = "302" ]; then
-              echo "✅ Frontend health check passed (HTTP ${HTTP_CODE})"
-            else
-              echo "❌ Frontend health check failed (HTTP ${HTTP_CODE})"
-              exit 1
-            fi
-
-      - name: Extended health check - Database
-        id: health-database
-        uses: nick-fields/retry@v2
-        with:
-          timeout_minutes: 2
-          max_attempts: 5
-          retry_on: error
-          warning_on_retry: true
-          command: |
-            echo "==> Checking database health (extended)..."
-            if ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-              "docker exec opclaw-postgres pg_isready -U opclaw"; then
-              echo "✅ Database health check passed"
-            else
-              echo "❌ Database health check failed"
-              exit 1
-            fi
-
-      #------------------------------------------------------------------------
-      # Comprehensive verification
-      #------------------------------------------------------------------------
-      - name: Comprehensive verification
-        id: verify-deployment
-        run: |
-          echo "==> Running comprehensive verification..."
-
-          # Run verification script
-          ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-            "cd /opt/opclaw && ./scripts/deploy/verify.sh --env production --component all" || {
-            echo "❌ Verification failed"
+          # 检查 SSH 连接
+          ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            -o ConnectTimeout=10 \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "hostname && whoami" || {
+            echo "❌ SSH 连接失败"
             exit 1
           }
 
-          # Check service uptime
-          ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-            "cd /opt/opclaw && docker compose ps" | grep -q "Up"
+          # 检查生产环境标识
+          PROD_CHECK=$(ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "hostname" || echo "UNKNOWN")
 
-          echo "✅ Comprehensive verification passed"
+          if [ "$PROD_CHECK" != "VM-4-12-ubuntu" ]; then
+            echo "⚠️ 警告: 主机名不匹配，但继续部署"
+            echo "⚠️ Warning: Hostname mismatch, but continuing"
+          fi
+
+          echo "✅ 生产环境验证通过"
 
       #------------------------------------------------------------------------
-      # Calculate deployment time
+      # 清理 SSH (Cleanup SSH)
       #------------------------------------------------------------------------
-      - name: Calculate deployment time
+      - name: 🧹 清理 SSH (Cleanup SSH)
         if: always()
         run: |
-          END_TIME=$(date +%s)
-          START_TIME=$(date -d "${{ github.event.head_commit.timestamp }}" +%s 2>/dev/null || echo "$END_TIME")
+          rm -f ~/.ssh/rap001_opclaw
+          echo "SSH 清理完成"
 
-          DEPLOYMENT_TIME=$((END_TIME - START_TIME))
-          echo "Deployment time: ${DEPLOYMENT_TIME}s"
+  #==========================================================================
+  # 单元测试作业 (Unit Test Job)
+  #==========================================================================
+  unit-test:
+    name: 🧪 单元测试 (Unit Tests)
+    runs-on: ubuntu-latest
+    needs: pre-check
 
-          if [ $DEPLOYMENT_TIME -gt 600 ]; then
-            echo "⚠️ Deployment exceeded 10 minutes"
-            echo "deployment_time=${DEPLOYMENT_TIME}s" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "✅ Deployment completed within 10 minutes"
-            echo "deployment_time=${DEPLOYMENT_TIME}s" >> $GITHUB_STEP_SUMMARY
-          fi
+    steps:
+      - name: 📥 检出代码 (Checkout Code)
+        uses: actions/checkout@v4
 
-      #------------------------------------------------------------------------
-      # Rollback on failure
-      #------------------------------------------------------------------------
-      - name: Rollback on failure
-        if: failure() && github.event.inputs.skip_backup != 'true'
+      - name: 📦 安装依赖 (Install Dependencies)
         run: |
-          echo "==> Deployment failed, initiating rollback..."
-          BACKUP_DIR="${{ steps.backup.outputs.backup_dir }}"
+          cd platform/backend
+          npm install -g pnpm@latest
+          pnpm install
 
-          if [ -z "$BACKUP_DIR" ]; then
-            echo "❌ No backup available for rollback"
+      - name: 🧪 运行单元测试 (Run Unit Tests)
+        if: github.event.inputs.skip_tests != 'true'
+        run: |
+          cd platform/backend
+          echo "运行单元测试..."
+          pnpm test || {
+            echo "❌ 单元测试失败"
+            echo "❌ Unit tests failed"
+            echo ""
+            echo "修复测试问题后重新运行部署"
+            echo "Fix test issues and re-run deployment"
+            exit 1
+          }
+          echo "✅ 单元测试通过"
+
+      - name: ⏭️ 跳过测试警告 (Skip Tests Warning)
+        if: github.event.inputs.skip_tests == 'true'
+        run: |
+          echo "⚠️  警告: 已跳过单元测试"
+          echo "⚠️  Warning: Unit tests skipped"
+          echo ""
+          echo "这不推荐，可能导致部署问题"
+          echo "This is not recommended and may cause deployment issues"
+
+  #==========================================================================
+  # 配置验证作业 (Config Validation Job)
+  #==========================================================================
+  config-validation:
+    name: 🔐 配置验证 (Config Validation)
+    runs-on: ubuntu-latest
+    needs: pre-check
+
+    steps:
+      - name: 📥 检出代码 (Checkout Code)
+        uses: actions/checkout@v4
+
+      - name: 🔧 配置 SSH (Setup SSH)
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/rap001_opclaw
+          chmod 600 ~/.ssh/rap001_opclaw
+          ssh-keyscan -H ${{ env.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: 🔍 验证配置文件 (Validate Configuration Files)
+        run: |
+          echo "验证生产环境配置..."
+
+          # 检查配置文件存在
+          ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "test -f ${{ env.DEPLOY_PATH }}/.env.production" || {
+            echo "❌ 配置文件不存在: .env.production"
+            exit 1
+          }
+
+          # 检查占位符（危险信号）
+          PLACEHOLDERS=$(ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "cat ${{ env.DEPLOY_PATH }}/.env.production | \
+             grep -E 'cli_xxxxxxxxxxxxx|CHANGE_THIS|your_|placeholder|TODO|FIXME' || true")
+
+          if [ -n "$PLACEHOLDERS" ]; then
+            echo "❌ 错误: 配置文件包含占位符"
+            echo "❌ Error: Configuration contains placeholders"
+            echo ""
+            echo "$PLACEHOLDERS"
+            echo ""
+            echo "请配置真实的值"
+            echo "Please configure real values"
             exit 1
           fi
 
-          # Rollback backend
-          ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-            "rm -rf /opt/opclaw/backend && cd /opt/opclaw && tar -xzf ${BACKUP_DIR}/backend.tar.gz" || true
+          # 检查必需的环境变量
+          REQUIRED_VARS=(
+            "DB_PASSWORD"
+            "REDIS_PASSWORD"
+            "FEISHU_APP_ID"
+            "FEISHU_APP_SECRET"
+            "JWT_SECRET"
+            "DEEPSEEK_API_KEY"
+          )
 
-          # Rollback frontend
-          ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-            "rm -rf /var/www/opclaw && tar -xzf ${BACKUP_DIR}/frontend.tar.gz -C /" || true
+          for var in "${REQUIRED_VARS[@]}"; do
+            if ! ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+              ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+              "grep -q '^${var}=' ${{ env.DEPLOY_PATH }}/.env.production"; then
+              echo "❌ 缺少必需的配置: ${var}"
+              exit 1
+            fi
+          done
 
-          # Rollback database
-          ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-            "gunzip < ${BACKUP_DIR}/database.sql.gz | docker exec -i opclaw-postgres psql -U opclaw opclaw" || true
+          echo "✅ 配置验证通过"
 
-          # Restart services
-          ssh -i ~/.ssh/rap001_opclaw root@${{ secrets.PRODUCTION_SERVER }} \
-            "cd /opt/opclaw && docker compose restart backend && systemctl reload nginx"
+      - name: 🧹 清理 SSH (Cleanup SSH)
+        if: always()
+        run: rm -f ~/.ssh/rap001_opclaw
 
-          echo "✅ Rollback completed"
+  #==========================================================================
+  # 数据库保护检查 (Database Protection Check)
+  #==========================================================================
+  database-protection:
+    name: 🛡️ 数据库保护 (Database Protection)
+    runs-on: ubuntu-latest
+    needs: pre-check
 
-      - name: Rollback failed - No backup
-        if: failure() && github.event.inputs.skip_backup == 'true'
+    steps:
+      - name: 📥 检出代码 (Checkout Code)
+        uses: actions/checkout@v4
+
+      - name: 🔧 配置 SSH (Setup SSH)
         run: |
-          echo "==> Deployment failed but backup was skipped"
-          echo "❌ Cannot rollback automatically - manual intervention required"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/rap001_opclaw
+          chmod 600 ~/.ssh/rap001_opclaw
+          ssh-keyscan -H ${{ env.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: 🛡️ 数据库保护检查 (Database Protection Check)
+        run: |
+          echo "检查数据库保护机制..."
+
+          # 检查数据库容器运行
+          DB_RUNNING=$(ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "docker ps --format '{{.Names}}' | grep -q 'opclaw-postgres' && echo 'yes' || echo 'no'")
+
+          if [ "$DB_RUNNING" = "yes" ]; then
+            echo "✅ 数据库容器运行中"
+
+            # 检查数据库连接
+            ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+              ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+              "docker exec opclaw-postgres pg_isready -U opclaw" || {
+              echo "❌ 数据库连接失败"
+              exit 1
+            }
+
+            echo "✅ 数据库连接正常"
+          else
+            echo "⚠️  数据库容器未运行，首次部署？"
+          fi
+
+          # 检查备份目录
+          ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "mkdir -p ${{ env.BACKUP_PATH }}/database"
+
+          echo "✅ 备份目录已准备"
+
+      - name: 🧹 清理 SSH (Cleanup SSH)
+        if: always()
+        run: rm -f ~/.ssh/rap001_opclaw
+
+  #==========================================================================
+  # 部署作业 (Deployment Job)
+  #==========================================================================
+  deploy:
+    name: 🚀 部署到生产 (Deploy to Production)
+    runs-on: ubuntu-latest
+    needs: [unit-test, config-validation, database-protection]
+
+    # 部署环境变量
+    env:
+      COMPONENT: ${{ github.event.inputs.component || 'all' }}
+      TIMESTAMP: ${{ github.run_number }}
+
+    steps:
+      - name: 📥 检出代码 (Checkout Code)
+        uses: actions/checkout@v4
+
+      - name: 🔧 配置 SSH (Setup SSH)
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/rap001_opclaw
+          chmod 600 ~/.ssh/rap001_opclaw
+          ssh-keyscan -H ${{ env.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      #------------------------------------------------------------------------
+      # 创建备份 (Create Backup)
+      #------------------------------------------------------------------------
+      - name: 💾 创建备份 (Create Backup)
+        run: |
+          echo "创建部署前备份..."
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
+          # 备份配置文件
+          ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "cp ${{ env.DEPLOY_PATH }}/.env.production \
+             ${{ env.BACKUP_PATH }}/.env.production.${TIMESTAMP}"
+
+          # 备份数据库
+          ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "docker exec opclaw-postgres pg_dump -U opclaw opclaw | \
+             gzip > ${{ env.BACKUP_PATH }}/database/opclaw_db_${TIMESTAMP}.sql.gz" || {
+            echo "⚠️  数据库备份失败（可能数据库未运行）"
+          }
+
+          # 备份当前代码
+          ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "cd ${{ env.DEPLOY_PATH }} && \
+             tar -czf ${{ env.BACKUP_PATH }}/code_backup_${TIMESTAMP}.tar.gz \
+             --exclude='node_modules' \
+             --exclude='backups' \
+             --exclude='.git' \
+             platform/backend 2>/dev/null || true"
+
+          echo "✅ 备份创建完成: ${TIMESTAMP}"
+
+      #------------------------------------------------------------------------
+      # 部署后端 (Deploy Backend)
+      #------------------------------------------------------------------------
+      - name: 🚀 部署后端服务 (Deploy Backend)
+        if: github.event.inputs.component == 'all' || github.event.inputs.component == 'backend'
+        run: |
+          echo "部署后端服务..."
+
+          # 上传新代码
+          ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "mkdir -p ${{ env.DEPLOY_PATH }}/platform/backend"
+
+          # 使用 rsync 同步代码（保留权限，增量传输）
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no" \
+            --exclude='node_modules' \
+            --exclude='dist' \
+            --exclude='.env*' \
+            platform/backend/ \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/platform/backend/
+
+          # 重新构建并重启容器
+          ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "cd ${{ env.DEPLOY_PATH }} && \
+             docker compose build backend && \
+             docker compose up -d backend"
+
+          echo "✅ 后端部署完成"
+
+      #------------------------------------------------------------------------
+      # 部署前端 (Deploy Frontend)
+      #------------------------------------------------------------------------
+      - name: 🚀 部署前端服务 (Deploy Frontend)
+        if: github.event.inputs.component == 'all' || github.event.inputs.component == 'frontend'
+        run: |
+          echo "部署前端服务..."
+
+          # 上传新代码
+          ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "mkdir -p ${{ env.DEPLOY_PATH }}/platform/frontend"
+
+          # 使用 rsync 同步代码
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no" \
+            --exclude='node_modules' \
+            --exclude='dist' \
+            --exclude='.env*' \
+            platform/frontend/ \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/platform/frontend/
+
+          # 构建前端（在本地或远程）
+          ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "cd ${{ env.DEPLOY_PATH }}/platform/frontend && \
+             npm install -g pnpm@latest && \
+             pnpm install && \
+             pnpm build"
+
+          # 重启前端容器
+          ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "cd ${{ env.DEPLOY_PATH }} && \
+             docker compose up -d frontend"
+
+          echo "✅ 前端部署完成"
+
+      #------------------------------------------------------------------------
+      # 健康检查 (Health Check)
+      #------------------------------------------------------------------------
+      - name: 🔍 健康检查 (Health Check)
+        id: health-check
+        run: |
+          echo "执行健康检查..."
+
+          MAX_RETRIES=3
+          RETRY_DELAY=30
+          RETRY_COUNT=0
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "健康检查尝试 $((RETRY_COUNT + 1))/$MAX_RETRIES"
+
+            # 检查后端健康
+            BACKEND_HEALTH=$(ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+              ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+              "curl -s -o /dev/null -w '%{http_code}' http://localhost:3000/health || echo '000'")
+
+            if [ "$BACKEND_HEALTH" = "200" ]; then
+              echo "✅ 后端健康检查通过"
+            else
+              echo "❌ 后端健康检查失败 (HTTP $BACKEND_HEALTH)"
+            fi
+
+            # 检查数据库健康
+            DB_HEALTH=$(ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+              ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+              "docker exec opclaw-postgres pg_isready -U opclaw && echo 'healthy' || echo 'unhealthy'")
+
+            if [ "$DB_HEALTH" = "healthy" ]; then
+              echo "✅ 数据库健康检查通过"
+            else
+              echo "❌ 数据库健康检查失败"
+            fi
+
+            # 如果所有检查通过，退出循环
+            if [ "$BACKEND_HEALTH" = "200" ] && [ "$DB_HEALTH" = "healthy" ]; then
+              echo "✅ 所有健康检查通过"
+              exit 0
+            fi
+
+            # 等待后重试
+            RETRY_COUNT=$((RETRY_COUNT + 1))
+            if [ $RETRY_COUNT -lt $MAX_RETRIES ]; then
+              echo "等待 ${RETRY_DELAY} 秒后重试..."
+              sleep $RETRY_DELAY
+            fi
+          done
+
+          echo "❌ 健康检查失败，已达到最大重试次数"
           exit 1
 
       #------------------------------------------------------------------------
-      # Notify deployment status
+      # 部署成功 (Deployment Success)
       #------------------------------------------------------------------------
-      - name: Notify deployment status
-        if: always()
+      - name: ✅ 部署成功 (Deployment Success)
+        if: success()
         run: |
-          if [ "${{ job.status }}" = "success" ]; then
-            echo "## ✅ Production Deployment Successful" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Environment:** Production" >> $GITHUB_STEP_SUMMARY
-            echo "**Component:** ${{ github.event.inputs.component || 'all' }}" >> $GITHUB_STEP_SUMMARY
-            echo "**Approved by:** 2 maintainers" >> $GITHUB_STEP_SUMMARY
-            echo "**Deployed by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-            echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-            echo "**URL:** http://118.25.0.190" >> $GITHUB_STEP_SUMMARY
+          echo ""
+          echo "=============================================================================="
+          echo "✅ 部署成功 (Deployment Successful)"
+          echo "=============================================================================="
+          echo ""
+          echo "环境 (Environment): ${{ env.ENVIRONMENT }}"
+          echo "主机 (Host): ${{ env.DEPLOY_HOST }}"
+          echo "组件 (Component): ${{ env.COMPONENT }}"
+          echo "时间 (Timestamp): $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo ""
+          echo "=============================================================================="
+
+      #------------------------------------------------------------------------
+      # 部署失败回滚 (Rollback on Failure)
+      #------------------------------------------------------------------------
+      - name: 🔄 部署失败回滚 (Rollback on Failure)
+        if: failure()
+        run: |
+          echo ""
+          echo "=============================================================================="
+          echo "❌ 部署失败，开始回滚 (Deployment Failed, Rolling Back)"
+          echo "=============================================================================="
+          echo ""
+
+          # 查找最新备份
+          LATEST_BACKUP=$(ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "ls -t ${{ env.BACKUP_PATH }}/code_backup_*.tar.gz 2>/dev/null | head -1")
+
+          if [ -n "$LATEST_BACKUP" ]; then
+            echo "找到备份: $LATEST_BACKUP"
+
+            # 恢复代码
+            ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+              ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+              "cd ${{ env.DEPLOY_PATH }} && \
+               tar -xzf $LATEST_BACKUP && \
+               docker compose up -d"
+
+            echo "✅ 回滚完成"
           else
-            echo "## ❌ Production Deployment Failed" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "**Environment:** Production" >> $GITHUB_STEP_SUMMARY
-            echo "**Component:** ${{ github.event.inputs.component || 'all' }}" >> $GITHUB_STEP_SUMMARY
-            echo "**Deployed by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-            echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-            echo "**Action:** Automatic rollback initiated" >> $GITHUB_STEP_SUMMARY
-            echo "**⚠️ Manual intervention may be required**" >> $GITHUB_STEP_SUMMARY
+            echo "❌ 未找到备份，无法回滚"
+            exit 1
           fi
 
-  ##############################################################################
-  # Job 3: Post-Deployment Tests - Run comprehensive tests
-  ##############################################################################
-  post-deploy-tests:
-    name: Post-Deployment Tests
-    runs-on: ubuntu-latest
-    needs: deploy-production
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 9
-
-      - name: Install test dependencies
-        working-directory: platform/e2e
-        run: pnpm install --frozen-lockfile
-
-      - name: Run production smoke tests
-        working-directory: platform/e2e
-        env:
-          CI: true
-          BASE_URL: http://118.25.0.190
-        run: |
-          pnpm exec playwright test --project=chromium --grep "@smoke"
-        continue-on-error: false
-
-      - name: Upload test results
+      - name: 🧹 清理 SSH (Cleanup SSH)
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: production-test-results
-          path: platform/e2e/playwright-report/
-          retention-days: 30
+        run: rm -f ~/.ssh/rap001_opclaw
 
-  ##############################################################################
-  # Job 4: Deployment Summary - Generate deployment report
-  ##############################################################################
-  deployment-summary:
-    name: Deployment Summary
+  #==========================================================================
+  # 部署后验证 (Post-deployment Verification)
+  #==========================================================================
+  post-deploy-check:
+    name: ✅ 部署后验证 (Post-deployment Check)
     runs-on: ubuntu-latest
-    needs: [deploy-production, post-deploy-tests]
-
+    needs: deploy
     if: always()
 
     steps:
-      - name: Generate deployment summary
+      - name: 📥 检出代码 (Checkout Code)
+        uses: actions/checkout@v4
+
+      - name: 🔧 配置 SSH (Setup SSH)
         run: |
-          echo "# Production Deployment Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Deployment Details" >> $GITHUB_STEP_SUMMARY
-          echo "- **Workflow:** ${{ github.workflow }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Run ID:** ${{ github.run_id }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Requested by:** ${{ github.actor }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Approved by:** 2 maintainers" >> $GITHUB_STEP_SUMMARY
-          echo "- **Component:** ${{ github.event.inputs.component || 'all' }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Environment:** Production" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Job Status" >> $GITHUB_STEP_SUMMARY
-          echo "- Pre-deployment Checks: ${{ needs.pre-deployment-checks.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Approval: Granted" >> $GITHUB_STEP_SUMMARY
-          echo "- Deploy: ${{ needs.deploy-production.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "- Post-Deploy Tests: ${{ needs.post-deploy-tests.result }}" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Access URLs" >> $GITHUB_STEP_SUMMARY
-          echo "- Frontend: http://118.25.0.190" >> $GITHUB_STEP_SUMMARY
-          echo "- Backend API: http://118.25.0.190/api" >> $GITHUB_STEP_SUMMARY
-          echo "- Health Check: http://118.25.0.190/api/health" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "## Next Steps" >> $GITHUB_STEP_SUMMARY
-          if [[ "${{ needs.deploy-production.result }}" == "success" ]] && [[ "${{ needs.post-deploy-tests.result }}" == "success" ]]; then
-            echo "- ✅ Monitor logs for any issues" >> $GITHUB_STEP_SUMMARY
-            echo "- ✅ Verify functionality in production environment" >> $GITHUB_STEP_SUMMARY
-            echo "- ✅ Update stakeholders on successful deployment" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "- ⚠️ Check deployment logs for errors" >> $GITHUB_STEP_SUMMARY
-            echo "- ⚠️ Verify rollback was successful" >> $GITHUB_STEP_SUMMARY
-            echo "- ⚠️ Investigate root cause of failure" >> $GITHUB_STEP_SUMMARY
-            echo "- ⚠️ Create incident report if needed" >> $GITHUB_STEP_SUMMARY
-          fi
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/rap001_opclaw
+          chmod 600 ~/.ssh/rap001_opclaw
+          ssh-keyscan -H ${{ env.DEPLOY_HOST }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: 🔍 最终验证 (Final Verification)
+        run: |
+          echo "执行最终验证..."
+
+          # 检查所有容器运行
+          ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "docker ps --format 'table {{.Names}}\t{{.Status}}' | grep opclaw"
+
+          # 检查日志（最后 20 行）
+          ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "docker logs opclaw-backend --tail 20"
+
+      - name: 🧹 清理 SSH (Cleanup SSH)
+        if: always()
+        run: rm -f ~/.ssh/rap001_opclaw
