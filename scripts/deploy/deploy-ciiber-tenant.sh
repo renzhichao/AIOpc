@@ -1,4 +1,4 @@
-#!/opt/homebrew/bin/bash
+#!/usr/bin/env bash
 #
 # deploy-ciiber-tenant.sh - CIIBER 租户部署脚本
 #
