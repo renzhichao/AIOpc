@@ -1,0 +1,208 @@
+#==============================================================================
+# Test Tenant Alpha Configuration
+# (测试租户 Alpha 配置)
+#
+# This is a test configuration for validating the configuration system.
+# DO NOT use in production environments.
+#
+# Tenant ID: test_tenant_alpha
+# Environment: development
+# Purpose: Configuration system testing and validation
+#==============================================================================
+
+#==============================================================================
+# Tenant Basic Information
+#==============================================================================
+
+tenant:
+  id: "test_tenant_alpha"
+  name: "Test Tenant Alpha"
+  environment: "development"
+  tier: "trial"
+
+#==============================================================================
+# Server Configuration
+#==============================================================================
+
+server:
+  host: "${TEST_SERVER_HOST:-localhost}"
+  ssh_user: "${TEST_SSH_USER:-root}"
+  ssh_key_path: "${TEST_SSH_KEY_PATH:-~/.ssh/id_rsa}"
+  deploy_path: "${TEST_DEPLOY_PATH:-/tmp/opclaw/test-alpha}"
+  api_port: "3000"
+  metrics_port: "9090"
+  resources:
+    memory_limit: "1g"
+    cpu_limit: "0.5"
+    memory_reservation: "256m"
+
+#==============================================================================
+# Feishu Integration Configuration
+#==============================================================================
+
+feishu:
+  app_id: "${FEISHU_APP_ID}"
+  app_secret: "${FEISHU_APP_SECRET}"
+  encrypt_key: "${FEISHU_ENCRYPT_KEY:-test-encrypt-key-32-characters-long!!}"
+  oauth_redirect_uri: "http://localhost:3000/api/auth/feishu/callback"
+  event_callback_url: "http://localhost:3000/api/feishu/events"
+  api_base_url: "https://open.feishu.cn"
+
+#==============================================================================
+# Database Configuration
+#==============================================================================
+
+database:
+  host: "${TEST_DB_HOST:-localhost}"
+  port: "5432"
+  name: "${TEST_DB_NAME:-opclaw_test_alpha}"
+  user: "${TEST_DB_USER:-opclaw_test}"
+  password: "${TEST_DB_PASSWORD}"
+  pool:
+    min: "1"
+    max: "5"
+    idle_timeout_ms: "30000"
+  ssl_mode: "disable"
+
+#==============================================================================
+# Redis Configuration
+#==============================================================================
+
+redis:
+  host: "${TEST_REDIS_HOST:-localhost}"
+  port: "6379"
+  password: "${TEST_REDIS_PASSWORD:-}"
+  db: "1"
+  pool:
+    min: "1"
+    max: "3"
+  tls:
+    enabled: "false"
+    ca_cert: ""
+
+#==============================================================================
+# JWT Configuration
+#==============================================================================
+
+jwt:
+  secret: "${JWT_SECRET}"
+  expires_in: "1h"
+  refresh_expires_in: "24h"
+  issuer: "test_tenant_alpha"
+  audience: "opclaw-test-api"
+
+#==============================================================================
+# OpenClaw Agent Configuration
+#==============================================================================
+
+agent:
+  deepseek:
+    api_base_url: "https://api.deepseek.com"
+    api_key: "${DEEPSEEK_API_KEY}"
+    model: "deepseek-chat"
+    max_tokens: "2048"
+    temperature: "0.7"
+
+  capabilities:
+    file_ops_enabled: "true"
+    web_search_enabled: "true"
+    exec_enabled: "false"
+    cron_enabled: "false"
+
+  tools:
+    max_concurrent: "3"
+    timeout_seconds: "30"
+
+#==============================================================================
+# Monitoring Configuration
+#==============================================================================
+
+monitoring:
+  enabled: "true"
+  prometheus:
+    metrics_path: "/metrics"
+    enabled: "true"
+  health_check:
+    path: "/health"
+    interval_seconds: "60"
+    timeout_seconds: "5"
+  alerts:
+    enabled: "false"
+    webhook_url: ""
+
+#==============================================================================
+# Logging Configuration
+#==============================================================================
+
+logging:
+  level: "debug"
+  format: "json"
+  output: "stdout"
+  file:
+    path: "/tmp/opclaw/test-alpha.log"
+    max_size_mb: "10"
+    max_files: "3"
+    max_age_days: "7"
+
+#==============================================================================
+# Backup Configuration
+#==============================================================================
+
+backup:
+  enabled: "false"
+  schedule: "0 3 * * *"
+  retention:
+    daily: "3"
+    weekly: "2"
+    monthly: "1"
+  storage:
+    type: "local"
+    local_path: "/tmp/backups/opclaw/test-alpha"
+    s3:
+      bucket: ""
+      region: ""
+      access_key: ""
+      secret_key: ""
+    oss:
+      bucket: ""
+      region: ""
+      access_key: ""
+      secret_key: ""
+
+#==============================================================================
+# Feature Flags
+#==============================================================================
+
+features:
+  user_registration_enabled: "true"
+  user_self_management_enabled: "true"
+  api_key_management_enabled: "true"
+  instance_sharing_enabled: "false"
+  custom_system_prompt_enabled: "true"
+  collaboration_enabled: "false"
+  advanced_analytics_enabled: "false"
+
+#==============================================================================
+# Custom Configuration
+#==============================================================================
+
+custom:
+  branding:
+    logo_url: ""
+    primary_color: "#1890ff"
+    company_name: "Test Company Alpha"
+
+  rate_limits:
+    api_rpm: "120"
+    oauth_rpm: "100"
+    webhook_rpm: "60"
+
+#==============================================================================
+# Test Metadata
+#==============================================================================
+
+_test:
+  purpose: "Configuration system validation"
+  created_by: "TASK-007 Configuration System Implementation"
+  is_production: "false"
+  validation_test: "true"

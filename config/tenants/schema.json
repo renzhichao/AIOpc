@@ -1,0 +1,620 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://aiopc.dev/schemas/tenant-config-v1.json",
+  "title": "Tenant Configuration Schema",
+  "description": "Schema for validating tenant configuration files in AIOpc multi-instance deployment system",
+  "type": "object",
+  "required": [
+    "tenant",
+    "server",
+    "feishu",
+    "database",
+    "redis",
+    "jwt",
+    "agent"
+  ],
+  "properties": {
+    "tenant": {
+      "type": "object",
+      "description": "Tenant basic information",
+      "required": ["id", "name", "environment"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique tenant identifier",
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "name": {
+          "type": "string",
+          "description": "Human-readable tenant name",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "environment": {
+          "type": "string",
+          "description": "Environment type",
+          "enum": ["production", "staging", "development"]
+        },
+        "tier": {
+          "type": "string",
+          "description": "Tenant tier for resource allocation",
+          "enum": ["trial", "basic", "standard", "premium", "enterprise"],
+          "default": "trial"
+        }
+      }
+    },
+    "server": {
+      "type": "object",
+      "description": "Server configuration",
+      "required": ["host", "ssh_user", "ssh_key_path", "deploy_path"],
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "Server hostname or IP address",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "ssh_user": {
+          "type": "string",
+          "description": "SSH connection user",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "ssh_key_path": {
+          "type": "string",
+          "description": "Path to SSH private key file",
+          "minLength": 1
+        },
+        "deploy_path": {
+          "type": "string",
+          "description": "Deployment path on remote server",
+          "minLength": 1,
+          "maxLength": 500
+        },
+        "api_port": {
+          "type": "string",
+          "description": "API server port",
+          "pattern": "^[0-9]+$",
+          "default": "3000"
+        },
+        "metrics_port": {
+          "type": "string",
+          "description": "Metrics server port",
+          "pattern": "^[0-9]+$",
+          "default": "9090"
+        },
+        "resources": {
+          "type": "object",
+          "description": "Resource limits for container deployments",
+          "properties": {
+            "memory_limit": {
+              "type": "string",
+              "description": "Memory limit (e.g., 2g, 2048m)",
+              "pattern": "^[0-9]+(m|g|gb|mb)$"
+            },
+            "cpu_limit": {
+              "type": "string",
+              "description": "CPU limit (e.g., 1.0, 0.5)",
+              "pattern": "^[0-9]+(\\.[0-9]+)?$"
+            },
+            "memory_reservation": {
+              "type": "string",
+              "description": "Memory reservation (e.g., 512m)",
+              "pattern": "^[0-9]+(m|g|gb|mb)$"
+            }
+          }
+        }
+      }
+    },
+    "feishu": {
+      "type": "object",
+      "description": "Feishu (Lark) integration configuration",
+      "required": ["app_id", "app_secret", "encrypt_key", "oauth_redirect_uri"],
+      "properties": {
+        "app_id": {
+          "type": "string",
+          "description": "Feishu App ID",
+          "pattern": "^cli_[a-zA-Z0-9]+$",
+          "minLength": 1
+        },
+        "app_secret": {
+          "type": "string",
+          "description": "Feishu App Secret",
+          "minLength": 1
+        },
+        "encrypt_key": {
+          "type": "string",
+          "description": "Encryption key for data encryption",
+          "minLength": 16
+        },
+        "oauth_redirect_uri": {
+          "type": "string",
+          "description": "OAuth redirect URI",
+          "format": "uri",
+          "minLength": 1
+        },
+        "event_callback_url": {
+          "type": "string",
+          "description": "Event callback URL",
+          "format": "uri"
+        },
+        "api_base_url": {
+          "type": "string",
+          "description": "Feishu API base URL",
+          "format": "uri",
+          "default": "https://open.feishu.cn"
+        }
+      }
+    },
+    "database": {
+      "type": "object",
+      "description": "Database configuration",
+      "required": ["host", "port", "name", "user", "password"],
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "Database host",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "port": {
+          "type": "string",
+          "description": "Database port",
+          "pattern": "^[0-9]+$",
+          "default": "5432"
+        },
+        "name": {
+          "type": "string",
+          "description": "Database name",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "user": {
+          "type": "string",
+          "description": "Database user",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "password": {
+          "type": "string",
+          "description": "Database password",
+          "minLength": 1
+        },
+        "pool": {
+          "type": "object",
+          "description": "Connection pool settings",
+          "properties": {
+            "min": {
+              "type": "string",
+              "description": "Minimum pool size",
+              "pattern": "^[0-9]+$"
+            },
+            "max": {
+              "type": "string",
+              "description": "Maximum pool size",
+              "pattern": "^[0-9]+$"
+            },
+            "idle_timeout_ms": {
+              "type": "string",
+              "description": "Idle timeout in milliseconds",
+              "pattern": "^[0-9]+$"
+            }
+          }
+        },
+        "ssl_mode": {
+          "type": "string",
+          "description": "SSL mode",
+          "enum": ["disable", "allow", "prefer", "require", "verify-ca", "verify-full"],
+          "default": "prefer"
+        }
+      }
+    },
+    "redis": {
+      "type": "object",
+      "description": "Redis configuration",
+      "required": ["host", "port"],
+      "properties": {
+        "host": {
+          "type": "string",
+          "description": "Redis host",
+          "minLength": 1,
+          "maxLength": 255
+        },
+        "port": {
+          "type": "string",
+          "description": "Redis port",
+          "pattern": "^[0-9]+$",
+          "default": "6379"
+        },
+        "password": {
+          "type": "string",
+          "description": "Redis password"
+        },
+        "db": {
+          "type": "string",
+          "description": "Database number",
+          "pattern": "^[0-9]+$",
+          "default": "0"
+        },
+        "pool": {
+          "type": "object",
+          "description": "Connection pool settings",
+          "properties": {
+            "min": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "max": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          }
+        },
+        "tls": {
+          "type": "object",
+          "description": "TLS/SSL settings",
+          "properties": {
+            "enabled": {
+              "type": "string",
+              "enum": ["true", "false"]
+            },
+            "ca_cert": {
+              "type": "string",
+              "description": "Path to CA certificate"
+            }
+          }
+        }
+      }
+    },
+    "jwt": {
+      "type": "object",
+      "description": "JWT configuration",
+      "required": ["secret", "expires_in"],
+      "properties": {
+        "secret": {
+          "type": "string",
+          "description": "JWT secret key",
+          "minLength": 32
+        },
+        "expires_in": {
+          "type": "string",
+          "description": "Token expiration time",
+          "pattern": "^[0-9]+(s|m|h|d|w)$",
+          "default": "24h"
+        },
+        "refresh_expires_in": {
+          "type": "string",
+          "description": "Refresh token expiration time",
+          "pattern": "^[0-9]+(s|m|h|d|w)$"
+        },
+        "issuer": {
+          "type": "string",
+          "description": "Token issuer"
+        },
+        "audience": {
+          "type": "string",
+          "description": "Token audience"
+        }
+      }
+    },
+    "agent": {
+      "type": "object",
+      "description": "OpenClaw Agent configuration",
+      "required": ["deepseek"],
+      "properties": {
+        "deepseek": {
+          "type": "object",
+          "description": "DeepSeek API configuration",
+          "required": ["api_key"],
+          "properties": {
+            "api_base_url": {
+              "type": "string",
+              "description": "API base URL",
+              "format": "uri",
+              "default": "https://api.deepseek.com"
+            },
+            "api_key": {
+              "type": "string",
+              "description": "API key",
+              "minLength": 1
+            },
+            "model": {
+              "type": "string",
+              "description": "Model name",
+              "enum": ["deepseek-chat", "deepseek-coder"],
+              "default": "deepseek-chat"
+            },
+            "max_tokens": {
+              "type": "string",
+              "description": "Maximum tokens per request",
+              "pattern": "^[0-9]+$"
+            },
+            "temperature": {
+              "type": "string",
+              "description": "Temperature setting",
+              "pattern": "^[0-9]+(\\.[0-9]+)?$"
+            }
+          }
+        },
+        "capabilities": {
+          "type": "object",
+          "description": "Agent capabilities",
+          "properties": {
+            "file_ops_enabled": {
+              "type": "string",
+              "enum": ["true", "false"]
+            },
+            "web_search_enabled": {
+              "type": "string",
+              "enum": ["true", "false"]
+            },
+            "exec_enabled": {
+              "type": "string",
+              "enum": ["true", "false"]
+            },
+            "cron_enabled": {
+              "type": "string",
+              "enum": ["true", "false"]
+            }
+          }
+        },
+        "tools": {
+          "type": "object",
+          "description": "Agent tools configuration",
+          "properties": {
+            "max_concurrent": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "timeout_seconds": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          }
+        }
+      }
+    },
+    "monitoring": {
+      "type": "object",
+      "description": "Monitoring configuration",
+      "properties": {
+        "enabled": {
+          "type": "string",
+          "enum": ["true", "false"]
+        },
+        "prometheus": {
+          "type": "object",
+          "properties": {
+            "metrics_path": {
+              "type": "string"
+            },
+            "enabled": {
+              "type": "string",
+              "enum": ["true", "false"]
+            }
+          }
+        },
+        "health_check": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "interval_seconds": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "timeout_seconds": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          }
+        },
+        "alerts": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": "string",
+              "enum": ["true", "false"]
+            },
+            "webhook_url": {
+              "type": "string",
+              "format": "uri"
+            }
+          }
+        }
+      }
+    },
+    "logging": {
+      "type": "object",
+      "description": "Logging configuration",
+      "required": ["level", "format", "output"],
+      "properties": {
+        "level": {
+          "type": "string",
+          "enum": ["error", "warn", "info", "debug", "trace"]
+        },
+        "format": {
+          "type": "string",
+          "enum": ["json", "text"]
+        },
+        "output": {
+          "type": "string",
+          "enum": ["stdout", "file", "both"]
+        },
+        "file": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "max_size_mb": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "max_files": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "max_age_days": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          }
+        }
+      }
+    },
+    "backup": {
+      "type": "object",
+      "description": "Backup configuration",
+      "properties": {
+        "enabled": {
+          "type": "string",
+          "enum": ["true", "false"]
+        },
+        "schedule": {
+          "type": "string",
+          "description": "Cron expression for backup schedule"
+        },
+        "retention": {
+          "type": "object",
+          "properties": {
+            "daily": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "weekly": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "monthly": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          }
+        },
+        "storage": {
+          "type": "object",
+          "properties": {
+            "type": {
+              "type": "string",
+              "enum": ["local", "s3", "oss"]
+            },
+            "local_path": {
+              "type": "string"
+            },
+            "s3": {
+              "type": "object",
+              "properties": {
+                "bucket": {
+                  "type": "string"
+                },
+                "region": {
+                  "type": "string"
+                },
+                "access_key": {
+                  "type": "string"
+                },
+                "secret_key": {
+                  "type": "string"
+                }
+              }
+            },
+            "oss": {
+              "type": "object",
+              "properties": {
+                "bucket": {
+                  "type": "string"
+                },
+                "region": {
+                  "type": "string"
+                },
+                "access_key": {
+                  "type": "string"
+                },
+                "secret_key": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "features": {
+      "type": "object",
+      "description": "Feature flags",
+      "properties": {
+        "user_registration_enabled": {
+          "type": "string",
+          "enum": ["true", "false"]
+        },
+        "user_self_management_enabled": {
+          "type": "string",
+          "enum": ["true", "false"]
+        },
+        "api_key_management_enabled": {
+          "type": "string",
+          "enum": ["true", "false"]
+        },
+        "instance_sharing_enabled": {
+          "type": "string",
+          "enum": ["true", "false"]
+        },
+        "custom_system_prompt_enabled": {
+          "type": "string",
+          "enum": ["true", "false"]
+        },
+        "collaboration_enabled": {
+          "type": "string",
+          "enum": ["true", "false"]
+        },
+        "advanced_analytics_enabled": {
+          "type": "string",
+          "enum": ["true", "false"]
+        }
+      }
+    },
+    "custom": {
+      "type": "object",
+      "description": "Custom tenant-specific configuration",
+      "properties": {
+        "branding": {
+          "type": "object",
+          "properties": {
+            "logo_url": {
+              "type": "string",
+              "format": "uri"
+            },
+            "primary_color": {
+              "type": "string",
+              "pattern": "^#[0-9A-Fa-f]{6}$"
+            },
+            "company_name": {
+              "type": "string"
+            }
+          }
+        },
+        "rate_limits": {
+          "type": "object",
+          "properties": {
+            "api_rpm": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "oauth_rpm": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            },
+            "webhook_rpm": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
+            }
+          }
+        }
+      }
+    }
+  }
+}
