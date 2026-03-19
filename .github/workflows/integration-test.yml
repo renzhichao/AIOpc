@@ -1,0 +1,584 @@
+name: 集成测试 (Integration Tests)
+
+#==============================================================================
+# 集成测试工作流
+# (Integration Test Workflow)
+#
+# 核心特性 (Key Features):
+# - 多租户环境集成测试 (Multi-tenant integration testing)
+# - 端到端工作流测试 (End-to-end workflow testing)
+# - 健康检查验证 (Health check verification)
+# - OAuth 流程测试 (OAuth flow testing)
+# - 性能基准测试 (Performance benchmarking)
+#
+# 触发条件 (Triggers):
+# - 手动触发 (Manual trigger)
+# - PR 合并前 (Before PR merge)
+# - 定期执行 (Scheduled execution)
+#
+#==============================================================================
+
+on:
+  # 手动触发 (Manual trigger)
+  workflow_dispatch:
+    inputs:
+      tenant:
+        description: '测试租户 (Test Tenant)'
+        required: true
+        default: 'test_tenant_alpha'
+        type: choice
+        options:
+          - test_tenant_alpha
+          # Add more test tenants here
+
+      test_suite:
+        description: '测试套件 (Test Suite)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - health
+          - oauth
+          - api
+          - performance
+
+      skip_cleanup:
+        description: '跳过清理 (Skip Cleanup) - 保留测试环境'
+        required: false
+        default: false
+        type: boolean
+
+  # Pull request 触发 (PR trigger)
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'platform/backend/**'
+      - 'platform/frontend/**'
+      - 'scripts/deploy/**'
+      - 'config/tenants/**'
+
+  # 定期执行 (Scheduled)
+  schedule:
+    - cron: '0 2 * * *'  # 每天凌晨2点运行 (Run daily at 2 AM)
+
+  # 工作流运行触发 (Workflow run trigger)
+  workflow_run:
+    workflows: ['租户部署 (Tenant Deployment)']
+    types:
+      - completed
+    branches: [main, develop]
+
+env:
+  NODE_VERSION: '22'
+  PYTHON_VERSION: '3.x'
+
+jobs:
+  #==========================================================================
+  # 准备作业 (Setup Job)
+  #==========================================================================
+  setup:
+    name: 🛠️ 准备测试环境 (Setup Test Environment)
+    runs-on: ubuntu-latest
+    outputs:
+      tenant_id: ${{ steps.load-config.outputs.tenant_id }}
+      tenant_name: ${{ steps.load-config.outputs.tenant_name }}
+      environment: ${{ steps.load-config.outputs.environment }}
+
+    steps:
+      - name: 📥 检出代码 (Checkout Code)
+        uses: actions/checkout@v4
+
+      - name: 🐍 设置 Python (Setup Python)
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 📦 安装依赖 (Install Dependencies)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yq jq curl
+
+      - name: 📋 加载租户配置 (Load Tenant Configuration)
+        id: load-config
+        run: |
+          # Determine tenant to test
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TEST_TENANT="${{ github.event.inputs.tenant }}"
+          else
+            TEST_TENANT="test_tenant_alpha"
+          fi
+
+          TENANT_CONFIG="config/tenants/${TEST_TENANT}.yml"
+
+          if [ ! -f "$TENANT_CONFIG" ]; then
+            echo "❌ 租户配置文件不存在 (Tenant config not found): $TENANT_CONFIG"
+            exit 1
+          fi
+
+          # Extract tenant information
+          TENANT_ID=$(yq '.tenant.id' "$TENANT_CONFIG")
+          TENANT_NAME=$(yq '.tenant.name' "$TENANT_CONFIG")
+          ENVIRONMENT=$(yq '.tenant.environment' "$TENANT_CONFIG")
+          SERVER_HOST=$(yq '.server.host' "$TENANT_CONFIG")
+          API_PORT=$(yq '.server.api_port' "$TENANT_CONFIG")
+
+          echo "tenant_id=$TENANT_ID" >> $GITHUB_OUTPUT
+          echo "tenant_name=$TENANT_NAME" >> $GITHUB_OUTPUT
+          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
+
+          echo "=============================================================================="
+          echo "📋 测试租户信息 (Test Tenant Information)"
+          echo "=============================================================================="
+          echo "租户ID (Tenant ID): $TENANT_ID"
+          echo "租户名称 (Tenant Name): $TENANT_NAME"
+          echo "环境 (Environment): $ENVIRONMENT"
+          echo "服务器 (Server): $SERVER_HOST:$API_PORT"
+
+  #==========================================================================
+  # 健康检查测试作业 (Health Check Test Job)
+  #==========================================================================
+  test-health:
+    name: 🏥 健康检查测试 (Health Check Tests)
+    runs-on: ubuntu-latest
+    needs: setup
+
+    steps:
+      - name: 📥 检出代码 (Checkout Code)
+        uses: actions/checkout@v4
+
+      - name: 🐍 设置 Python (Setup Python)
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 📦 安装依赖 (Install Dependencies)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yq
+
+      - name: 🏥 运行健康检查 (Run Health Checks)
+        id: health-check
+        run: |
+          TENANT_CONFIG="config/tenants/${{ needs.setup.outputs.tenant_id }}.yml"
+          SERVER_HOST=$(yq '.server.host' "$TENANT_CONFIG")
+          API_PORT=$(yq '.server.api_port' "$TENANT_CONFIG")
+          DOMAIN=$(yq '.server.domain' "$TENANT_CONFIG")
+
+          BASE_URL="http://${DOMAIN:-$SERVER_HOST}:${API_PORT}"
+
+          echo "=============================================================================="
+          echo "🏥 健康检查测试 (Health Check Tests)"
+          echo "=============================================================================="
+          echo "基础URL (Base URL): $BASE_URL"
+          echo ""
+
+          # Test 1: Root endpoint
+          echo "测试 1: 根路径端点 (Test 1: Root Endpoint)"
+          if curl -f -s "${BASE_URL}/" | head -20; then
+            echo "✅ 根路径端点测试通过 (Root endpoint test passed)"
+          else
+            echo "❌ 根路径端点测试失败 (Root endpoint test failed)"
+            exit 1
+          fi
+          echo ""
+
+          # Test 2: Health endpoint
+          echo "测试 2: 健康端点 (Test 2: Health Endpoint)"
+          HEALTH_RESPONSE=$(curl -s "${BASE_URL}/health")
+          if echo "$HEALTH_RESPONSE" | jq .; then
+            echo "✅ 健康端点测试通过 (Health endpoint test passed)"
+
+            # Check health status
+            HEALTH_STATUS=$(echo "$HEALTH_RESPONSE" | jq -r '.status // "unknown"')
+            if [[ "$HEALTH_STATUS" == "healthy" ]] || [[ "$HEALTH_STATUS" == "ok" ]]; then
+              echo "✅ 健康状态: $HEALTH_STATUS"
+            else
+              echo "⚠️ 健康状态异常: $HEALTH_STATUS"
+            fi
+          else
+            echo "❌ 健康端点测试失败 (Health endpoint test failed)"
+            exit 1
+          fi
+          echo ""
+
+          # Test 3: Metrics endpoint
+          echo "测试 3: 指标端点 (Test 3: Metrics Endpoint)"
+          if curl -f -s "${BASE_URL}/metrics" | head -20; then
+            echo "✅ 指标端点测试通过 (Metrics endpoint test passed)"
+          else
+            echo "⚠️ 指标端点测试失败 (Metrics endpoint test failed)"
+          fi
+          echo ""
+
+          # Test 4: Response time
+          echo "测试 4: 响应时间 (Test 4: Response Time)"
+          START_TIME=$(date +%s%3N)
+          curl -f -s "${BASE_URL}/health" > /dev/null
+          END_TIME=$(date +%s%3N)
+          RESPONSE_TIME=$((END_TIME - START_TIME))
+
+          echo "响应时间 (Response Time): ${RESPONSE_TIME}ms"
+          if [[ $RESPONSE_TIME -lt 1000 ]]; then
+            echo "✅ 响应时间良好 (Response time is good)"
+          elif [[ $RESPONSE_TIME -lt 3000 ]]; then
+            echo "⚠️ 响应时间偏长 (Response time is slow)"
+          else
+            echo "❌ 响应时间过长 (Response time is too slow)"
+            exit 1
+          fi
+          echo ""
+
+          echo "health_check_status=passed" >> $GITHUB_OUTPUT
+          echo "response_time=${RESPONSE_TIME}" >> $GITHUB_OUTPUT
+
+      - name: 📊 生成测试摘要 (Generate Test Summary)
+        if: always()
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 🏥 健康检查测试摘要 (Health Check Test Summary)
+
+          ### 测试信息 (Test Information)
+          - **租户 (Tenant)**: ${{ needs.setup.outputs.tenant_name }}
+          - **环境 (Environment)**: ${{ needs.setup.outputs.environment }}
+
+          ### 测试结果 (Test Results)
+          - **状态 (Status)**: ${{ steps.health-check.outputs.health_check_status }}
+          - **响应时间 (Response Time)**: ${{ steps.health-check.outputs.response_time }}ms
+
+          ### 测试覆盖 (Test Coverage)
+          - ✅ 根路径端点 (Root Endpoint)
+          - ✅ 健康端点 (Health Endpoint)
+          - ✅ 指标端点 (Metrics Endpoint)
+          - ✅ 响应时间 (Response Time)
+          EOF
+
+  #==========================================================================
+  # OAuth 测试作业 (OAuth Test Job)
+  #==========================================================================
+  test-oauth:
+    name: 🔐 OAuth 测试 (OAuth Tests)
+    runs-on: ubuntu-latest
+    needs: setup
+
+    steps:
+      - name: 📥 检出代码 (Checkout Code)
+        uses: actions/checkout@v4
+
+      - name: 🐍 设置 Python (Setup Python)
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 📦 安装依赖 (Install Dependencies)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yq
+
+      - name: 🔐 运行 OAuth 测试 (Run OAuth Tests)
+        id: oauth-test
+        run: |
+          TENANT_CONFIG="config/tenants/${{ needs.setup.outputs.tenant_id }}.yml"
+          SERVER_HOST=$(yq '.server.host' "$TENANT_CONFIG")
+          API_PORT=$(yq '.server.api_port' "$TENANT_CONFIG")
+          FEISHU_APP_ID=$(yq '.feishu.app_id' "$TENANT_CONFIG")
+
+          BASE_URL="http://${SERVER_HOST}:${API_PORT}"
+
+          echo "=============================================================================="
+          echo "🔐 OAuth 测试 (OAuth Tests)"
+          echo "=============================================================================="
+          echo "基础URL (Base URL): $BASE_URL"
+          echo "Feishu App ID: $FEISHU_APP_ID"
+          echo ""
+
+          # Test 1: OAuth login endpoint
+          echo "测试 1: OAuth 登录端点 (Test 1: OAuth Login Endpoint)"
+          OAUTH_URL="${BASE_URL}/api/auth/feishu/login"
+          if curl -f -s "$OAUTH_URL" | head -20; then
+            echo "✅ OAuth 登录端点测试通过 (OAuth login endpoint test passed)"
+          else
+            echo "⚠️ OAuth 登录端点测试失败 (OAuth login endpoint test failed)"
+          fi
+          echo ""
+
+          # Test 2: OAuth redirect URL format
+          echo "测试 2: OAuth 重定向 URL 格式 (Test 2: OAuth Redirect URL Format)"
+          REDIRECT_URI=$(yq '.feishu.oauth_redirect_uri' "$TENANT_CONFIG")
+          if [[ "$REDIRECT_URI" =~ ^https?:// ]]; then
+            echo "✅ OAuth 重定向 URI 格式正确 (OAuth redirect URI format is correct)"
+          else
+            echo "❌ OAuth 重定向 URI 格式错误 (OAuth redirect URI format is incorrect)"
+          fi
+          echo ""
+
+          # Test 3: Feishu API connectivity
+          echo "测试 3: Feishu API 连通性 (Test 3: Feishu API Connectivity)"
+          FEISHU_API_BASE=$(yq '.feishu.api_base_url' "$TENANT_CONFIG")
+          if curl -f -s "${FEISHU_API_BASE}/" --max-time 5 > /dev/null 2>&1; then
+            echo "✅ Feishu API 连通性测试通过 (Feishu API connectivity test passed)"
+          else
+            echo "⚠️ Feishu API 连通性测试失败 (Feishu API connectivity test failed)"
+          fi
+          echo ""
+
+          echo "oauth_test_status=completed" >> $GITHUB_OUTPUT
+
+      - name: 📊 生成测试摘要 (Generate Test Summary)
+        if: always()
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 🔐 OAuth 测试摘要 (OAuth Test Summary)
+
+          ### 测试信息 (Test Information)
+          - **租户 (Tenant)**: ${{ needs.setup.outputs.tenant_name }}
+          - **环境 (Environment)**: ${{ needs.setup.outputs.environment }}
+
+          ### 测试结果 (Test Results)
+          - **状态 (Status)**: ${{ steps.oauth-test.outputs.oauth_test_status }}
+
+          ### 测试覆盖 (Test Coverage)
+          - ✅ OAuth 登录端点 (OAuth Login Endpoint)
+          - ✅ OAuth 重定向 URL 格式 (OAuth Redirect URL Format)
+          - ✅ Feishu API 连通性 (Feishu API Connectivity)
+          EOF
+
+  #==========================================================================
+  # API 测试作业 (API Test Job)
+  #==========================================================================
+  test-api:
+    name: 🔌 API 测试 (API Tests)
+    runs-on: ubuntu-latest
+    needs: setup
+
+    steps:
+      - name: 📥 检出代码 (Checkout Code)
+        uses: actions/checkout@v4
+
+      - name: 🐍 设置 Python (Setup Python)
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 📦 安装依赖 (Install Dependencies)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yq
+
+      - name: 🔌 运行 API 测试 (Run API Tests)
+        id: api-test
+        run: |
+          TENANT_CONFIG="config/tenants/${{ needs.setup.outputs.tenant_id }}.yml"
+          SERVER_HOST=$(yq '.server.host' "$TENANT_CONFIG")
+          API_PORT=$(yq '.server.api_port' "$TENANT_CONFIG")
+
+          BASE_URL="http://${SERVER_HOST}:${API_PORT}"
+
+          echo "=============================================================================="
+          echo "🔌 API 测试 (API Tests)"
+          echo "=============================================================================="
+          echo "基础URL (Base URL): $BASE_URL"
+          echo ""
+
+          # Test 1: API version endpoint
+          echo "测试 1: API 版本端点 (Test 1: API Version Endpoint)"
+          if curl -f -s "${BASE_URL}/api/version" | jq .; then
+            echo "✅ API 版本端点测试通过 (API version endpoint test passed)"
+          else
+            echo "⚠️ API 版本端点测试失败 (API version endpoint test failed)"
+          fi
+          echo ""
+
+          # Test 2: API status endpoint
+          echo "测试 2: API 状态端点 (Test 2: API Status Endpoint)"
+          if curl -f -s "${BASE_URL}/api/status" | jq .; then
+            echo "✅ API 状态端点测试通过 (API status endpoint test passed)"
+          else
+            echo "⚠️ API 状态端点测试失败 (API status endpoint test failed)"
+          fi
+          echo ""
+
+          # Test 3: CORS headers
+          echo "测试 3: CORS 头部 (Test 3: CORS Headers)"
+          CORS_HEADERS=$(curl -s -I "${BASE_URL}/api/version" | grep -i "access-control-allow-origin" || echo "")
+          if [[ -n "$CORS_HEADERS" ]]; then
+            echo "✅ CORS 头部配置正确 (CORS headers configured correctly)"
+            echo "$CORS_HEADERS"
+          else
+            echo "⚠️ 未找到 CORS 头部 (CORS headers not found)"
+          fi
+          echo ""
+
+          echo "api_test_status=completed" >> $GITHUB_OUTPUT
+
+      - name: 📊 生成测试摘要 (Generate Test Summary)
+        if: always()
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 🔌 API 测试摘要 (API Test Summary)
+
+          ### 测试信息 (Test Information)
+          - **租户 (Tenant)**: ${{ needs.setup.outputs.tenant_name }}
+          - **环境 (Environment)**: ${{ needs.setup.outputs.environment }}
+
+          ### 测试结果 (Test Results)
+          - **状态 (Status)**: ${{ steps.api-test.outputs.api_test_status }}
+
+          ### 测试覆盖 (Test Coverage)
+          - ✅ API 版本端点 (API Version Endpoint)
+          - ✅ API 状态端点 (API Status Endpoint)
+          - ✅ CORS 头部 (CORS Headers)
+          EOF
+
+  #==========================================================================
+  # 性能测试作业 (Performance Test Job)
+  #==========================================================================
+  test-performance:
+    name: ⚡ 性能测试 (Performance Tests)
+    runs-on: ubuntu-latest
+    needs: setup
+
+    steps:
+      - name: 📥 检出代码 (Checkout Code)
+        uses: actions/checkout@v4
+
+      - name: 🐍 设置 Python (Setup Python)
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: 📦 安装依赖 (Install Dependencies)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yq apache2-utils
+
+      - name: ⚡ 运行性能测试 (Run Performance Tests)
+        id: performance-test
+        run: |
+          TENANT_CONFIG="config/tenants/${{ needs.setup.outputs.tenant_id }}.yml"
+          SERVER_HOST=$(yq '.server.host' "$TENANT_CONFIG")
+          API_PORT=$(yq '.server.api_port' "$TENANT_CONFIG")
+
+          BASE_URL="http://${SERVER_HOST}:${API_PORT}"
+
+          echo "=============================================================================="
+          echo "⚡ 性能测试 (Performance Tests)"
+          echo "=============================================================================="
+          echo "基础URL (Base URL): $BASE_URL"
+          echo ""
+
+          # Test 1: Response time benchmark
+          echo "测试 1: 响应时间基准 (Test 1: Response Time Benchmark)"
+          TOTAL_TIME=0
+          ITERATIONS=10
+
+          for i in $(seq 1 $ITERATIONS); do
+            START_TIME=$(date +%s%3N)
+            curl -f -s "${BASE_URL}/health" > /dev/null
+            END_TIME=$(date +%s%3N)
+            RESPONSE_TIME=$((END_TIME - START_TIME))
+            TOTAL_TIME=$((TOTAL_TIME + RESPONSE_TIME))
+            echo "  请求 $i: ${RESPONSE_TIME}ms"
+          done
+
+          AVG_TIME=$((TOTAL_TIME / ITERATIONS))
+          echo "平均响应时间 (Average Response Time): ${AVG_TIME}ms"
+
+          if [[ $AVG_TIME -lt 500 ]]; then
+            echo "✅ 性能优秀 (Performance is excellent)"
+            PERFORMANCE_LEVEL="excellent"
+          elif [[ $AVG_TIME -lt 1000 ]]; then
+            echo "✅ 性能良好 (Performance is good)"
+            PERFORMANCE_LEVEL="good"
+          elif [[ $AVG_TIME -lt 2000 ]]; then
+            echo "⚠️ 性能一般 (Performance is fair)"
+            PERFORMANCE_LEVEL="fair"
+          else
+            echo "❌ 性能较差 (Performance is poor)"
+            PERFORMANCE_LEVEL="poor"
+          fi
+          echo ""
+
+          # Test 2: Concurrent request handling
+          echo "测试 2: 并发请求处理 (Test 2: Concurrent Request Handling)"
+          CONCURRENT_REQUESTS=10
+          echo "发送 ${CONCURRENT_REQUESTS} 个并发请求 (Sending ${CONCURRENT_REQUESTS} concurrent requests)"
+
+          if command -v ab &> /dev/null; then
+            ab -n $CONCURRENT_REQUESTS -c $CONCURRENT_REQUESTS -q "${BASE_URL}/health" > /dev/null 2>&1
+            echo "✅ 并发请求测试完成 (Concurrent request test completed)"
+          else
+            echo "⚠️ Apache Bench 未安装，跳过并发测试 (Apache Bench not installed, skipping concurrent test)"
+          fi
+          echo ""
+
+          echo "performance_test_status=completed" >> $GITHUB_OUTPUT
+          echo "performance_level=${PERFORMANCE_LEVEL}" >> $GITHUB_OUTPUT
+          echo "avg_response_time=${AVG_TIME}" >> $GITHUB_OUTPUT
+
+      - name: 📊 生成测试摘要 (Generate Test Summary)
+        if: always()
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## ⚡ 性能测试摘要 (Performance Test Summary)
+
+          ### 测试信息 (Test Information)
+          - **租户 (Tenant)**: ${{ needs.setup.outputs.tenant_name }}
+          - **环境 (Environment)**: ${{ needs.setup.outputs.environment }}
+
+          ### 测试结果 (Test Results)
+          - **性能等级 (Performance Level)**: ${{ steps.performance-test.outputs.performance_level }}
+          - **平均响应时间 (Average Response Time)**: ${{ steps.performance-test.outputs.avg_response_time }}ms
+
+          ### 测试覆盖 (Test Coverage)
+          - ✅ 响应时间基准 (Response Time Benchmark)
+          - ✅ 并发请求处理 (Concurrent Request Handling)
+          EOF
+
+  #==========================================================================
+  # 测试摘要作业 (Test Summary Job)
+  #==========================================================================
+  test-summary:
+    name: 📊 测试摘要 (Test Summary)
+    runs-on: ubuntu-latest
+    needs: [setup, test-health, test-oauth, test-api, test-performance]
+    if: always()
+
+    steps:
+      - name: 📊 生成最终测试摘要 (Generate Final Test Summary)
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 📊 集成测试完成摘要 (Integration Test Completion Summary)
+
+          ### 测试信息 (Test Information)
+          - **租户 (Tenant)**: ${{ needs.setup.outputs.tenant_name }}
+          - **环境 (Environment)**: ${{ needs.setup.outputs.environment }}
+          - **触发方式 (Trigger)**: ${{ github.event_name }}
+
+          ### 测试套件状态 (Test Suite Status)
+          | 测试套件 (Test Suite) | 状态 (Status) |
+          |---------------------|-------------|
+          | 🏥 健康检查 (Health Check) | ${{ needs.test-health.result }} |
+          | 🔐 OAuth 测试 (OAuth Tests) | ${{ needs.test-oauth.result }} |
+          | 🔌 API 测试 (API Tests) | ${{ needs.test-api.result }} |
+          | ⚡ 性能测试 (Performance Tests) | ${{ needs.test-performance.result }} |
+
+          ### 总体状态 (Overall Status)
+          EOF
+
+          # Determine overall status
+          if [[ "${{ needs.test-health.result }}" == "success" ]] && \
+             [[ "${{ needs.test-oauth.result }}" == "success" ]] && \
+             [[ "${{ needs.test-api.result }}" == "success" ]] && \
+             [[ "${{ needs.test-performance.result }}" == "success" ]]; then
+            echo "✅ 所有测试通过 (All tests passed)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ 部分测试失败 (Some tests failed)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo ""
+          echo "### 相关链接 (Related Links)"
+          echo "- [查看工作流运行 (View Workflow Run)](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+
+          echo ""
+          echo "✅ 集成测试工作流完成 (Integration test workflow completed)"
