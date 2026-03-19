@@ -1,0 +1,27 @@
+{
+  "name": "@aioplc/e2e-tests",
+  "version": "1.0.0",
+  "description": "End-to-end testing framework for AIOpc platform",
+  "private": true,
+  "scripts": {
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "test:headed": "playwright test --headed",
+    "test:report": "playwright show-report",
+    "test:watch": "playwright test --watch",
+    "test:coverage": "playwright test --coverage",
+    "verify": "node scripts/verify-e2e-framework.js",
+    "install:browsers": "playwright install --with-deps",
+    "clean": "rm -rf playwright-report test-results"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.58.2",
+    "@types/node": "^20.19.37",
+    "typescript": "~5.9.3"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=8.0.0"
+  }
+}

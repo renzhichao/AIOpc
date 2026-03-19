@@ -11,11 +11,18 @@ build/
 .env
 .env.local
 .env.*.local
-# Exception: Track production config files (per user requirement)
-!.env.production
-!docker-compose.prod.yml
+
+# Environment files (keep platform/.env.production as single source of truth)
+*.local
+.env.staging
+.env.development
+
+# Agent local configs (keep .env.example files)
+deployment/remote-agent/.env
+deployment/remote-agent/services/*/.env
+
+# DO NOT ignore platform/.env.production - it's our single source of truth
 !platform/.env.production
-!platform/docker-compose.prod.yml
 
 # IDE
 .vscode/

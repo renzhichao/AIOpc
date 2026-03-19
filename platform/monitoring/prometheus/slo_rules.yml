@@ -1,0 +1,418 @@
+# SLO (Service Level Objective) Prometheus Rules
+# 定义服务级别指标的 Recording Rules 和 Alerting Rules
+# 文档: docs/operations/SLIS_SLOS.md
+
+groups:
+  # ============================================
+  # Recording Rules - SLI 计算
+  # ============================================
+  - name: slo_recording_rules
+    interval: 30s
+    rules:
+      # 可用性 SLI - 成功率
+      - record: http_requests_success_rate
+        expr: |
+          sum(rate(http_requests_total{status!~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total[5m])) * 100
+        labels:
+          slo_type: "availability"
+
+      # 可用性 SLI - 总请求率
+      - record: http_requests_total_rate
+        expr: |
+          sum(rate(http_requests_total[5m]))
+        labels:
+          slo_type: "throughput"
+
+      # 延迟 SLI - P50 (中位数)
+      - record: http_request_duration_p50
+        expr: |
+          histogram_quantile(0.50,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service)
+          ) * 1000
+        labels:
+          slo_type: "latency"
+          percentile: "p50"
+
+      # 延迟 SLI - P95 (95分位数)
+      - record: http_request_duration_p95
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service)
+          ) * 1000
+        labels:
+          slo_type: "latency"
+          percentile: "p95"
+
+      # 延迟 SLI - P99 (99分位数)
+      - record: http_request_duration_p99
+        expr: |
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le, service)
+          ) * 1000
+        labels:
+          slo_type: "latency"
+          percentile: "p99"
+
+      # 错误率 SLI - 5xx 错误率
+      - record: http_request_error_rate
+        expr: |
+          sum(rate(http_requests_total{status=~"5.."}[5m]))
+          /
+          sum(rate(http_requests_total[5m])) * 100
+        labels:
+          slo_type: "error_rate"
+
+      # 错误率 SLI - 4xx 客户端错误率
+      - record: http_request_client_error_rate
+        expr: |
+          sum(rate(http_requests_total{status=~"4.."}[5m]))
+          /
+          sum(rate(http_requests_total[5m])) * 100
+        labels:
+          slo_type: "client_error_rate"
+
+      # WebSocket 连接成功率
+      - record: websocket_connection_success_rate
+        expr: |
+          sum(rate(websocket_connections_total{status="success"}[5m]))
+          /
+          sum(rate(websocket_connections_total[5m])) * 100
+        labels:
+          slo_type: "websocket_availability"
+
+      # WebSocket 消息传递延迟 P95
+      - record: websocket_message_duration_p95
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(websocket_message_duration_seconds_bucket[5m])) by (le)
+          ) * 1000
+        labels:
+          slo_type: "websocket_latency"
+
+      # 数据库查询成功率
+      - record: db_query_success_rate
+        expr: |
+          sum(rate(db_queries_total{status="success"}[5m]))
+          /
+          sum(rate(db_queries_total[5m])) * 100
+        labels:
+          slo_type: "db_availability"
+
+      # 数据库查询延迟 P95
+      - record: db_query_duration_p95
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(db_query_duration_seconds_bucket[5m])) by (le)
+          ) * 1000
+        labels:
+          slo_type: "db_latency"
+
+      # 外部 API 调用成功率 (DeepSeek, Feishu)
+      - record: external_api_success_rate
+        expr: |
+          sum(rate(external_api_requests_total{status!~"5.."}[5m]))
+          /
+          sum(rate(external_api_requests_total[5m])) * 100
+        labels:
+          slo_type: "external_api_availability"
+
+      # 错误预算 - 30 天滚动窗口
+      # 假设 99.9% 可用性目标 = 每月 43.8 分钟停机容忍
+      - record: error_budget_remaining
+        expr: |
+          (
+            (43.8 * 60) -  # 每月总预算（秒）
+            (sum(increase(downtime_seconds[30d])) or 0)  # 实际停机时间
+          )
+          /
+          (43.8 * 60) * 100  # 转换为百分比
+        labels:
+          slo_window: "30d"
+          slo_target: "99.9"
+
+      # 错误预算消耗百分比
+      - record: error_burn_rate
+        expr: |
+          (
+            (sum(increase(downtime_seconds[1h])) or 0) * (30 * 24)
+            /
+            (43.8 * 60)
+          ) * 100
+        labels:
+          calculation: "projected_30d_burn"
+
+  # ============================================
+  # Alerting Rules - SLO 告警
+  # ============================================
+  - name: slo_alerts
+    interval: 30s
+    rules:
+      # 可用性告警 - 成功率低于 99.9%
+      - alert: LowAvailability
+        expr: |
+          http_requests_success_rate < 99.9
+        for: 5m
+        labels:
+          severity: warning
+          slo_type: availability
+          team: backend
+        annotations:
+          summary: "可用性低于 SLO 目标 (99.9%)"
+          description: "当前可用性: {{ $value }}%, 目标: ≥99.9%"
+          runbook_url: "https://docs.aiopc.com/runbooks/low-availability"
+          dashboard_url: "https://monitor.aiopc.com/d/slo-dashboard"
+
+      # 可用性严重告警 - 成功率低于 99%
+      - alert: CriticalAvailability
+        expr: |
+          http_requests_success_rate < 99.0
+        for: 2m
+        labels:
+          severity: critical
+          slo_type: availability
+          team: backend
+        annotations:
+          summary: "可用性严重下降 (低于 99%)"
+          description: "当前可用性: {{ $value }}%, 立即处理！"
+          runbook_url: "https://docs.aiopc.com/runbooks/critical-availability"
+          pagerduty: "aiopc-backend-critical"
+
+      # P95 延迟告警 - 超过 500ms
+      - alert: HighP95Latency
+        expr: |
+          http_request_duration_p95 > 500
+        for: 5m
+        labels:
+          severity: warning
+          slo_type: latency
+          team: backend
+        annotations:
+          summary: "P95 延迟超过 SLO 阈值 (500ms)"
+          description: "当前 P95 延迟: {{ $value }}ms, 目标: <500ms"
+          runbook_url: "https://docs.aiopc.com/runbooks/high-latency"
+
+      # P99 延迟告警 - 超过 1000ms
+      - alert: HighP99Latency
+        expr: |
+          http_request_duration_p99 > 1000
+        for: 5m
+        labels:
+          severity: warning
+          slo_type: latency
+          team: backend
+        annotations:
+          summary: "P99 延迟超过 SLO 阈值 (1000ms)"
+          description: "当前 P99 延迟: {{ $value }}ms, 目标: <1000ms"
+
+      # 错误率告警 - 超过 0.1%
+      - alert: HighErrorRate
+        expr: |
+          http_request_error_rate > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          slo_type: error_rate
+          team: backend
+        annotations:
+          summary: "错误率超过 SLO 阈值 (0.1%)"
+          description: "当前错误率: {{ $value }}%, 目标: <0.1%"
+          runbook_url: "https://docs.aiopc.com/runbooks/high-error-rate"
+
+      # 错误率严重告警 - 超过 1%
+      - alert: CriticalErrorRate
+        expr: |
+          http_request_error_rate > 1.0
+        for: 2m
+        labels:
+          severity: critical
+          slo_type: error_rate
+          team: backend
+        annotations:
+          summary: "错误率严重超标 (超过 1%)"
+          description: "当前错误率: {{ $value }}%, 立即处理！"
+          pagerduty: "aiopc-backend-critical"
+
+      # 错误预算告警 - 低于 50%
+      - alert: ErrorBudgetLow
+        expr: |
+          error_budget_remaining < 50
+        for: 5m
+        labels:
+          severity: warning
+          slo_type: error_budget
+          team: sre
+        annotations:
+          summary: "错误预算剩余低于 50%"
+          description: "错误预算剩余: {{ $value }}%, 减少非关键功能开发"
+          runbook_url: "https://docs.aiopc.com/runbooks/error-budget-low"
+
+      # 错误预算严重告警 - 低于 20%
+      - alert: ErrorBudgetCritical
+        expr: |
+          error_budget_remaining < 20
+        for: 1m
+        labels:
+          severity: critical
+          slo_type: error_budget
+          team: sre
+        annotations:
+          summary: "错误预算剩余低于 20%"
+          description: "错误预算剩余: {{ $value }}%, 暂停非紧急部署"
+          runbook_url: "https://docs.aiopc.com/runbooks/error-budget-critical"
+          action_required: "停止所有非紧急功能发布，专注稳定性改进"
+
+      # 错误预算耗尽告警 - 低于 10%
+      - alert: ErrorBudgetExhausted
+        expr: |
+          error_budget_remaining < 10
+        for: 1m
+        labels:
+          severity: critical
+          slo_type: error_budget
+          team: sre
+        annotations:
+          summary: "错误预算即将耗尽 (低于 10%)"
+          description: "错误预算剩余: {{ $value }}%, 只允许紧急修复"
+          runbook_url: "https://docs.aiopc.com/runbooks/error-budget-exhausted"
+          action_required: "只允许关键 Bug 修复，暂停所有功能开发"
+          pagerduty: "aiopc-sre-critical"
+
+      # 错误预算消耗过快告警
+      - alert: ErrorBurnRateHigh
+        expr: |
+          error_burn_rate > 10
+        for: 10m
+        labels:
+          severity: warning
+          slo_type: error_budget
+          team: sre
+        annotations:
+          summary: "错误预算消耗过快"
+          description: "按当前速率，30 天将消耗 {{ $value }}% 的错误预算"
+          runbook_url: "https://docs.aiopc.com/runbooks/high-burn-rate"
+
+      # WebSocket 连接成功率告警
+      - alert: LowWebSocketAvailability
+        expr: |
+          websocket_connection_success_rate < 99.5
+        for: 5m
+        labels:
+          severity: warning
+          slo_type: websocket_availability
+          team: backend
+        annotations:
+          summary: "WebSocket 连接成功率低于 SLO 目标 (99.5%)"
+          description: "当前 WebSocket 成功率: {{ $value }}%"
+
+      # 数据库查询成功率告警
+      - alert: LowDatabaseAvailability
+        expr: |
+          db_query_success_rate < 99.9
+        for: 5m
+        labels:
+          severity: warning
+          slo_type: db_availability
+          team: backend
+        annotations:
+          summary: "数据库查询成功率低于 SLO 目标 (99.9%)"
+          description: "当前数据库成功率: {{ $value }}%"
+
+      # 数据库查询延迟告警
+      - alert: HighDatabaseLatency
+        expr: |
+          db_query_duration_p95 > 500
+        for: 5m
+        labels:
+          severity: warning
+          slo_type: db_latency
+          team: backend
+        annotations:
+          summary: "数据库 P95 查询延迟超过 500ms"
+          description: "当前数据库 P95 延迟: {{ $value }}ms"
+
+      # 外部 API 调用成功率告警
+      - alert: LowExternalAPIAvailability
+        expr: |
+          external_api_success_rate < 99.0
+        for: 5m
+        labels:
+          severity: warning
+          slo_type: external_api_availability
+          team: backend
+        annotations:
+          summary: "外部 API 调用成功率低于 SLO 目标 (99.0%)"
+          description: "当前外部 API 成功率: {{ $value }}%"
+
+  # ============================================
+  # Aggregation Rules - 汇总规则
+  # ============================================
+  - name: slo_aggregation_rules
+    interval: 1m
+    rules:
+      # 按 service 分组的可用性
+      - record: http_requests_success_rate_by_service
+        expr: |
+          sum by (service) (rate(http_requests_total{status!~"5.."}[5m]))
+          /
+          sum by (service) (rate(http_requests_total[5m])) * 100
+
+      # 按 service 分组的 P95 延迟
+      - record: http_request_duration_p95_by_service
+        expr: |
+          histogram_quantile(0.95,
+            sum by (service, le) (rate(http_request_duration_seconds_bucket[5m]))
+          ) * 1000
+
+      # 按 service 分组的错误率
+      - record: http_request_error_rate_by_service
+        expr: |
+          sum by (service) (rate(http_requests_total{status=~"5.."}[5m]))
+          /
+          sum by (service) (rate(http_requests_total[5m])) * 100
+
+      # 按 endpoint 分组的可用性
+      - record: http_requests_success_rate_by_endpoint
+        expr: |
+          sum by (endpoint) (rate(http_requests_total{status!~"5.."}[5m]))
+          /
+          sum by (endpoint) (rate(http_requests_total[5m])) * 100
+
+      # 按方法分组的错误率
+      - record: http_request_error_rate_by_method
+        expr: |
+          sum by (method) (rate(http_requests_total{status=~"5.."}[5m]))
+          /
+          sum by (method) (rate(http_requests_total[5m])) * 100
+
+  # ============================================
+  # Trend Analysis Rules - 趋势分析
+  # ============================================
+  - name: slo_trend_rules
+    interval: 5m
+    rules:
+      # 24 小时可用性趋势
+      - record: availability_trend_24h
+        expr: |
+          avg_over_time(http_requests_success_rate[24h])
+
+      # 24 小时错误率趋势
+      - record: error_rate_trend_24h
+        expr: |
+          avg_over_time(http_request_error_rate[24h])
+
+      # 24 小时 P95 延迟趋势
+      - record: latency_p95_trend_24h
+        expr: |
+          avg_over_time(http_request_duration_p95[24h])
+
+      # 7 天可用性趋势
+      - record: availability_trend_7d
+        expr: |
+          avg_over_time(http_requests_success_rate[7d])
+
+      # 30 天可用性滚动平均 (用于 SLO 合规性检查)
+      - record: availability_30d_rolling
+        expr: |
+          avg_over_time(http_requests_success_rate[30d])
