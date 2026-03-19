@@ -398,12 +398,11 @@ jobs:
             platform/backend/ \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/platform/backend/
 
-          # 重新构建并重启容器
+          # 使用安全部署脚本（不重启 PostgreSQL/Redis）
+          # IMPORTANT: This script ONLY touches backend container
           ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
-            "cd ${{ env.DEPLOY_PATH }} && \
-             docker compose build backend && \
-             docker compose up -d backend"
+            "bash ${{ env.DEPLOY_PATH }}/scripts/safe-deploy-backend.sh"
 
           echo "✅ 后端部署完成"
 
@@ -482,8 +481,24 @@ jobs:
               echo "❌ 数据库健康检查失败"
             fi
 
+            # 检查前端健康（仅当部署了前端或部署全部组件时）
+            if [ "${{ env.COMPONENT }}" = "all" ] || [ "${{ env.COMPONENT }}" = "frontend" ]; then
+              FRONTEND_HEALTH=$(ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+                ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+                "curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1/ --max-time 5 || echo '000'")
+
+              if [ "$FRONTEND_HEALTH" = "200" ] || [ "$FRONTEND_HEALTH" = "301" ] || [ "$FRONTEND_HEALTH" = "302" ]; then
+                echo "✅ 前端健康检查通过 (HTTP $FRONTEND_HEALTH)"
+              else
+                echo "❌ 前端健康检查失败 (HTTP $FRONTEND_HEALTH)"
+              fi
+            else
+              FRONTEND_HEALTH="200"  # 跳过前端检查时视为通过
+              echo "⏭️  跳过前端健康检查"
+            fi
+
             # 如果所有检查通过，退出循环
-            if [ "$BACKEND_HEALTH" = "200" ] && [ "$DB_HEALTH" = "healthy" ]; then
+            if [ "$BACKEND_HEALTH" = "200" ] && [ "$DB_HEALTH" = "healthy" ] && [ "$FRONTEND_HEALTH" != "000" ]; then
               echo "✅ 所有健康检查通过"
               exit 0
             fi
@@ -529,25 +544,39 @@ jobs:
           echo "=============================================================================="
           echo ""
 
-          # 查找最新备份
-          LATEST_BACKUP=$(ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+          # 查找最新代码备份
+          LATEST_CODE_BACKUP=$(ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
             "ls -t ${{ env.BACKUP_PATH }}/code_backup_*.tar.gz 2>/dev/null | head -1")
 
-          if [ -n "$LATEST_BACKUP" ]; then
-            echo "找到备份: $LATEST_BACKUP"
+          if [ -n "$LATEST_CODE_BACKUP" ]; then
+            echo "找到代码备份: $LATEST_CODE_BACKUP"
 
-            # 恢复代码
+            # 恢复代码并重建容器（安全方式，不影响数据库）
             ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
               ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
               "cd ${{ env.DEPLOY_PATH }} && \
-               tar -xzf $LATEST_BACKUP && \
-               docker compose up -d"
+               tar -xzf $LATEST_CODE_BACKUP && \
+               docker compose build backend && \
+               docker stop opclaw-backend && \
+               docker rm opclaw-backend && \
+               docker compose up -d --no-deps backend"
 
-            echo "✅ 回滚完成"
+            echo "✅ 代码回滚完成"
           else
-            echo "❌ 未找到备份，无法回滚"
+            echo "❌ 未找到代码备份，无法回滚"
             exit 1
+          fi
+
+          # 尝试恢复数据库（如果需要）
+          LATEST_DB_BACKUP=$(ssh -i ~/.ssh/rap001_opclaw -o StrictHostKeyChecking=no \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "ls -t ${{ env.BACKUP_PATH }}/database/opclaw_db_*.sql.gz 2>/dev/null | head -1")
+
+          if [ -n "$LATEST_DB_BACKUP" ]; then
+            echo "找到数据库备份: $LATEST_DB_BACKUP"
+            echo "⚠️  警告: 数据库恢复需要手动执行，以避免覆盖现有数据"
+            echo "⚠️  Warning: Database restore requires manual execution"
           fi
 
       - name: 🧹 清理 SSH (Cleanup SSH)
