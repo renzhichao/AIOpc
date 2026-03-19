@@ -361,8 +361,8 @@ jobs:
           context: ./platform/backend
           push: ${{ github.event.inputs.dry_run != 'true' }}
           tags: |
-            ${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository }}/opclaw-backend:${{ env.DEPLOYMENT_VERSION }}
-            ${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository }}/opclaw-backend:latest
+            ${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository_owner }}/aio${{ github.event.repository.name == 'AIOpc' && 'pc' || github.event.repository.name }}/opclaw-backend:${{ env.DEPLOYMENT_VERSION }}
+            ${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository_owner }}/aio${{ github.event.repository.name == 'AIOpc' && 'pc' || github.event.repository.name }}/opclaw-backend:latest
           labels: |
             tenant=${{ needs.validate-config.outputs.tenant_id }}
             environment=${{ needs.validate-config.outputs.environment }}
@@ -381,8 +381,8 @@ jobs:
           context: ./platform/frontend
           push: ${{ github.event.inputs.dry_run != 'true' }}
           tags: |
-            ${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository }}/opclaw-frontend:${{ env.DEPLOYMENT_VERSION }}
-            ${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository }}/opclaw-frontend:latest
+            ${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository_owner }}/aio${{ github.event.repository.name == 'AIOpc' && 'pc' || github.event.repository.name }}/opclaw-frontend:${{ env.DEPLOYMENT_VERSION }}
+            ${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository_owner }}/aio${{ github.event.repository.name == 'AIOpc' && 'pc' || github.event.repository.name }}/opclaw-frontend:latest
           labels: |
             tenant=${{ needs.validate-config.outputs.tenant_id }}
             environment=${{ needs.validate-config.outputs.environment }}
@@ -409,8 +409,8 @@ jobs:
           ✅ 构建完成 (Build completed)
 
           ### 镜像标签 (Image Tags)
-          - **Backend**: `${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository }}/opclaw-backend:${{ env.DEPLOYMENT_VERSION }}`
-          - **Frontend**: `${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository }}/opclaw-frontend:${{ env.DEPLOYMENT_VERSION }}`
+          - **Backend**: `${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository_owner }}/aio${{ github.event.repository.name == 'AIOpc' && 'pc' || github.event.repository.name }}/opclaw-backend:${{ env.DEPLOYMENT_VERSION }}`
+          - **Frontend**: `${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository_owner }}/aio${{ github.event.repository.name == 'AIOpc' && 'pc' || github.event.repository.name }}/opclaw-frontend:${{ env.DEPLOYMENT_VERSION }}`
           EOF
 
   #==========================================================================
