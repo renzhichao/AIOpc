@@ -668,8 +668,10 @@
 
 ### TASK-016: Tenant CRUD Scripts
 
-**任务状态**: `IN_PROGRESS`
+**任务状态**: `COMPLETED`
 **任务开始时间**: 2026-03-19
+**任务完成时间**: 2026-03-19
+**任务提交记录**: Commit ID: `0a15d60`
 
 **任务描述**:
 实现租户的创建、读取、更新、删除管理脚本
@@ -678,37 +680,40 @@
 - TASK-015 (Documentation - Phase 2) - Phase 2完成
 
 **前置检查项**:
-- [ ] 配置系统已实现
-- [ ] 状态数据库可用
+- [x] 配置系统已实现
+- [x] 状态数据库可用
 
 **参考文档**:
 - FIP Section: Implementation Plan → Tenant Management Scripts
 
 **Acceptance Criteria**:
-- [ ] scripts/tenant/create.sh创建租户脚本
+- [x] scripts/tenant/create.sh创建租户脚本
   - 从template.yml生成新租户配置
   - 交互式创建支持
   - 配置验证
-- [ ] scripts/tenant/list.sh列出所有租户脚本
+- [x] scripts/tenant/list.sh列出所有租户脚本
   - 显示租户ID、名称、环境、状态
   - 支持过滤和排序
-- [ ] scripts/tenant/show.sh查看租户详情脚本
+- [x] scripts/tenant/show.sh查看租户详情脚本
   - 显示完整配置
   - 显示部署历史
   - 显示健康状态
-- [ ] scripts/tenant/delete.sh删除租户脚本
+- [x] scripts/tenant/delete.sh删除租户脚本
   - 配置文件删除
   - 状态数据库记录删除
   - 确认机制
-- [ ] 所有脚本经过测试
+- [x] 所有脚本经过测试
 
 **产出物**:
-- `scripts/tenant/create.sh` - 创建租户脚本
-- `scripts/tenant/list.sh` - 列出租户脚本
-- `scripts/tenant/show.sh` - 查看租户脚本
-- `scripts/tenant/delete.sh` - 删除租户脚本
-- `scripts/tenant/validate.sh` - 验证租户配置脚本
-- `docs/operations/tenant-management-guide.md` - 租户管理指南
+- [x] `scripts/tenant/create.sh` - 创建租户脚本 (12KB)
+- [x] `scripts/tenant/list.sh` - 列出租户脚本 (15KB)
+- [x] `scripts/tenant/show.sh` - 查看租户脚本 (14KB)
+- [x] `scripts/tenant/update.sh` - 更新租户脚本 (12KB)
+- [x] `scripts/tenant/delete.sh` - 删除租户脚本 (10KB)
+- [x] `scripts/tenant/validate.sh` - 验证租户配置脚本 (11KB)
+- [x] `scripts/tests/test-tenant-crud.sh` - 测试套件 (17KB)
+- [x] `docs/operations/tenant-management-guide.md` - 租户管理指南 (20KB)
+- [x] `docs/operations/tenant-quick-reference.md` - 快速参考 (4.6KB)
 
 ---
 
