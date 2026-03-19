@@ -17,7 +17,8 @@
 
 ### 服务器配置
 - ✅ **服务器IP**: 113.105.103.165
-- ✅ **SSH用户**: root
+- ✅ **SSH用户**: openclaw
+- ✅ **SSH密码**: openclaw
 - ✅ **SSH密钥路径**: ~/.ssh/ciiber_key (待登录后生成)
 - ✅ **部署路径**: /opt/opclaw/platform
 - ✅ **API端口**: 3000

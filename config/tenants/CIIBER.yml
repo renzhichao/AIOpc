@@ -52,7 +52,7 @@ server:
 
   # SSH connection user (required for remote deployments)
   # Default: root for new servers, ubuntu for some cloud providers
-  ssh_user: "root"
+  ssh_user: "openclaw"
 
   # Path to SSH private key file (required for remote deployments)
   # Use absolute path or relative to project root
