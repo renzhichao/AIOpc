@@ -371,8 +371,8 @@ create_deployment_backup() {
     return 0
 }
 
-# Record deployment start
-record_deployment_start() {
+# Record deployment start locally (wrapper for state library function)
+record_deployment_start_local() {
     log_step "Recording deployment start"
 
     local deployment_type="${CONFIG_DEPLOYMENT_TYPE:-update}"
@@ -671,8 +671,8 @@ verify_oauth_flow() {
     return 0
 }
 
-# Record deployment success
-record_deployment_success() {
+# Record deployment success locally (wrapper for state library function)
+record_deployment_success_local() {
     log_step "Recording deployment success"
 
     if [[ "$DRY_RUN" == "true" ]]; then
@@ -837,7 +837,7 @@ main() {
     check_concurrent_deployments || exit 1
     test_ssh_connection || exit 1
     create_deployment_backup || exit 1
-    record_deployment_start || exit 1
+    record_deployment_start_local || exit 1
 
     # Deployment phase
     log_separator
@@ -865,7 +865,7 @@ main() {
 
     run_health_checks || rollback_deployment "Health checks failed"
     verify_oauth_flow || log_warning "OAuth verification failed, continuing anyway"
-    record_deployment_success || log_warning "Failed to record deployment success"
+    record_deployment_success_local || log_warning "Failed to record deployment success"
 
     # Success
     log_separator
