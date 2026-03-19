@@ -60,11 +60,26 @@ declare  SSH_TMP_DIR="${SSH_TMP_DIR:-/tmp/ssh_ops}"
 # Logging Integration
 #==============================================================================
 
-# Try to source logging library if available
-if [[ -f "${SCRIPT_DIR}/logging.sh" ]]; then
+# Define SSH-specific logging functions
+# These wrap the general logging functions if available, otherwise use fallbacks
+if [[ -n "${LOGGING_SH_Sourced:-}" ]]; then
+    # logging.sh is already loaded, create SSH-specific wrappers
+    ssh_log_info() { log_info "$*"; }
+    ssh_log_error() { log_error "$*"; }
+    ssh_log_warn() { log_warning "$*"; }
+    ssh_log_debug() { log_debug "$*"; }
+elif [[ -f "${SCRIPT_DIR}/logging.sh" ]]; then
     source "${SCRIPT_DIR}/logging.sh"
+    ssh_log_info() { log_info "$*"; }
+    ssh_log_error() { log_error "$*"; }
+    ssh_log_warn() { log_warning "$*"; }
+    ssh_log_debug() { log_debug "$*"; }
 elif [[ -f "/usr/local/lib/logging.sh" ]]; then
     source "/usr/local/lib/logging.sh"
+    ssh_log_info() { log_info "$*"; }
+    ssh_log_error() { log_error "$*"; }
+    ssh_log_warn() { log_warning "$*"; }
+    ssh_log_debug() { log_debug "$*"; }
 else
     # Fallback logging functions if logging.sh not available
     ssh_log_info() { echo "[SSH INFO] $*" >&2; }
