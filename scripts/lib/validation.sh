@@ -67,28 +67,60 @@ validate_config_comprehensive() {
     local warning_checks=0
 
     # Run all validation checks
-    run_validation_check "basic_structure" "$config_file" && ((passed_checks++)) || ((failed_checks++))
+    if run_validation_check "basic_structure" "$config_file"; then
+        ((passed_checks++))
+    else
+        ((failed_checks++))
+    fi
     ((total_checks++))
 
-    run_validation_check "required_fields" "$config_file" && ((passed_checks++)) || ((failed_checks++))
+    if run_validation_check "required_fields" "$config_file"; then
+        ((passed_checks++))
+    else
+        ((failed_checks++))
+    fi
     ((total_checks++))
 
-    run_validation_check "data_types" "$config_file" && ((passed_checks++)) || ((failed_checks++))
+    if run_validation_check "data_types" "$config_file"; then
+        ((passed_checks++))
+    else
+        ((failed_checks++))
+    fi
     ((total_checks++))
 
-    run_validation_check "secret_strength" "$config_file" && ((passed_checks++)) || ((failed_checks++))
+    if run_validation_check "secret_strength" "$config_file"; then
+        ((passed_checks++))
+    else
+        ((failed_checks++))
+    fi
     ((total_checks++))
 
-    run_validation_check "network_settings" "$config_file" && ((passed_checks++)) || ((failed_checks++))
+    if run_validation_check "network_settings" "$config_file"; then
+        ((passed_checks++))
+    else
+        ((failed_checks++))
+    fi
     ((total_checks++))
 
-    run_validation_check "file_paths" "$config_file" && ((passed_checks++)) || ((failed_checks++))
+    if run_validation_check "file_paths" "$config_file"; then
+        ((passed_checks++))
+    else
+        ((failed_checks++))
+    fi
     ((total_checks++))
 
-    run_validation_check "best_practices" "$config_file" && ((passed_checks++)) || ((warning_checks++))
+    if run_validation_check "best_practices" "$config_file"; then
+        ((passed_checks++))
+    else
+        ((warning_checks++))
+    fi
     ((total_checks++))
 
-    run_validation_check "consistency" "$config_file" && ((passed_checks++)) || ((warning_checks++))
+    if run_validation_check "consistency" "$config_file"; then
+        ((passed_checks++))
+    else
+        ((warning_checks++))
+    fi
     ((total_checks++))
 
     # Print summary
@@ -414,11 +446,18 @@ validate_file_paths() {
     local environment
     environment=$(get_config_value "$config_file" "tenant.environment")
 
-    if [ "$environment" = "production" ]; then
-        if [ ! -f "$ssh_key_path" ]; then
-            log_config_warning "SSH key path does not exist: $ssh_key_path"
-            ((warnings++))
+    # In CI environment, SSH_KEY_PATH is set via environment variable
+    # Skip path validation if SSH_KEY_PATH env var is set
+    if [ -z "${SSH_KEY_PATH:-}" ]; then
+        # Only check config file path if SSH_KEY_PATH env var is not set
+        if [ "$environment" = "production" ]; then
+            if [ ! -f "$ssh_key_path" ]; then
+                log_config_warning "SSH key path does not exist: $ssh_key_path"
+                ((warnings++))
+            fi
         fi
+    else
+        log_config_debug "SSH_KEY_PATH environment variable set, skipping config path validation"
     fi
 
     if [ $errors -gt 0 ]; then
