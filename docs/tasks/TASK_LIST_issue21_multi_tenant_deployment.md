@@ -460,8 +460,10 @@
 
 ### TASK-011: Parameterized Deployment Scripts
 
-**任务状态**: `IN_PROGRESS`
+**任务状态**: `COMPLETED`
 **任务开始时间**: 2026-03-19
+**任务完成时间**: 2026-03-19
+**任务提交记录**: Commit ID: `9135e04`
 
 **任务描述**:
 实现参数化的部署脚本，支持通过配置文件部署到不同租户服务器
@@ -472,34 +474,33 @@
 **前置检查项**:
 - [x] 所有前置任务已完成
 - [x] 核心脚本库可用
-- [ ] 有测试环境可用于验证
+- [x] 测试环境已验证
 
 **参考文档**:
 - FIP Section: Implementation Plan → Script Specifications
 - Deploy script specifications
 
 **Acceptance Criteria**:
-- [ ] scripts/deploy/deploy-tenant.sh主部署脚本实现
+- [x] scripts/deploy/deploy-tenant.sh主部署脚本实现
   - 支持--config参数指定租户配置
   - 支持--component参数（all/backend/frontend）
   - 支持--skip-tests参数
   - 支持--dry-run参数
-- [ ] 部署前验证（配置完整性、SSH连接、磁盘空间）
-- [ ] 环境变量替换（${VAR}格式）
-- [ ] .env.production文件生成
-- [ ] Docker镜像构建和部署
-- [ ] 容器重启和健康检查
-- [ ] 自动回滚机制
-- [ ] 在test_tenant_alpha验证
+- [x] 部署前验证（配置完整性、SSH连接、磁盘空间）
+- [x] 环境变量替换（${VAR}格式）
+- [x] .env.production文件生成
+- [x] Docker镜像构建和部署
+- [x] 容器重启和健康检查
+- [x] 自动回滚机制
+- [x] 在test_tenant_alpha验证
 
 **产出物**:
-- `scripts/deploy/deploy-tenant.sh` - 主部署脚本
-- `scripts/deploy/pre-flight-checks.sh` - 部署前检查
-- `scripts/deploy/build-image.sh` - 镜像构建
-- `scripts/deploy/deploy-backend.sh` - 后端部署
-- `scripts/deploy/deploy-frontend.sh` - 前端部署
-- `scripts/deploy/restart-services.sh` - 服务重启
-- `scripts/deploy/rollback.sh` - 回滚脚本（已在TASK-004创建，这里更新）
+- [x] `scripts/deploy/deploy-tenant.sh` - 主部署脚本 (25,938 bytes)
+- [x] `scripts/deploy/pre-deploy.sh` - 部署前检查 (15,481 bytes)
+- [x] `scripts/deploy/post-deploy.sh` - 部署后验证 (19,390 bytes)
+- [x] `scripts/deploy/rollback-tenant.sh` - 租户回滚 (18,872 bytes)
+- [x] `scripts/tests/test-deploy-tenant.sh` - 测试套件 (21,337 bytes)
+- [x] `docs/operations/deployment-guide.md` - 部署指南 (840 lines)
 
 ---
 
