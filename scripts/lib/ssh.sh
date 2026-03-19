@@ -33,28 +33,28 @@
 #==============================================================================
 
 # Default SSH options
-declare -g SSH_OPTS="${SSH_OPTS:- -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3}"
+declare  SSH_OPTS="${SSH_OPTS:- -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3}"
 
 # Default command timeout (seconds)
-declare -g SSH_TIMEOUT="${SSH_TIMEOUT:-300}"
+declare  SSH_TIMEOUT="${SSH_TIMEOUT:-300}"
 
 # Default number of retries
-declare -g SSH_RETRIES="${SSH_RETRIES:-3}"
+declare  SSH_RETRIES="${SSH_RETRIES:-3}"
 
 # Default retry delay (seconds)
-declare -g SSH_RETRY_DELAY="${SSH_RETRY_DELAY:-5}"
+declare  SSH_RETRY_DELAY="${SSH_RETRY_DELAY:-5}"
 
 # SSH password (if using password-based auth)
-declare -g SSH_PASSWORD="${SSH_PASSWORD:-}"
+declare  SSH_PASSWORD="${SSH_PASSWORD:-}"
 
 # SSH key path
-declare -g SSH_KEY_PATH="${SSH_KEY_PATH:-}"
+declare  SSH_KEY_PATH="${SSH_KEY_PATH:-}"
 
 # Verbose mode
-declare -g SSH_VERBOSE="${SSH_VERBOSE:-false}"
+declare  SSH_VERBOSE="${SSH_VERBOSE:-false}"
 
 # Temporary directory for SSH operations
-declare -g SSH_TMP_DIR="${SSH_TMP_DIR:-/tmp/ssh_ops}"
+declare  SSH_TMP_DIR="${SSH_TMP_DIR:-/tmp/ssh_ops}"
 
 #==============================================================================
 # Logging Integration

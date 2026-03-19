@@ -53,7 +53,7 @@ declare -ri ERROR_DEPLOYMENT=14
 declare -ri ERROR_ROLLBACK=15
 
 # Error messages associative array
-declare -gA ERROR_MESSAGES=(
+declare -A ERROR_MESSAGES=(
     [$ERROR_SUCCESS]="Success"
     [$ERROR_GENERAL]="General error"
     [$ERROR_INVALID_ARGUMENT]="Invalid argument"
@@ -77,39 +77,39 @@ declare -gA ERROR_MESSAGES=(
 #==============================================================================
 
 # Script name
-declare -g ERROR_SCRIPT_NAME="${ERROR_SCRIPT_NAME:-script}"
+declare  ERROR_SCRIPT_NAME="${ERROR_SCRIPT_NAME:-script}"
 
 # Current error code
-declare -gi ERROR_CURRENT_CODE=0
+declare -i ERROR_CURRENT_CODE=0
 
 # Current error message
-declare -g ERROR_CURRENT_MESSAGE=""
+declare  ERROR_CURRENT_MESSAGE=""
 
 # Error context (additional information)
-declare -g ERROR_CONTEXT=""
+declare  ERROR_CONTEXT=""
 
 # Cleanup functions array
-declare -ga ERROR_CLEANUP_FUNCTIONS=()
+declare -a ERROR_CLEANUP_FUNCTIONS=()
 
 # Trap handler enabled flag
-declare -g ERROR_TRAPS_ENABLED=false
+declare  ERROR_TRAPS_ENABLED=false
 
 # Error handler enabled flag
-declare -g ERROR_HANDLER_ENABLED=false
+declare  ERROR_HANDLER_ENABLED=false
 
 # Verbose error reporting
-declare -g ERROR_VERBOSE="${ERROR_VERBOSE:-true}"
+declare  ERROR_VERBOSE="${ERROR_VERBOSE:-true}"
 
 # Exit on error flag
-declare -g ERROR_EXIT_ON_ERROR="${ERROR_EXIT_ON_ERROR:-true}"
+declare  ERROR_EXIT_ON_ERROR="${ERROR_EXIT_ON_ERROR:-true}"
 
 # Error stack trace
-declare -ga ERROR_STACK_TRACE=()
+declare -a ERROR_STACK_TRACE=()
 
 # Retry configuration
-declare -gi ERROR_RETRY_MAX="${ERROR_RETRY_MAX:-3}"
-declare -gi ERROR_RETRY_DELAY="${ERROR_RETRY_DELAY:-1}"
-declare -gi ERROR_RETRY_BACKOFF="${ERROR_RETRY_BACKOFF:-2}"
+declare -i ERROR_RETRY_MAX="${ERROR_RETRY_MAX:-3}"
+declare -i ERROR_RETRY_DELAY="${ERROR_RETRY_DELAY:-1}"
+declare -i ERROR_RETRY_BACKOFF="${ERROR_RETRY_BACKOFF:-2}"
 
 #==============================================================================
 # Logging Integration
