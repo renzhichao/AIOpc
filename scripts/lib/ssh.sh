@@ -50,6 +50,9 @@ declare  SSH_PASSWORD="${SSH_PASSWORD:-}"
 # SSH key path
 declare  SSH_KEY_PATH="${SSH_KEY_PATH:-}"
 
+# SSH port (default: 22, use -p flag for custom port)
+declare  SSH_PORT="${SSH_PORT:-22}"
+
 # Verbose mode
 declare  SSH_VERBOSE="${SSH_VERBOSE:-false}"
 
@@ -122,6 +125,11 @@ _ssh_build_cmd() {
         cmd="$cmd -i $SSH_KEY_PATH"
     fi
 
+    # Add custom port if specified (not default 22)
+    if [[ -n "$SSH_PORT" && "$SSH_PORT" != "22" ]]; then
+        cmd="$cmd -p $SSH_PORT"
+    fi
+
     # Add SSH options
     cmd="$cmd $SSH_OPTS"
 
@@ -141,6 +149,12 @@ _ssh_build_scp_cmd() {
     # Add SSH key if specified
     if [[ -n "$SSH_KEY_PATH" && -f "$SSH_KEY_PATH" ]]; then
         cmd="$cmd -i $SSH_KEY_PATH"
+    fi
+
+    # Add custom port if specified (not default 22)
+    # Note: SCP uses -P (capital P) for port, not -p
+    if [[ -n "$SSH_PORT" && "$SSH_PORT" != "22" ]]; then
+        cmd="$cmd -P $SSH_PORT"
     fi
 
     # Add SSH options (SCP compatible)
