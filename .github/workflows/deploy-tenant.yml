@@ -38,6 +38,7 @@ on:
         type: choice
         # Dynamically populated from config/tenants/*.yml
         options:
+          - CIIBER
           - test_tenant_alpha
           # Add more tenants here or use populate-tenants.sh to update
 

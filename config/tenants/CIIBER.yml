@@ -54,6 +54,9 @@ server:
   # Default: root for new servers, ubuntu for some cloud providers
   ssh_user: "openclaw"
 
+  # SSH port (optional, default: 22)
+  port: "20122"
+
   # Path to SSH private key file (required for remote deployments)
   # Use absolute path or relative to project root
   # Example: ~/.ssh/id_rsa, ~/.ssh/tenant_key
@@ -93,7 +96,7 @@ feishu:
   # Encryption key for data encryption (required)
   # Use a strong random string (32+ characters recommended)
   # Generate with: openssl rand -base64 32
-  encrypt_key: ""  # PENDING: 待客户提供
+  encrypt_key: "DoZ9NxC523OFphRtNnPdHDjk3OUHtsNZ"  # Generated 2026-03-19 (可替换为客户提供的密钥)
 
   # OAuth redirect URI (required)
   # Must match what's configured in Feishu app settings
@@ -132,7 +135,7 @@ database:
 
   # Database password (required)
   # Use strong password! Keep secret!
-  password: ""  # PENDING: 待生成 (≥16字符)
+  password: "TVqSqee4ZeirusJAcuUqXm5cBt2UBFx5"  # Generated 2026-03-19
 
   # Connection pool settings (optional)
   pool:
@@ -160,7 +163,7 @@ redis:
 
   # Redis password (required if Redis has authentication)
   # Leave empty if no authentication
-  password: ""  # PENDING: 待生成
+  password: "8wqP09459CRNAahiGHCn"  # Generated 2026-03-19
 
   # Database number (optional)
   # Default: 0
@@ -185,7 +188,7 @@ jwt:
   # JWT secret key (required)
   # Use strong random string! Keep secret!
   # Generate with: openssl rand -base64 64
-  secret: ""  # PENDING: 待生成 (≥32字符)
+  secret: "StoSs7OeYmRwmxuBe8Lh50mRRGiYolDcTPY6HRvoPhD7rdaj8vHW1rE4Vp9VWQ4"  # Generated 2026-03-19
 
   # Token expiration time (required)
   # Format: number + unit (s, m, h, d, w)
