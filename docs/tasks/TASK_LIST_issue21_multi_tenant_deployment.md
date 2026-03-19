@@ -241,41 +241,43 @@
 
 ### TASK-006: State Database Setup
 
-**任务状态**: `IN_PROGRESS`
+**任务状态**: `COMPLETED`
 **任务开始时间**: 2026-03-19
+**任务完成时间**: 2026-03-19
+**任务提交记录**: Commit ID: `362712f`
 
 **任务描述**:
 创建并配置deployment_state数据库，用于跟踪部署状态、版本历史和审计日志
 
 **前置依赖**:
-- TASK-005 (Zero-Downtime Migration Procedure Testing) - Phase 0完成
+- TASK-005 (Zero-Downtime Migration Procedure Testing) - ✅ Phase 0完成
 
 **前置检查项**:
-- [ ] PostgreSQL已安装（本地或远程服务器）
-- [ ] 有创建数据库的权限
-- [ ] 数据库连接信息已准备
+- [x] PostgreSQL已安装（本地或远程服务器）
+- [x] 有创建数据库的权限
+- [x] 数据库连接信息已准备
 
 **参考文档**:
 - FIP Section: State Management Architecture → Deployment State Database Schema
 - Schema: tenants, deployments, deployment_config_snapshots, health_checks, security_audit_log, config_drift_reports, incidents
 
 **Acceptance Criteria**:
-- [ ] deployment_state数据库创建成功
-- [ ] 所有表创建成功（8张表 + 2个视图）
-- [ ] 所有索引创建成功
-- [ ] 数据库用户权限配置正确
-- [ ] health_check()函数创建
-- [ ] log_ssh_key_usage()函数创建
-- [ ] 数据库连接测试通过
-- [ ] 高可用配置（如果需要）
+- [x] deployment_state数据库创建成功
+- [x] 所有表创建成功（8张表 + 3个视图）
+- [x] 所有索引创建成功
+- [x] 数据库用户权限配置正确
+- [x] health_check()函数创建
+- [x] log_ssh_key_usage()函数创建
+- [x] 数据库连接测试通过
+- [x] 高可用配置（如果需要）
 
 **产出物**:
-- `scripts/state/setup-state-db.sh` - 状态数据库初始化脚本
-- `scripts/state/schema.sql` - 数据库Schema定义
-- `scripts/state/ha-setup.sql` - 高可用配置（可选）
-- `scripts/state/test-db-connection.sh` - 连接测试脚本
-- `.env.state_db` - 状态数据库配置文件模板
-- `docs/operations/state-database-setup.md` - 设置文档
+- [x] `scripts/state/setup-state-db.sh` - 状态数据库初始化脚本
+- [x] `scripts/state/schema.sql` - 数据库Schema定义
+- [x] `scripts/state/ha-setup.sql` - 高可用配置（可选）
+- [x] `scripts/state/test-db-connection.sh` - 连接测试脚本
+- [x] `.env.state_db` - 状态数据库配置文件模板
+- [x] `docs/operations/state-database-setup.md` - 设置文档
 
 ---
 
