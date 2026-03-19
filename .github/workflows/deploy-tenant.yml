@@ -115,8 +115,13 @@ jobs:
       #------------------------------------------------------------------------
       - name: 📦 安装依赖 (Install Dependencies)
         run: |
-          sudo apt-get update
-          sudo apt-get install -y yq
+          # Install Go-based yq v4 (mikefarah/yq) instead of Python-based yq
+          # Using the official binary from GitHub releases
+          YQ_VERSION="v4.47.1"
+          wget https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64 -O /tmp/yq
+          sudo chmod +x /tmp/yq
+          sudo mv /tmp/yq /usr/local/bin/yq
+          yq --version
 
       #------------------------------------------------------------------------
       # 提取租户配置 (Extract Tenant Configuration)
