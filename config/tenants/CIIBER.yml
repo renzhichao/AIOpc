@@ -1,0 +1,425 @@
+#==============================================================================
+# Tenant Configuration Template
+# (租户配置模板)
+#
+# This template defines the complete structure for tenant configurations in the
+# AIOpc multi-instance deployment system. Each tenant should have their own
+# configuration file based on this template.
+#
+# Usage:
+#   1. Copy this template to create a new tenant config:
+#      cp template.yml <tenant_id>.yml
+#   2. Replace placeholder values with actual tenant data
+#   3. Use environment variables for sensitive data
+#   4. Validate with: scripts/config/validate-config.sh <tenant_id>.yml
+#
+# Template Version: 1.0
+# Last Updated: 2026-03-19
+#==============================================================================
+
+#==============================================================================
+# Tenant Basic Information
+# (租户基本信息)
+#==============================================================================
+
+tenant:
+  # Unique tenant identifier (required)
+  # Format: alphanumeric, hyphens, underscores only
+  # Example: tenant_001, prod-alpha, test-bravo
+  id: "CIIBER"
+
+  # Human-readable tenant name (required)
+  # Used for display purposes in logs and UI
+  name: "CIIBER"
+
+  # Environment type (required)
+  # Values: production, staging, development
+  environment: "production"
+
+  # Tenant tier for resource allocation (optional)
+  # Values: trial, basic, standard, premium, enterprise
+  tier: "standard"
+
+#==============================================================================
+# Server Configuration
+# (服务器配置)
+#==============================================================================
+
+server:
+  # Server hostname or IP address (required)
+  # Can be IP address (e.g., 118.25.0.190) or domain name
+  host: "113.105.103.165"
+
+  # SSH connection user (required for remote deployments)
+  # Default: root for new servers, ubuntu for some cloud providers
+  ssh_user: "root"
+
+  # Path to SSH private key file (required for remote deployments)
+  # Use absolute path or relative to project root
+  # Example: ~/.ssh/id_rsa, ~/.ssh/tenant_key
+  ssh_key_path: "~/.ssh/ciiber_key"
+
+  # Deployment path on remote server (required)
+  # Where the application will be deployed
+  # Default: /opt/opclaw/platform
+  deploy_path: "${DEPLOY_PATH:-/opt/opclaw/platform}"
+
+  # Port configuration (optional)
+  api_port: "${API_PORT:-3000}"
+  metrics_port: "${METRICS_PORT:-9090}"
+
+  # Resource limits (optional, for container deployments)
+  resources:
+    memory_limit: "${MEMORY_LIMIT:-2g}"
+    cpu_limit: "${CPU_LIMIT:-1.0}"
+    memory_reservation: "${MEMORY_RESERVATION:-512m}"
+
+#==============================================================================
+# Feishu (Lark) Integration Configuration
+# (飞书集成配置)
+#==============================================================================
+
+feishu:
+  # Feishu App ID (required)
+  # Get from Feishu Open Platform
+  # Format: cli_xxxxxxxxxxxxx
+  app_id: ""  # PENDING: 待客户提供
+
+  # Feishu App Secret (required)
+  # Get from Feishu Open Platform
+  # Keep secret! Use environment variable
+  app_secret: ""  # PENDING: 待客户提供
+
+  # Encryption key for data encryption (required)
+  # Use a strong random string (32+ characters recommended)
+  # Generate with: openssl rand -base64 32
+  encrypt_key: ""  # PENDING: 待客户提供
+
+  # OAuth redirect URI (required)
+  # Must match what's configured in Feishu app settings
+  # Format: https://your-domain.com/api/auth/feishu/callback
+  oauth_redirect_uri: "https://ciiber.example.com/api/auth/feishu/callback"  # PENDING: 待客户提供域名
+
+  # Event callback URL (optional, for bot integration)
+  # Feishu will send events to this URL
+  event_callback_url: "${FEISHU_EVENT_CALLBACK_URL:-https://localhost/api/feishu/events}"
+
+  # API base URL (optional, defaults to Feishu production)
+  # Values: https://open.feishu.cn (production), https://open.larksuite.com (international)
+  api_base_url: "${FEISHU_API_BASE_URL:-https://open.feishu.cn}"
+
+#==============================================================================
+# Database Configuration
+# (数据库配置)
+#==============================================================================
+
+database:
+  # Database host (required)
+  # Can be localhost, IP address, or domain name
+  host: "localhost"  # 默认本地部署
+
+  # Database port (required)
+  # Default: 5432 for PostgreSQL
+  port: "5432"
+
+  # Database name (required)
+  # Will be created during setup if it doesn't exist
+  name: "opclaw_ciiber"
+
+  # Database user (required)
+  # Will be created during setup if it doesn't exist
+  user: "opclaw"
+
+  # Database password (required)
+  # Use strong password! Keep secret!
+  password: ""  # PENDING: 待生成 (≥16字符)
+
+  # Connection pool settings (optional)
+  pool:
+    min: "${DB_POOL_MIN:-2}"
+    max: "${DB_POOL_MAX:-10}"
+    idle_timeout_ms: "${DB_POOL_IDLE_TIMEOUT:-30000}"
+
+  # SSL mode (optional)
+  # Values: disable, allow, prefer, require, verify-ca, verify-full
+  ssl_mode: "${DB_SSL_MODE:-prefer}"
+
+#==============================================================================
+# Redis Configuration
+# (Redis配置)
+#==============================================================================
+
+redis:
+  # Redis host (required)
+  # Can be localhost, IP address, or domain name
+  host: "localhost"  # 默认本地部署
+
+  # Redis port (required)
+  # Default: 6379
+  port: "6379"
+
+  # Redis password (required if Redis has authentication)
+  # Leave empty if no authentication
+  password: ""  # PENDING: 待生成
+
+  # Database number (optional)
+  # Default: 0
+  db: "${REDIS_DB:-0}"
+
+  # Connection pool settings (optional)
+  pool:
+    min: "${REDIS_POOL_MIN:-1}"
+    max: "${REDIS_POOL_MAX:-5}"
+
+  # TLS/SSL settings (optional)
+  tls:
+    enabled: "${REDIS_TLS_ENABLED:-false}"
+    ca_cert: "${REDIS_TLS_CA_CERT:-}"
+
+#==============================================================================
+# JWT Configuration
+# (JWT配置)
+#==============================================================================
+
+jwt:
+  # JWT secret key (required)
+  # Use strong random string! Keep secret!
+  # Generate with: openssl rand -base64 64
+  secret: ""  # PENDING: 待生成 (≥32字符)
+
+  # Token expiration time (required)
+  # Format: number + unit (s, m, h, d, w)
+  # Examples: 1h, 24h, 7d
+  expires_in: "24h"
+
+  # Refresh token expiration (optional)
+  refresh_expires_in: "7d"
+
+  # Token issuer (optional)
+  # Default: tenant_id
+  issuer: "CIIBER"
+
+  # Token audience (optional)
+  audience: "opclaw-api"
+
+#==============================================================================
+# OpenClaw Agent Configuration
+# (OpenClaw Agent配置)
+#==============================================================================
+
+agent:
+  # DeepSeek API configuration
+  deepseek:
+    # API base URL
+    api_base_url: "https://api.deepseek.com"
+
+    # API key (required)
+    # Get from DeepSeek platform
+    api_key: ""  # PENDING: 待提供
+
+    # Model name (required)
+    # Values: deepseek-chat, deepseek-coder
+    model: "deepseek-chat"
+
+    # Maximum tokens per request (optional)
+    max_tokens: "${DEEPSEEK_MAX_TOKENS:-4096}"
+
+    # Temperature (optional)
+    # Range: 0.0 - 2.0, lower = more focused, higher = more creative
+    temperature: "${DEEPSEEK_TEMPERATURE:-0.7}"
+
+  # Agent capabilities
+  capabilities:
+    # Enable file operations
+    file_ops_enabled: "${AGENT_FILE_OPS_ENABLED:-true}"
+
+    # Enable web search
+    web_search_enabled: "${AGENT_WEB_SEARCH_ENABLED:-true}"
+
+    # Enable command execution (requires approval)
+    exec_enabled: "${AGENT_EXEC_ENABLED:-false}"
+
+    # Enable cron/scheduled tasks
+    cron_enabled: "${AGENT_CRON_ENABLED:-false}"
+
+  # Agent tools configuration
+  tools:
+    # Maximum concurrent tool executions
+    max_concurrent: "${AGENT_MAX_CONCURRENT_TOOLS:-5}"
+
+    # Tool timeout in seconds
+    timeout_seconds: "${AGENT_TOOL_TIMEOUT:-30}"
+
+#==============================================================================
+# Monitoring Configuration
+# (监控配置)
+#==============================================================================
+
+monitoring:
+  # Enable monitoring
+  enabled: "${MONITORING_ENABLED:-true}"
+
+  # Prometheus configuration
+  prometheus:
+    # Metrics endpoint path
+    metrics_path: "${PROMETHEUS_METRICS_PATH:-/metrics}"
+
+    # Enable metrics collection
+    enabled: "${PROMETHEUS_ENABLED:-true}"
+
+  # Health check configuration
+  health_check:
+    # Health check endpoint path
+    path: "${HEALTH_CHECK_PATH:-/health}"
+
+    # Health check interval in seconds
+    interval_seconds: "${HEALTH_CHECK_INTERVAL:-30}"
+
+    # Timeout in seconds
+    timeout_seconds: "${HEALTH_CHECK_TIMEOUT:-10}"
+
+  # Alert configuration
+  alerts:
+    # Enable alerting
+    enabled: "${ALERTS_ENABLED:-false}"
+
+    # Alert webhook URL
+    webhook_url: "${ALERT_WEBHOOK_URL:-}"
+
+#==============================================================================
+# Logging Configuration
+# (日志配置)
+#==============================================================================
+
+logging:
+  # Log level (required)
+  # Values: error, warn, info, debug, trace
+  level: "${LOG_LEVEL:-info}"
+
+  # Log format (required)
+  # Values: json, text
+  format: "${LOG_FORMAT:-json}"
+
+  # Log output (required)
+  # Values: stdout, file, both
+  output: "${LOG_OUTPUT:-stdout}"
+
+  # File logging configuration (if output includes "file")
+  file:
+    # Log file path
+    path: "${LOG_FILE_PATH:-/var/log/opclaw/tenant.log}"
+
+    # Maximum log file size in MB
+    max_size_mb: "${LOG_MAX_SIZE_MB:-100}"
+
+    # Maximum number of log files to keep
+    max_files: "${LOG_MAX_FILES:-10}"
+
+    # Maximum age of log files in days
+    max_age_days: "${LOG_MAX_AGE_DAYS:-30}"
+
+#==============================================================================
+# Backup Configuration
+# (备份配置)
+#==============================================================================
+
+backup:
+  # Enable automatic backups
+  enabled: "${BACKUP_ENABLED:-true}"
+
+  # Backup schedule (cron format)
+  # Default: Daily at 2 AM
+  schedule: "${BACKUP_SCHEDULE:-0 2 * * *}"
+
+  # Backup retention
+  retention:
+    # Number of daily backups to keep
+    daily: "${BACKUP_RETENTION_DAILY:-7}"
+
+    # Number of weekly backups to keep
+    weekly: "${BACKUP_RETENTION_WEEKLY:-4}"
+
+    # Number of monthly backups to keep
+    monthly: "${BACKUP_RETENTION_MONTHLY:-3}"
+
+  # Backup storage location
+  storage:
+    # Type: local, s3, oss
+    type: "${BACKUP_STORAGE_TYPE:-local}"
+
+    # Local backup path (if type is "local")
+    local_path: "${BACKUP_LOCAL_PATH:-/var/backups/opclaw}"
+
+    # S3 configuration (if type is "s3")
+    s3:
+      bucket: "${BACKUP_S3_BUCKET:-}"
+      region: "${BACKUP_S3_REGION:-}"
+      access_key: "${BACKUP_S3_ACCESS_KEY:-}"
+      secret_key: "${BACKUP_S3_SECRET_KEY:-}"
+
+    # OSS configuration (if type is "oss")
+    oss:
+      bucket: "${BACKUP_OSS_BUCKET:-}"
+      region: "${BACKUP_OSS_REGION:-}"
+      access_key: "${BACKUP_OSS_ACCESS_KEY:-}"
+      secret_key: "${BACKUP_OSS_SECRET_KEY:-}"
+
+#==============================================================================
+# Feature Flags
+# (功能开关)
+#==============================================================================
+
+features:
+  # Enable user registration
+  user_registration_enabled: "${FEATURE_USER_REGISTRATION:-true}"
+
+  # Enable user self-management
+  user_self_management_enabled: "${FEATURE_USER_SELF_MANAGEMENT:-true}"
+
+  # Enable API key management
+  api_key_management_enabled: "${FEATURE_API_KEY_MANAGEMENT:-true}"
+
+  # Enable instance sharing
+  instance_sharing_enabled: "${FEATURE_INSTANCE_SHARING:-false}"
+
+  # Enable custom system prompts
+  custom_system_prompt_enabled: "${FEATURE_CUSTOM_PROMPT:-true}"
+
+  # Enable multi-user collaboration
+  collaboration_enabled: "${FEATURE_COLLABORATION:-false}"
+
+  # Enable advanced analytics
+  advanced_analytics_enabled: "${FEATURE_ADVANCED_ANALYTICS:-false}"
+
+#==============================================================================
+# Custom Configuration
+# (自定义配置)
+#==============================================================================
+
+# This section allows for tenant-specific custom configuration
+# Add any custom key-value pairs here
+custom:
+  # Example custom configurations
+  # custom_key: "${CUSTOM_VALUE:-default_value}"
+
+  # Branding
+  branding:
+    logo_url: "${BRANDING_LOGO_URL:-}"
+    primary_color: "${BRANDING_PRIMARY_COLOR:-#1890ff}"
+    company_name: "${BRANDING_COMPANY_NAME:-}"
+
+  # Rate limiting (requests per minute)
+  rate_limits:
+    api_rpm: "${RATE_LIMIT_API_RPM:-60}"
+    oauth_rpm: "${RATE_LIMIT_OAUTH_RPM:-50}"
+    webhook_rpm: "${RATE_LIMIT_WEBHOOK_RPM:-30}"
+
+#==============================================================================
+# Template Metadata (DO NOT MODIFY)
+#==============================================================================
+
+_template:
+  version: "1.0"
+  created_at: "2026-03-19"
+  last_updated: "2026-03-19"
+  schema_version: "1.0"
