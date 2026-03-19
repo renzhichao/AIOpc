@@ -413,9 +413,9 @@ services:
     depends_on:
       - backend
     ports:
-      - \"80:80\"
+      - \"80:5173\"
     healthcheck:
-      test: [\"CMD\", \"wget\", \"--no-verbose\", \"--tries=1\", \"--spider\", \"http://localhost/\"]
+      test: [\"CMD\", \"wget\", \"--no-verbose\", \"--tries=1\", \"--spider\", \"http://localhost:5173/\"]
       interval: 30s
       timeout: 10s
       retries: 3
