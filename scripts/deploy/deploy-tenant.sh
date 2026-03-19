@@ -241,6 +241,16 @@ load_tenant_configuration() {
         return 1
     fi
 
+    # Setup SSH port configuration for all SSH operations
+    local server_port="${CONFIG_SERVER_PORT:-22}"
+    if [[ -n "$server_port" && "$server_port" != "22" ]]; then
+        export SSH_PORT="$server_port"
+        log_info "SSH port configured: $server_port (non-default)"
+    else
+        export SSH_PORT="22"
+        log_debug "SSH port: 22 (default)"
+    fi
+
     log_step_complete "Configuration loaded and validated"
     return 0
 }
@@ -296,7 +306,7 @@ test_ssh_connection() {
     # Configure SSH
     ssh_set_key "$ssh_key_path"
 
-    # Test connection
+    # Test connection (SSH_PORT is already set by load_tenant_configuration)
     local ssh_target="${server_user}@${server_host}"
     if ! ssh_test "$ssh_target"; then
         log_step_failed "SSH connection test failed"
