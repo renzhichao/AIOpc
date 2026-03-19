@@ -719,8 +719,10 @@
 
 ### TASK-017: Tenant Health Check Scripts
 
-**任务状态**: `IN_PROGRESS`
+**任务状态**: `COMPLETED`
 **任务开始时间**: 2026-03-19
+**任务完成时间**: 2026-03-19
+**任务提交记录**: Commit ID: `b120562`
 
 **任务描述**:
 实现租户健康检查脚本，支持单个和批量检查
@@ -729,31 +731,32 @@
 - TASK-016 (Tenant CRUD Scripts)
 
 **前置检查项**:
-- [ ] 增强健康检查脚本已实现
-- [ ] 有租户配置可用
+- [x] 增强健康检查脚本已实现
+- [x] 有租户配置可用
 
 **参考文档**:
 - FIP Section: Implementation Plan → Health Check Scripts
 
 **Acceptance Criteria**:
-- [ ] scripts/tenant/health-check.sh单个租户健康检查
+- [x] scripts/tenant/health-check.sh单个租户健康检查
   - 调用enhanced-health-check.sh
   - 生成健康报告
   - 记录到state database
-- [ ] scripts/tenant/health-check-all.sh批量健康检查
+- [x] scripts/tenant/health-check-all.sh批量健康检查
   - 遍历所有租户
   - 并行检查（可选）
   - 生成汇总报告
-- [ ] 健康状态分类（healthy/warning/critical）
-- [ ] 支持JSON输出（便于集成）
-- [ ] 支持邮件告警（可选）
+- [x] 健康状态分类（healthy/warning/critical）
+- [x] 支持JSON输出（便于集成）
+- [x] 支持邮件告警（可选）
 
 **产出物**:
-- `scripts/tenant/health-check.sh` - 单租户健康检查
-- `scripts/tenant/health-check-all.sh` - 批量健康检查
-- `scripts/tenant/health-status.sh` - 健康状态查询
-- `scripts/tenant/alert-health-issue.sh` - 健康告警
-- `docs/operations/health-check-guide.md` - 健康检查指南
+- [x] `scripts/tenant/health-check.sh` - 单租户健康检查 (18KB)
+- [x] `scripts/tenant/health-check-all.sh` - 批量健康检查 (19KB)
+- [x] `scripts/tenant/health-status.sh` - 健康状态查询 (19KB)
+- [x] `scripts/tenant/alert-health-issue.sh` - 健康告警 (17KB)
+- [x] `scripts/tests/test-health-check.sh` - 测试套件 (18KB)
+- [x] `docs/operations/health-check-guide.md` - 健康检查指南 (18KB)
 
 ---
 
