@@ -533,8 +533,14 @@ jobs:
           echo ""
 
           # 构建部署命令 (Build deployment command)
-          DEPLOY_CMD="${{ env.SCRIPT_DIR }}/deploy-tenant.sh"
-          DEPLOY_CMD="$DEPLOY_CMD config/tenants/${{ github.event.inputs.tenant }}.yml"
+          # 根据租户选择部署脚本 (Select deploy script based on tenant)
+          TENANT="${{ github.event.inputs.tenant }}"
+          if [ "$TENANT" = "CIIBER" ]; then
+            DEPLOY_CMD="${{ env.SCRIPT_DIR }}/deploy-ciiber-tenant.sh"
+          else
+            DEPLOY_CMD="${{ env.SCRIPT_DIR }}/deploy-tenant.sh"
+            DEPLOY_CMD="$DEPLOY_CMD config/tenants/${{ github.event.inputs.tenant }}.yml"
+          fi
 
           # 添加选项 (Add options)
           if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
@@ -565,10 +571,18 @@ jobs:
           echo ""
 
           # 设置环境变量 (Set environment variables)
-          export SSH_KEY_PATH="~/.ssh/deploy_key"
+          export SSH_KEY_PATH="$HOME/.ssh/deploy_key"
           export DEPLOYMENT_VERSION="${{ env.DEPLOYMENT_VERSION }}"
           export GIT_COMMIT_SHA="${{ github.sha }}"
           export GIT_BRANCH="${{ github.ref_name }}"
+
+          # CIIBER 特定环境变量 (CIIBER-specific environment variables)
+          if [ "${{ github.event.inputs.tenant }}" = "CIIBER" ]; then
+            export DB_PASSWORD="${{ secrets.CIIBER_DB_PASSWORD }}"
+            export REDIS_PASSWORD="${{ secrets.CIIBER_REDIS_PASSWORD }}"
+            export JWT_SECRET="${{ secrets.CIIBER_JWT_SECRET }}"
+            export FEISHU_ENCRYPT_KEY="${{ secrets.CIIBER_FEISHU_ENCRYPT_KEY }}"
+          fi
 
           # 执行部署 (Execute deployment)
           if bash -c "$DEPLOY_CMD"; then
