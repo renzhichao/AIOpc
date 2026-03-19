@@ -341,6 +341,35 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       #------------------------------------------------------------------------
+      # 设置 Docker 镜像标签 (Setup Docker Image Tags)
+      #------------------------------------------------------------------------
+      - name: 🏷️ 设置镜像标签 (Set Image Tags)
+        id: image-tags
+        run: |
+          # Convert repository name to lowercase for Docker registry
+          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+
+          # Set image tags
+          BACKEND_TAG="${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${REPO_LOWER}/opclaw-backend:${{ env.DEPLOYMENT_VERSION }}"
+          BACKEND_LATEST="${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${REPO_LOWER}/opclaw-backend:latest"
+          FRONTEND_TAG="${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${REPO_LOWER}/opclaw-frontend:${{ env.DEPLOYMENT_VERSION }}"
+          FRONTEND_LATEST="${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${REPO_LOWER}/opclaw-frontend:latest"
+
+          # Output to GITHUB_ENV and GITHUB_OUTPUT
+          echo "BACKEND_TAG=${BACKEND_TAG}" >> $GITHUB_ENV
+          echo "BACKEND_LATEST=${BACKEND_LATEST}" >> $GITHUB_ENV
+          echo "FRONTEND_TAG=${FRONTEND_TAG}" >> $GITHUB_ENV
+          echo "FRONTEND_LATEST=${FRONTEND_LATEST}" >> $GITHUB_ENV
+          echo "BACKEND_TAG=${BACKEND_TAG}" >> $GITHUB_OUTPUT
+          echo "FRONTEND_TAG=${FRONTEND_TAG}" >> $GITHUB_OUTPUT
+
+          echo "Image tags set:"
+          echo "Backend: ${BACKEND_TAG}"
+          echo "Backend Latest: ${BACKEND_LATEST}"
+          echo "Frontend: ${FRONTEND_TAG}"
+          echo "Frontend Latest: ${FRONTEND_LATEST}"
+
+      #------------------------------------------------------------------------
       # 登录到 Docker Registry (Login to Docker Registry)
       #------------------------------------------------------------------------
       - name: 🔐 登录 Docker Registry (Login to Docker Registry)
@@ -361,8 +390,8 @@ jobs:
           context: ./platform/backend
           push: ${{ github.event.inputs.dry_run != 'true' }}
           tags: |
-            ${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository_owner }}/aio${{ github.event.repository.name == 'AIOpc' && 'pc' || github.event.repository.name }}/opclaw-backend:${{ env.DEPLOYMENT_VERSION }}
-            ${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository_owner }}/aio${{ github.event.repository.name == 'AIOpc' && 'pc' || github.event.repository.name }}/opclaw-backend:latest
+            ${{ env.BACKEND_TAG }}
+            ${{ env.BACKEND_LATEST }}
           labels: |
             tenant=${{ needs.validate-config.outputs.tenant_id }}
             environment=${{ needs.validate-config.outputs.environment }}
@@ -381,8 +410,8 @@ jobs:
           context: ./platform/frontend
           push: ${{ github.event.inputs.dry_run != 'true' }}
           tags: |
-            ${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository_owner }}/aio${{ github.event.repository.name == 'AIOpc' && 'pc' || github.event.repository.name }}/opclaw-frontend:${{ env.DEPLOYMENT_VERSION }}
-            ${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository_owner }}/aio${{ github.event.repository.name == 'AIOpc' && 'pc' || github.event.repository.name }}/opclaw-frontend:latest
+            ${{ env.FRONTEND_TAG }}
+            ${{ env.FRONTEND_LATEST }}
           labels: |
             tenant=${{ needs.validate-config.outputs.tenant_id }}
             environment=${{ needs.validate-config.outputs.environment }}
@@ -409,8 +438,8 @@ jobs:
           ✅ 构建完成 (Build completed)
 
           ### 镜像标签 (Image Tags)
-          - **Backend**: `${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository_owner }}/aio${{ github.event.repository.name == 'AIOpc' && 'pc' || github.event.repository.name }}/opclaw-backend:${{ env.DEPLOYMENT_VERSION }}`
-          - **Frontend**: `${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository_owner }}/aio${{ github.event.repository.name == 'AIOpc' && 'pc' || github.event.repository.name }}/opclaw-frontend:${{ env.DEPLOYMENT_VERSION }}`
+          - **Backend**: `${{ env.BACKEND_TAG }}`
+          - **Frontend**: `${{ env.FRONTEND_TAG }}`
           EOF
 
   #==========================================================================
