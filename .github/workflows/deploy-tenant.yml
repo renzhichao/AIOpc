@@ -346,14 +346,16 @@ jobs:
       - name: 🏷️ 设置镜像标签 (Set Image Tags)
         id: image-tags
         run: |
-          # Convert repository name to lowercase for Docker registry
-          REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          # For GHCR, use the repository owner as the namespace
+          # Image path: ghcr.io/owner/image:tag (not ghcr.io/owner/repo/image:tag)
+          REGISTRY="${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}"
+          OWNER="${{ github.repository_owner }}"
 
           # Set image tags
-          BACKEND_TAG="${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${REPO_LOWER}/opclaw-backend:${{ env.DEPLOYMENT_VERSION }}"
-          BACKEND_LATEST="${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${REPO_LOWER}/opclaw-backend:latest"
-          FRONTEND_TAG="${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${REPO_LOWER}/opclaw-frontend:${{ env.DEPLOYMENT_VERSION }}"
-          FRONTEND_LATEST="${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${REPO_LOWER}/opclaw-frontend:latest"
+          BACKEND_TAG="${REGISTRY}/${OWNER}/opclaw-backend:${{ env.DEPLOYMENT_VERSION }}"
+          BACKEND_LATEST="${REGISTRY}/${OWNER}/opclaw-backend:latest"
+          FRONTEND_TAG="${REGISTRY}/${OWNER}/opclaw-frontend:${{ env.DEPLOYMENT_VERSION }}"
+          FRONTEND_LATEST="${REGISTRY}/${OWNER}/opclaw-frontend:latest"
 
           # Output to GITHUB_ENV and GITHUB_OUTPUT
           echo "BACKEND_TAG=${BACKEND_TAG}" >> $GITHUB_ENV
