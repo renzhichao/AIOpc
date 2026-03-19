@@ -359,34 +359,108 @@ check_concurrent_deployments() {
     return 0
 }
 
-# Check 12: Security validation
+# Check 12: Security validation (comprehensive security check suite)
 check_security_validation() {
-    log_info "Performing security validation..."
+    local config_file="$1"
+    local tenant_id="${CONFIG_TENANT_ID:-}"
 
-    # Check for placeholder values
-    if check_placeholders "$1"; then
-        log_error "Configuration contains placeholder values"
-        FAILED_CHECKS+=("security_placeholders")
-        return 1
+    log_section "Comprehensive Security Validation"
+
+    # Run the comprehensive security check suite
+    local security_dir="${SCRIPT_DIR}/../security"
+    local security_suite="${security_dir}/security-check-suite.sh"
+
+    if [[ ! -f "$security_suite" ]]; then
+        log_warning "Security check suite not found: $security_suite"
+        log_warning "Falling back to basic security checks"
+
+        # Fallback to basic checks
+        if check_placeholders "$config_file"; then
+            log_error "Configuration contains placeholder values"
+            FAILED_CHECKS+=("security_placeholders")
+            return 1
+        fi
+
+        if ! check_critical_fields "$config_file"; then
+            log_error "Critical security fields are missing or invalid"
+            FAILED_CHECKS+=("security_critical")
+            return 1
+        fi
+
+        local jwt_secret="${CONFIG_JWT_SECRET:-}"
+        if [[ ${#jwt_secret} -lt 32 ]]; then
+            log_warning "JWT secret is weak (< 32 characters)"
+            WARNING_CHECKS+=("jwt_strength")
+        fi
+
+        log_success "Basic security validation passed"
+        PASSED_CHECKS+=("security")
+        return 0
     fi
 
-    # Check critical fields
-    if ! check_critical_fields "$1"; then
-        log_error "Critical security fields are missing or invalid"
-        FAILED_CHECKS+=("security_critical")
-        return 1
-    fi
+    # Run comprehensive security checks
+    log_info "Running comprehensive security check suite..."
 
-    # Check secret strength
-    local jwt_secret="${CONFIG_JWT_SECRET:-}"
-    if [[ ${#jwt_secret} -lt 32 ]]; then
-        log_warning "JWT secret is weak (< 32 characters)"
-        WARNING_CHECKS+=("jwt_strength")
-    fi
+    local security_output
+    local security_exit_code=0
 
-    log_success "Security validation passed"
-    PASSED_CHECKS+=("security")
-    return 0
+    # Run security checks (config, secrets, permissions - skip log scan for speed)
+    security_output=$("$security_suite" "$config_file" "$tenant_id" --config --secrets --permissions --quiet 2>&1) || security_exit_code=$?
+
+    case $security_exit_code in
+        0)
+            log_success "Comprehensive security validation PASSED"
+            PASSED_CHECKS+=("security")
+            return 0
+            ;;
+        1)
+            log_error "Comprehensive security validation FAILED"
+            log_error "Security issues detected - deployment BLOCKED"
+
+            # Parse output for details
+            if [[ "$security_output" =~ (Secrets found|Weak secrets|Placeholders detected) ]]; then
+                FAILED_CHECKS+=("security_comprehensive")
+            fi
+
+            return 1
+            ;;
+        2)
+            log_warning "Security check suite configuration error"
+            log_warning "Falling back to basic security checks"
+
+            # Fallback to basic checks
+            if check_placeholders "$config_file"; then
+                log_error "Configuration contains placeholder values"
+                FAILED_CHECKS+=("security_placeholders")
+                return 1
+            fi
+
+            if ! check_critical_fields "$config_file"; then
+                log_error "Critical security fields are missing or invalid"
+                FAILED_CHECKS+=("security_critical")
+                return 1
+            fi
+
+            log_success "Basic security validation passed"
+            PASSED_CHECKS+=("security")
+            return 0
+            ;;
+        *)
+            log_warning "Security check suite returned unexpected exit code: $security_exit_code"
+            log_warning "Treating as warning and proceeding with basic checks"
+
+            # Basic checks
+            if check_placeholders "$config_file"; then
+                log_error "Configuration contains placeholder values"
+                FAILED_CHECKS+=("security_placeholders")
+                return 1
+            fi
+
+            log_success "Basic security validation passed"
+            PASSED_CHECKS+=("security")
+            return 0
+            ;;
+    esac
 }
 
 # Check 13: Network configuration
