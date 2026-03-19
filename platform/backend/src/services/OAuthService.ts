@@ -3,6 +3,7 @@ import axios from 'axios';
 import jwt from 'jsonwebtoken';
 import { UserRepository } from '../repositories/UserRepository';
 import { InstanceRepository } from '../repositories/InstanceRepository';
+import { User } from '../entities/User.entity';
 import { logger } from '../config/logger';
 import type { StringValue } from 'ms';
 import {
@@ -127,13 +128,50 @@ export class OAuthService {
       });
 
       // 3. 在数据库中查找或创建用户
-      const user = await this.userRepository.findOrCreate({
-        feishu_user_id: userInfo.open_id,
-        feishu_union_id: userInfo.union_id,
-        name: userInfo.name,
-        email: userInfo.email || undefined,
-        avatar_url: userInfo.avatar_url
-      });
+      // ======================================================================
+      // TEMPORARY HACK: 特殊处理数据丢失恢复的临时用户 (2026-03-18)
+      // TODO: 完成所有用户重新登录后，移除此特殊处理代码
+      // ======================================================================
+      let user = await this.userRepository.findByFeishuUserId(userInfo.open_id);
+
+      // 如果通过 open_id 找不到用户，检查是否是数据丢失恢复的临时用户
+      if (!user) {
+        user = await this.handleRecoveredUser(userInfo);
+      }
+
+      // 如果仍然找不到用户，创建新用户
+      if (!user) {
+        const newUser = await this.userRepository.create({
+          feishu_user_id: userInfo.open_id,
+          feishu_union_id: userInfo.union_id,
+          name: userInfo.name,
+          email: userInfo.email || undefined,
+          avatar_url: userInfo.avatar_url
+        });
+        user = newUser;
+        logger.info('New user created', { userId: user.id, name: user.name });
+      } else {
+        // 更新现有用户数据
+        const updateData: Partial<User> = {
+          name: userInfo.name,
+          email: userInfo.email || undefined,
+          avatar_url: userInfo.avatar_url
+        };
+
+        if (userInfo.union_id !== undefined) {
+          updateData.feishu_union_id = userInfo.union_id;
+        }
+
+        await this.userRepository.update(user.id, updateData);
+        const updatedUser = await this.userRepository.findById(user.id);
+        if (updatedUser) {
+          user = updatedUser;
+        }
+        logger.info('Existing user updated', { userId: user.id, name: user.name });
+      }
+      // ======================================================================
+      // END TEMPORARY HACK
+      // ======================================================================
 
       // 4. 更新最后登录时间
       await this.userRepository.updateLastLogin(user.id);
@@ -396,4 +434,100 @@ export class OAuthService {
       return null;
     }
   }
+
+  /**
+   * ======================================================================
+   * TEMPORARY HACK: 处理数据丢失恢复的临时用户 (2026-03-18)
+   * TODO: 完成所有用户重新登录后（预计1-2周），移除此方法和相关调用
+   * ======================================================================
+   *
+   * 当用户通过飞书登录时，检查是否是数据丢失恢复的4个特殊用户之一：
+   * - 向总 (ID: 3)
+   * - 李芬 (ID: 4)
+   * - 蔡总 (ID: 5)
+   * - 张志云 (ID: 6)
+   *
+   * 如果是，更新临时用户的 Feishu ID 为真实值，用户无感知自动关联原有账户和数据
+   *
+   * @param userInfo 从飞书获取的用户信息
+   * @returns 匹配的临时用户，如果不匹配则返回 null
+   */
+  private async handleRecoveredUser(userInfo: FeishuUserInfo): Promise<User | null> {
+    try {
+      // 数据丢失恢复的特殊用户映射（基于用户名称模糊匹配）
+      const recoveredUsersMap: { [key: string]: number } = {
+        '向总': 3,
+        '李芬': 4,
+        '蔡总': 5,
+        '张志云': 6
+      };
+
+      // 检查用户名称是否匹配
+      let matchedUserId: number | null = null;
+
+      // 精确匹配
+      if (recoveredUsersMap[userInfo.name]) {
+        matchedUserId = recoveredUsersMap[userInfo.name];
+      } else {
+        // 模糊匹配（处理"向总 (待恢复)"这样的情况）
+        for (const [namePattern, userId] of Object.entries(recoveredUsersMap)) {
+          if (userInfo.name.includes(namePattern) || namePattern.includes(userInfo.name)) {
+            matchedUserId = userId;
+            break;
+          }
+        }
+      }
+
+      // 如果找到匹配的用户
+      if (matchedUserId !== null) {
+        const tempUser = await this.userRepository.findById(matchedUserId);
+
+        if (tempUser) {
+          // 检查是否是临时用户（feishu_user_id 以 pending_recover_ 开头）
+          if (tempUser.feishu_user_id && tempUser.feishu_user_id.startsWith('pending_recover_')) {
+            logger.info('Found recovered user, updating with real Feishu credentials', {
+              userId: tempUser.id,
+              userName: tempUser.name,
+              oldFeishuId: tempUser.feishu_user_id,
+              newFeishuId: userInfo.open_id
+            });
+
+            // 更新用户的真实 Feishu ID
+            await this.userRepository.update(tempUser.id, {
+              feishu_user_id: userInfo.open_id,
+              feishu_union_id: userInfo.union_id || undefined,
+              name: userInfo.name,
+              email: userInfo.email || undefined,
+              avatar_url: userInfo.avatar_url
+            });
+
+            // 重新获取更新后的用户
+            const updatedUser = await this.userRepository.findById(tempUser.id);
+
+            logger.info('Successfully merged recovered user account', {
+              userId: updatedUser?.id,
+              feishuUserId: updatedUser?.feishu_user_id
+            });
+
+            return updatedUser || null;
+          }
+        }
+      }
+
+      // 没有找到匹配的临时用户，返回 null 让调用者创建新用户
+      return null;
+    } catch (error) {
+      // 如果处理失败，记录错误但不中断登录流程
+      logger.error('Failed to handle recovered user', {
+        userName: userInfo.name,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      });
+      return null;
+    }
+  }
+  /**
+   * ======================================================================
+   * END TEMPORARY HACK
+   * ======================================================================
+   */
 }

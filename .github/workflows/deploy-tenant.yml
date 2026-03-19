@@ -576,12 +576,18 @@ jobs:
           export GIT_COMMIT_SHA="${{ github.sha }}"
           export GIT_BRANCH="${{ github.ref_name }}"
 
+          # GHCR 登录凭证 (GHCR login credentials)
+          export GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
+          export GITHUB_USERNAME="${{ github.actor }}"
+
           # CIIBER 特定环境变量 (CIIBER-specific environment variables)
           if [ "${{ github.event.inputs.tenant }}" = "CIIBER" ]; then
             export DB_PASSWORD="${{ secrets.CIIBER_DB_PASSWORD }}"
             export REDIS_PASSWORD="${{ secrets.CIIBER_REDIS_PASSWORD }}"
             export JWT_SECRET="${{ secrets.CIIBER_JWT_SECRET }}"
             export FEISHU_ENCRYPT_KEY="${{ secrets.CIIBER_FEISHU_ENCRYPT_KEY }}"
+            export FEISHU_APP_ID="${{ secrets.CIIBER_FEISHU_APP_ID }}"
+            export FEISHU_APP_SECRET="${{ secrets.CIIBER_FEISHU_APP_SECRET }}"
           fi
 
           # 执行部署 (Execute deployment)
