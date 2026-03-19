@@ -762,8 +762,10 @@
 
 ### TASK-018: SSH Key Management System
 
-**任务状态**: `IN_PROGRESS`
+**任务状态**: `COMPLETED`
 **任务开始时间**: 2026-03-19
+**任务完成时间**: 2026-03-19
+**任务提交记录**: Commit ID: `2153a29`
 
 **任务描述**:
 实现SSH密钥轮换和管理系统，包括自动化轮换脚本和审计追踪
@@ -772,36 +774,37 @@
 - TASK-016 (Tenant CRUD Scripts)
 
 **前置检查项**:
-- [ ] 状态数据库可用
-- [ ] 有SSH密钥管理权限
+- [x] 状态数据库可用
+- [x] 有SSH密钥管理权限
 
 **参考文档**:
 - FIP Section: Security Considerations → Enhanced SSH Key Management
 - SSH audit schema: ssh_key_audit table
 
 **Acceptance Criteria**:
-- [ ] scripts/security/rotate-ssh-key.sh密钥轮换脚本
+- [x] scripts/security/rotate-ssh-key.sh密钥轮换脚本
   - 生成新密钥对
   - 部署到服务器
   - 更新GitHub Secrets
   - 移除旧密钥
   - 归档旧密钥
   - 审计日志记录
-- [ ] scripts/security/list-ssh-keys.sh列出密钥脚本
-- [ ] scripts/security/audit-ssh-keys.sh审计密钥脚本
-- [ ] scripts/security/setup-ssh-key.sh初始化SSH密钥脚本
-- [ ] 密钥轮换测试通过
-- [ ] 密钥使用追踪功能
-- [ ] 密钥过期提醒（90天）
+- [x] scripts/security/list-ssh-keys.sh列出密钥脚本
+- [x] scripts/security/audit-ssh-keys.sh审计密钥脚本
+- [x] scripts/security/setup-ssh-key.sh初始化SSH密钥脚本
+- [x] 密钥轮换测试通过
+- [x] 密钥使用追踪功能
+- [x] 密钥过期提醒（90天）
 
 **产出物**:
-- `scripts/security/rotate-ssh-key.sh` - SSH密钥轮换脚本
-- `scripts/security/list-ssh-keys.sh` - 列出SSH密钥
-- `scripts/security/audit-ssh-keys.sh` - 审计SSH密钥
-- `scripts/security/setup-ssh-key.sh` - 设置SSH密钥
-- `scripts/security/test-ssh-key.sh` - 测试SSH密钥
-- `docs/operations/ssh-key-management.md` - SSH密钥管理指南
-- `docs/security/ssh-key-rotation-procedure.md` - SSH密钥轮换程序
+- [x] `scripts/security/rotate-ssh-key.sh` - SSH密钥轮换脚本 (25KB)
+- [x] `scripts/security/list-ssh-keys.sh` - 列出SSH密钥 (13KB)
+- [x] `scripts/security/audit-ssh-keys.sh` - 审计SSH密钥 (19KB)
+- [x] `scripts/security/setup-ssh-key.sh` - 设置SSH密钥 (16KB)
+- [x] `scripts/security/test-ssh-key.sh` - 测试SSH密钥 (13KB)
+- [x] `scripts/tests/test-ssh-key-management.sh` - 测试套件 (18KB)
+- [x] `docs/operations/ssh-key-management.md` - SSH密钥管理指南 (15KB)
+- [x] `docs/security/ssh-key-rotation-procedure.md` - SSH密钥轮换程序 (13KB)
 
 ---
 
