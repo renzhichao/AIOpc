@@ -1,9 +1,12 @@
-# 核心需求文档: 支持多服务实例部署
+# 核心需求文档: 支持多服务实例部署（简化版）
 
-> **需求文档版本**: 1.0
+> **需求文档版本**: 2.0
 > **创建日期**: 2026-03-19
+> **更新日期**: 2026-03-19
 > **Issue**: #21 - 支持多服务实例部署
 > **优先级**: P0 - 高优先级
+
+> **架构模式**: 多实例单租户 (Multi-Instance Single-Tenant)
 
 ---
 
@@ -11,182 +14,234 @@
 
 ### 业务背景
 
-当前 AIOpc 平台仅支持单一租户部署，无法满足企业客户的私有化部署需求。多个企业客户需要将平台部署到各自的服务器和飞书帐号体系中，实现数据和配置的完全隔离。
+当前 AIOpc 平台采用 **单实例单租户** 架构，仅支持单一企业部署。需要改造为 **多实例单租户** 架构，使每个企业客户拥有独立的平台实例（独立服务器、数据库、域名、飞书应用）。
 
-### 核心问题
+### 核心设计原则
 
-1. **单租户限制**: 平台仅支持单一飞书应用配置，无法服务于多个企业
-2. **部署限制**: 部署流程仅针对单台服务器设计，无法灵活部署到不同租户服务器
-3. **配置耦合**: 飞书 OAuth 配置硬编码，缺乏多实例配置管理
-4. **扩展性不足**: 缺乏横向扩展能力，难以支持多租户并发
+**架构简化**:
+- ✅ 每个租户 = 独立服务器 + 独立数据库 + 独立配置
+- ✅ 不需要数据库层面的租户隔离
+- ✅ 不需要应用层面的租户路由
+- ✅ 配置通过独立配置文件管理
+
+**核心价值**:
+- 🚀 快速部署：为不同企业快速部署独立平台实例
+- 🔒 完全隔离：每个租户数据、配置、资源完全独立
+- 📦 简单管理：每个租户一个配置文件，易于管理
+- 🔄 灵活扩展：新增租户只需部署新实例
 
 ---
 
 ## 🎯 功能需求
 
-### REQ-MULTI-001: 多租户配置管理
+### REQ-MULTI-001: 租户配置文件管理
 
 **优先级**: P0
-**描述**: 支持为不同租户配置独立的飞书应用凭据
+**描述**: 为每个租户创建独立的配置文件，包含该租户的所有配置信息
 
 **Acceptance Criteria**:
-- [ ] 支持为每个租户配置独立的 `FEISHU_APP_ID` 和 `FEISHU_APP_SECRET`
-- [ ] 配置支持动态加载，无需重启服务
-- [ ] 配置变更支持热更新
-- [ ] 配置文件支持环境变量覆盖
+- [ ] 每个租户一个独立配置文件 `config/tenants/{tenant_id}.yml`
+- [ ] 配置文件包含：服务器信息、SSH密钥、飞书应用配置、数据库配置
+- [ ] 支持配置文件模板 `config/tenants/template.yml`
+- [ ] 支持配置文件验证（检查必需字段）
 
-**输入示例**:
+**配置文件结构**:
 ```yaml
-# 租户配置示例
-tenants:
-  tenant_a:
-    feishu_app_id: cli_aaa111111
-    feishu_app_secret: xxx_secret_aaa
-    domain: tenant-a.example.com
+# config/tenants/tenant_a.yml
+tenant:
+  id: tenant_a
+  name: "客户A公司"
+  environment: production
 
-  tenant_b:
-    feishu_app_id: cli_bbb222222
-    feishu_app_secret: yyy_secret_bbb
-    domain: tenant-b.example.com
+# 服务器配置
+server:
+  host: tenant-a.example.com
+  ssh_user: root
+  ssh_key_path: ~/.ssh/tenant_a_key
+  deploy_path: /opt/opclaw
+
+# 飞书应用配置
+feishu:
+  app_id: cli_aaa111111
+  app_secret: L0cHQDBbEiIys6AHW53miecONb1xA4qy
+  encrypt_key: suNsfjHj2nwpvIUT/gB4UZSETSaAnOVCnoylIp4Oo6HiVz/b0Yh/hRA1fQGa/a0U
+  oauth_redirect_uri: https://tenant-a.example.com/api/oauth/callback
+
+# 数据库配置
+database:
+  host: localhost
+  port: 5432
+  name: opclaw
+  user: opclaw
+  password: ${DB_PASSWORD}  # 从环境变量读取
+
+# Redis配置
+redis:
+  host: localhost
+  port: 6379
+  password: ${REDIS_PASSWORD}
+
+# JWT配置
+jwt:
+  secret: ${JWT_SECRET}
+  expires_in: 7d
 ```
 
 ---
 
-### REQ-MULTI-002: 租户识别与路由
+### REQ-MULTI-002: 参数化部署脚本
 
 **优先级**: P0
-**描述**: 实现基于域名的租户识别和请求路由
+**描述**: 修改部署脚本支持租户配置文件参数
 
 **Acceptance Criteria**:
-- [ ] 支持通过请求域名识别租户（如 `tenant-a.example.com`）
-- [ ] 支持通过子域名模式识别租户（如 `tenant-a.platform.com`）
-- [ ] 支持通过 URL 路径识别租户（如 `platform.com/tenant-a/`）
-- [ ] 租户识别失败时返回友好错误提示
-
-**路由规则**:
-```typescript
-// 租户识别优先级
-1. 子域名: tenant-a.example.com → tenant_a
-2. 自定义域名: custom-domain.com → tenant_x (映射配置)
-3. 路径参数: example.com/tenant-a/ → tenant_a
-4. 默认租户: example.com → default_tenant
-```
-
----
-
-### REQ-MULTI-003: 多服务器部署支持
-
-**优先级**: P0
-**描述**: 修改部署流水线支持部署到指定的租户服务器
-
-**Acceptance Criteria**:
-- [ ] 部署脚本支持指定目标服务器
-- [ ] 支持为不同租户配置独立的部署配置
-- [ ] 支持部署前验证（配置检查、依赖检查）
-- [ ] 支持部署后健康检查
-- [ ] 支持多服务器并行部署
+- [ ] 部署脚本接受租户配置文件作为参数
+- [ ] 自动从配置文件读取服务器信息、SSH密钥等
+- [ ] 支持部署前验证（服务器连接、配置完整性）
+- [ ] 支持部署后验证（健康检查）
+- [ ] 错误处理和回滚机制
 
 **部署命令示例**:
 ```bash
-# 部署到特定租户服务器
+# 部署到指定租户
 ./scripts/deploy/deploy-tenant.sh \
-  --tenant tenant_a \
-  --server tenant-a.example.com \
-  --ssh-key ~/.ssh/tenant_a_key \
-  --config config/tenants/tenant_a.yml
+  --config config/tenants/tenant_a.yml \
+  --component all \
+  --skip-tests false
 
-# 批量部署到多个租户
+# 批量部署多个租户
 ./scripts/deploy/deploy-all-tenants.sh \
   --tenants tenant_a,tenant_b,tenant_c
+
+# 仅部署后端
+./scripts/deploy/deploy-tenant.sh \
+  --config config/tenants/tenant_a.yml \
+  --component backend
 ```
 
 ---
 
-### REQ-MULTI-004: 租户数据隔离
-
-**优先级**: P1
-**描述**: 实现租户级别的数据隔离，确保不同租户数据完全独立
-
-**Acceptance Criteria**:
-- [ ] 不同租户用户数据完全隔离（users 表增加 tenant_id）
-- [ ] 不同租户实例数据完全隔离（instances 表增加 tenant_id）
-- [ ] 不同租户配置数据完全隔离
-- [ ] API 查询自动过滤租户数据
-- [ ] 防止跨租户数据访问
-
-**数据模型变更**:
-```sql
--- users 表增加租户字段
-ALTER TABLE users ADD COLUMN tenant_id VARCHAR(64) NOT NULL DEFAULT 'default';
-CREATE INDEX idx_users_tenant ON users(tenant_id);
-
--- instances 表增加租户字段
-ALTER TABLE instances ADD COLUMN tenant_id VARCHAR(64) NOT NULL DEFAULT 'default';
-CREATE INDEX idx_instances_tenant ON instances(tenant_id);
-
--- 租户配置表（新建）
-CREATE TABLE tenants (
-  id VARCHAR(64) PRIMARY KEY,
-  name VARCHAR(255) NOT NULL,
-  feishu_app_id VARCHAR(128) NOT NULL,
-  feishu_app_secret VARCHAR(255) NOT NULL,
-  domain VARCHAR(255),
-  status VARCHAR(32) DEFAULT 'active',
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
-```
-
----
-
-### REQ-MULTI-005: 租户级 OAuth 认证
+### REQ-MULTI-003: 多租户部署工作流
 
 **优先级**: P0
-**描述**: 支持不同租户使用各自的飞书应用进行认证
+**描述**: 创建 GitHub Actions 工作流支持多租户部署
 
 **Acceptance Criteria**:
-- [ ] OAuth 回调 URL 支持动态配置（基于租户域名）
-- [ ] JWT Token 包含租户信息（tenant_id, tenant_name）
-- [ ] 不同租户的认证流程完全独立
-- [ ] 租户 A 的用户无法访问租户 B 的资源
+- [ ] 支持通过 GitHub Actions 触发租户部署
+- [ ] 支持手动选择目标租户
+- [ ] 支持选择部署组件（all/backend/frontend）
+- [ ] 部署日志和状态反馈
 
-**Token Payload 示例**:
-```typescript
-{
-  sub: "user_123",
-  tenant_id: "tenant_a",
-  tenant_name: "Tenant A Company",
-  name: "张三",
-  email: "zhangsan@tenant-a.com",
-  roles: ["user"],
-  iat: 1642234567,
-  exp: 1642238167
-}
+**Workflow 输入参数**:
+```yaml
+name: 租户部署 (Tenant Deployment)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tenant:
+        description: '选择租户 (Select Tenant)'
+        required: true
+        type: choice
+        options:
+          - tenant_a
+          - tenant_b
+          - tenant_c
+      component:
+        description: '部署组件 (Component)'
+        required: true
+        type: choice
+        options:
+          - all
+          - backend
+          - frontend
+      skip_tests:
+        description: '跳过测试 (Skip Tests)'
+        type: boolean
+        default: false
 ```
 
 ---
 
-### REQ-MULTI-006: 租户级监控与日志
+### REQ-MULTI-004: 租户管理脚本
 
 **优先级**: P1
-**描述**: 实现租户级别的监控和日志隔离
+**描述**: 创建租户管理脚本，简化租户部署和管理操作
 
 **Acceptance Criteria**:
-- [ ] 日志包含租户标识（tenant_id）
-- [ ] 监控指标按租户分组统计
-- [ ] 支持按租户查询日志和指标
-- [ ] 告警配置支持租户级别设置
+- [ ] 支持列出所有租户
+- [ ] 支持查看租户配置
+- [ ] 支持验证租户配置完整性
+- [ ] 支持租户健康检查
 
-**日志格式示例**:
-```json
-{
-  "timestamp": "2026-03-19T10:00:00Z",
-  "tenant_id": "tenant_a",
-  "user_id": "user_123",
-  "action": "instance.create",
-  "resource": "inst-001",
-  "status": "success"
-}
+**管理命令示例**:
+```bash
+# 列出所有租户
+./scripts/tenant/list.sh
+
+# 查看租户配置
+./scripts/tenant/show.sh --tenant tenant_a
+
+# 验证租户配置
+./scripts/tenant/validate.sh --tenant tenant_a
+
+# 租户健康检查
+./scripts/tenant/health-check.sh --tenant tenant_a
+
+# 批量健康检查
+./scripts/tenant/health-check-all.sh
+```
+
+---
+
+### REQ-MULTI-005: 租户配置模板
+
+**优先级**: P1
+**描述**: 创建租户配置模板，简化新租户配置创建
+
+**Acceptance Criteria**:
+- [ ] 提供租户配置模板 `template.yml`
+- [ ] 提供配置生成脚本
+- [ ] 提供配置验证脚本
+- [ ] 文档说明各配置项含义
+
+**快速创建新租户**:
+```bash
+# 从模板创建新租户配置
+./scripts/tenant/create.sh \
+  --tenant-id tenant_d \
+  --tenant-name "客户D公司" \
+  --server tenant-d.example.com \
+  --ssh-key ~/.ssh/tenant_d_key
+
+# 交互式创建
+./scripts/tenant/create.sh --interactive
+```
+
+---
+
+### REQ-MULTI-006: 部署验证与监控
+
+**优先级**: P1
+**描述**: 实现租户级别的部署验证和基础监控
+
+**Acceptance Criteria**:
+- [ ] 部署后自动验证服务健康
+- [ ] 检查关键端点（健康检查、OAuth回调）
+- [ ] 生成部署报告
+- [ ] 记录部署历史
+
+**验证项**:
+```bash
+# 部署验证检查清单
+- [ ] 服务器连接成功
+- [ ] 配置文件加载成功
+- [ ] 后端容器运行正常
+- [ ] 前端容器运行正常
+- [ ] 数据库连接正常
+- [ ] Redis 连接正常
+- [ ] 健康检查端点响应正常
+- [ ] OAuth 回调端点可访问
 ```
 
 ---
@@ -197,87 +252,134 @@ CREATE TABLE tenants (
 
 | 指标 | 要求 | 说明 |
 |------|------|------|
-| 租户识别延迟 | < 10ms | 从请求到识别租户的时间 |
-| 配置加载延迟 | < 50ms | 租户配置加载时间 |
-| 并发租户数 | ≥ 100 | 系统支持的并发租户数量 |
-| 租户数据隔离 | 100% | 确保无跨租户数据泄露 |
+| 部署时间 | < 10 分钟 | 从触发到部署完成 |
+| 健康检查时间 | < 30 秒 | 部署后验证时间 |
+| 配置加载时间 | < 5 秒 | 从文件加载配置 |
 
 ### NFR-MULTI-002: 安全要求
 
 | 要求 | 说明 |
 |------|------|
-| 配置加密 | 租户敏感配置（如 app_secret）必须加密存储 |
-| 传输加密 | 租户间通信必须使用 HTTPS |
-| 访问控制 | 严格的租户访问控制，防止越权 |
-| 审计日志 | 记录所有跨租户访问尝试 |
+| SSH 密钥管理 | 每个租户使用独立的 SSH 密钥 |
+| 配置文件权限 | 配置文件权限 600，仅所有者可读 |
+| 敏感信息加密 | 敏感配置使用环境变量，不写入配置文件 |
+| 审计日志 | 记录所有部署操作（谁、何时、哪个租户） |
 
-### NFR-MULTI-003: 兼容性要求
+### NFR-MULTI-003: 可维护性要求
 
 | 要求 | 说明 |
 |------|------|
-| 向后兼容 | 现有单租户部署模式必须继续支持 |
-| 平滑迁移 | 支持现有单租户向多租户模式迁移 |
-| 配置兼容 | 旧版配置文件可以自动转换 |
+| 配置即代码 | 租户配置文件纳入版本控制 |
+| 文档完善 | 每个脚本包含帮助信息和使用示例 |
+| 错误处理 | 友好的错误提示和恢复建议 |
+| 日志记录 | 详细的部署日志，便于排查问题 |
 
 ---
 
 ## 🔄 用例场景
 
-### UC-MULTI-001: 新租户部署流程
+### UC-MULTI-001: 部署新租户
 
 **Actor**: 运维工程师
 
 **前置条件**:
-- 目标服务器已准备就绪
+- 租户服务器已准备就绪
 - 租户飞书应用已创建
+- SSH 密钥已配置
 
 **主要流程**:
-1. 创建租户配置文件 `config/tenants/tenant_a.yml`
-2. 执行部署脚本 `./deploy-tenant.sh --tenant tenant_a`
-3. 验证部署状态（健康检查、配置验证）
-4. 配置租户域名 DNS 解析
-5. 测试租户 OAuth 认证流程
-6. 确认租户数据隔离正常
+1. 创建租户配置文件
+   ```bash
+   ./scripts/tenant/create.sh --tenant-id tenant_a
+   ```
+2. 编辑配置文件，填写租户信息
+   ```bash
+   vi config/tenants/tenant_a.yml
+   ```
+3. 验证配置文件
+   ```bash
+   ./scripts/tenant/validate.sh --tenant tenant_a
+   ```
+4. 执行部署
+   ```bash
+   ./scripts/deploy/deploy-tenant.sh --config config/tenants/tenant_a.yml
+   ```
+5. 等待部署完成并检查健康状态
+   ```bash
+   ./scripts/tenant/health-check.sh --tenant tenant_a
+   ```
+6. 测试租户平台功能
 
-**后置条件**: 租户可以独立使用平台，与其他租户完全隔离
+**后置条件**: 租户平台部署成功，可以独立使用
 
 ---
 
-### UC-MULTI-002: 租户用户登录
+### UC-MULTI-002: 更新租户配置
 
-**Actor**: 租户用户
+**Actor**: 运维工程师
 
 **前置条件**:
-- 用户属于租户 A
-- 租户 A 平台已部署
+- 租户已部署
+- 需要更新飞书应用配置或其他配置
 
 **主要流程**:
-1. 用户访问租户 A 平台域名（tenant-a.example.com）
-2. 系统识别租户为 tenant_a
-3. 用户点击飞书登录
-4. 系统使用租户 A 的飞书应用配置发起认证
-5. 飞书认证成功后回调
-6. 系统生成包含租户信息的 JWT Token
-7. 用户登录成功，仅能访问租户 A 的数据
+1. 编辑租户配置文件
+2. 验证配置文件
+3. 执行增量部署（仅更新配置，不重新部署代码）
+   ```bash
+   ./scripts/deploy/deploy-tenant.sh \
+     --config config/tenants/tenant_a.yml \
+     --mode config-only
+   ```
+4. 重启相关服务
+5. 验证配置生效
 
-**后置条件**: 用户以租户 A 身份成功登录
+---
+
+### UC-MULTI-003: 批量部署多个租户
+
+**Actor**: 运维工程师
+
+**前置条件**:
+- 多个租户配置文件已准备好
+- 多个租户服务器已准备就绪
+
+**主要流程**:
+1. 验证所有租户配置
+   ```bash
+   ./scripts/tenant/validate-all.sh
+   ```
+2. 执行批量部署
+   ```bash
+   ./scripts/deploy/deploy-all-tenants.sh \
+     --tenants tenant_a,tenant_b,tenant_c \
+     --parallel 3  # 并发数为3
+   ```
+3. 监控部署进度
+4. 查看部署报告
+   ```bash
+   ./scripts/tenant/deployment-report.sh
+   ```
 
 ---
 
 ## 📊 系统约束
 
-### 约束-1: 向后兼容性
-- 现有单租户部署模式必须继续支持
-- 现有 API 接口必须保持兼容
-- 现有数据库结构必须平滑升级
+### 约束-1: 服务器资源
+- 每个租户需要独立的服务器资源
+- 服务器需满足最低配置要求（CPU、内存、磁盘）
 
-### 约束-2: 资源限制
-- 每个租户服务器资源有限（内存、CPU）
-- 需要考虑单服务器多租户 vs 多服务器单租户的成本
+### 约束-2: 飞书应用
+- 每个租户需要创建独立的飞书应用
+- 需要配置正确的 OAuth 回调 URL
 
-### 约束-3: 飞书限制
-- 每个飞书应用有独立的速率限制
-- 需要处理不同租户飞书 API 的限流
+### 约束-3: 域名和SSL
+- 每个租户需要独立的域名
+- 需要配置 SSL 证书（Let's Encrypt 或自有证书）
+
+### 约束-4: 配置安全
+- 租户配置文件包含敏感信息，需要妥善保管
+- 建议将配置文件纳入私有仓库，使用密钥管理工具
 
 ---
 
@@ -285,28 +387,77 @@ CREATE TABLE tenants (
 
 ### 最小可行产品 (MVP)
 
-- [ ] 支持至少 2 个租户同时部署
+- [ ] 支持通过配置文件部署到不同租户服务器
 - [ ] 每个租户使用独立的飞书应用配置
-- [ ] 租户间数据完全隔离
-- [ ] 部署脚本支持指定租户和服务器
+- [ ] 部署脚本支持参数化（服务器、SSH密钥、配置）
+- [ ] 基础的健康检查和验证
 
 ### 完整功能
 
-- [ ] 支持至少 10 个租户同时部署
-- [ ] 租户级监控和日志
-- [ ] 租户级资源配额管理
-- [ ] 租户自助管理界面
+- [ ] GitHub Actions 集成
+- [ ] 租户管理脚本套件
+- [ ] 批量部署支持
+- [ ] 部署历史和报告
+- [ ] 监控和告警集成
 
 ---
 
 ## 📚 参考文档
 
 - [Issue #21: 支持多服务实例部署](https://github.com/renzhichao/AIOpc/issues/21)
-- [GAP Analysis: 多租户部署现状分析](./GAP_Analysis_issue21_multi_tenant.md)
-- [现有 OAuth 实现](../backend/src/services/OAuthService.ts)
-- [部署脚本文档](../../scripts/README.md)
+- [GAP Analysis: 多租户部署现状分析](./GAP_Analysis_issue21_multi_tenant_v2.md)
+- [现有部署脚本](../../scripts/deploy/README.md)
+- [现有部署工作流](../../.github/workflows/deploy-production.yml)
+
+---
+
+## 🎨 架构图
+
+### 多实例单租户架构
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    GitHub (代码仓库)                          │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │  AIOpc 代码库                                          │ │
+│  │  ├─ platform/ (前端/后端代码)                        │ │
+│  │  ├─ config/tenants/ (租户配置)                        │ │
+│  │  │  ├─ template.yml (配置模板)                       │ │
+│  │  │  ├─ tenant_a.yml (租户A配置)                      │ │
+│  │  │  └─ tenant_b.yml (租户B配置)                      │ │
+│  │  └─ scripts/deploy/ (部署脚本)                        │ │
+│  └────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────┘
+                            │
+                            ▼
+              ┌─────────────────────────┐
+              │  部署脚本 (参数化)        │
+              │  deploy-tenant.sh       │
+              │  --config tenant_a.yml  │
+              └─────────────────────────┘
+                            │
+            ┌───────────┬───────────────┐
+            ▼           ▼               ▼
+    ┌─────────┐  ┌─────────┐   ┌─────────┐
+    │租户A    │  │租户B    │   │租户C    │
+    │服务器   │  │服务器   │   │服务器   │
+    └─────────┘  └─────────┘   └─────────┘
+        │            │               │
+        ▼            ▼               ▼
+    ┌─────────────────────────────────────┐
+    │  每个租户独立部署                     │
+    │  ├─ Docker Compose                 │
+    │  ├─ Nginx (租户域名)               │
+    │  ├─ Backend (租户飞书配置)        │
+    │  ├─ Frontend                       │
+    │  ├─ PostgreSQL (独立数据库)       │
+    │  └─ Redis (独立缓存)               │
+    └─────────────────────────────────────┘
+```
 
 ---
 
 **文档版本历史**:
-- v1.0 (2026-03-19): 初始版本
+- v1.0 (2026-03-19): 初始版本（复杂多租户架构）
+- v2.0 (2026-03-19): 简化为多实例单租户架构 ⭐ **当前版本**
