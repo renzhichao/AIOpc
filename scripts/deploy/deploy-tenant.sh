@@ -295,8 +295,16 @@ test_ssh_connection() {
         return 1
     fi
 
-    # Expand SSH key path
-    ssh_key_path="${ssh_key_path/#\~/$HOME}"
+    # Priority: Use SSH_KEY_PATH from environment if set (CI environment),
+    # otherwise use path from config file (local deployment)
+    if [[ -n "${SSH_KEY_PATH:-}" ]]; then
+        ssh_key_path="${SSH_KEY_PATH}"
+        log_debug "Using SSH key from environment: $ssh_key_path"
+    else
+        # Expand SSH key path from config
+        ssh_key_path="${ssh_key_path/#\~/$HOME}"
+        log_debug "Using SSH key from config: $ssh_key_path"
+    fi
 
     if [[ ! -f "$ssh_key_path" ]]; then
         log_step_failed "SSH key not found: $ssh_key_path"
