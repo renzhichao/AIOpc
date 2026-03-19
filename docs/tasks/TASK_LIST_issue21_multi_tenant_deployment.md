@@ -66,42 +66,44 @@
 
 ### TASK-002: Enhanced Health Check Implementation
 
-**任务状态**: `IN_PROGRESS`
+**任务状态**: `COMPLETED`
 **任务开始时间**: 2026-03-19
+**任务完成时间**: 2026-03-19
+**任务提交记录**: Commit ID: `ddab79b`
 
 **任务描述**:
 实现多层健康检查机制，不仅检查HTTP 200，还要验证数据库、OAuth、Redis等关键组件
 
 **前置依赖**:
-- TASK-001 (Production Backup Validation) - 确保可以回滚
+- TASK-001 (Production Backup Validation) - ✅ 已完成
 
 **前置检查项**:
-- [ ] 生产服务器SSH连接正常
-- [ ] Docker环境运行正常
-- [ ] 有权限修改部署脚本
+- [x] 生产服务器SSH连接正常
+- [x] Docker环境运行正常
+- [x] 有权限修改部署脚本
 
 **参考文档**:
 - FIP Section: Production Safety Net → Enhanced Health Checks
 - Current health check: `platform/backend/src/health/`
 
 **Acceptance Criteria**:
-- [ ] Layer 1: HTTP健康检查 (/health endpoint返回200)
-- [ ] Layer 2: 数据库连接检查 (pg_isready)
-- [ ] Layer 3: 数据库查询测试 (SELECT 1)
-- [ ] Layer 4: OAuth配置验证
-- [ ] Layer 5: Redis连接检查 (redis-cli PING)
-- [ ] 所有检查失败时返回具体错误信息
-- [ ] 支持3次重试，30秒指数退避
-- [ ] 健康检查脚本可独立执行
+- [x] Layer 1: HTTP健康检查 (/health endpoint返回200)
+- [x] Layer 2: 数据库连接检查 (pg_isready)
+- [x] Layer 3: 数据库查询测试 (SELECT 1)
+- [x] Layer 4: OAuth配置验证
+- [x] Layer 5: Redis连接检查 (redis-cli PING)
+- [x] 所有检查失败时返回具体错误信息
+- [x] 支持3次重试，30秒指数退避
+- [x] 健康检查脚本可独立执行
 
 **产出物**:
-- `scripts/monitoring/enhanced-health-check.sh` - 多层健康检查脚本
-- `scripts/monitoring/health-check-layer1.sh` - HTTP检查
-- `scripts/monitoring/health-check-layer2.sh` - DB连接检查
-- `scripts/monitoring/health-check-layer3.sh` - DB查询检查
-- `scripts/monitoring/health-check-layer4.sh` - OAuth检查
-- `scripts/monitoring/health-check-layer5.sh` - Redis检查
-- `scripts/lib/health-check.sh` - 健康检查库函数
+- [x] `scripts/monitoring/enhanced-health-check.sh` - 多层健康检查脚本
+- [x] `scripts/monitoring/health-check-layer1.sh` - HTTP检查
+- [x] `scripts/monitoring/health-check-layer2.sh` - DB连接检查
+- [x] `scripts/monitoring/health-check-layer3.sh` - DB查询检查
+- [x] `scripts/monitoring/health-check-layer4.sh` - OAuth检查
+- [x] `scripts/monitoring/health-check-layer5.sh` - Redis检查
+- [x] `scripts/lib/health-check.sh` - 健康检查库函数
 
 ---
 
