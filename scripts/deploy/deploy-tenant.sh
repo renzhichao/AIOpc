@@ -298,7 +298,8 @@ test_ssh_connection() {
     # Priority: Use SSH_KEY_PATH from environment if set (CI environment),
     # otherwise use path from config file (local deployment)
     if [[ -n "${SSH_KEY_PATH:-}" ]]; then
-        ssh_key_path="${SSH_KEY_PATH}"
+        # Expand SSH key path from environment (handles ~ expansion)
+        ssh_key_path="${SSH_KEY_PATH/#\~/$HOME}"
         log_debug "Using SSH key from environment: $ssh_key_path"
     else
         # Expand SSH key path from config
