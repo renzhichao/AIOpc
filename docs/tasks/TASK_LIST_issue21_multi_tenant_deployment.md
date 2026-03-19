@@ -326,8 +326,10 @@
 
 ### TASK-008: Core Script Library Development
 
-**任务状态**: `IN_PROGRESS`
+**任务状态**: `COMPLETED`
 **任务开始时间**: 2026-03-19
+**任务完成时间**: 2026-03-19
+**任务提交记录**: Commit ID: `35b8d76`
 
 **任务描述**:
 开发核心脚本库，包括日志、SSH、文件操作等通用功能
@@ -337,37 +339,37 @@
 - TASK-007 (Configuration System Implementation) - ✅ 已完成
 
 **前置检查项**:
-- [ ] scripts/lib/目录已创建
-- [ ] 基础开发工具已安装
+- [x] scripts/lib/目录已创建
+- [x] 基础开发工具已安装
 
 **参考文档**:
 - FIP Section: Implementation Plan → Script Specifications
 - Library requirements: logging, ssh, file operations, error handling
 
 **Acceptance Criteria**:
-- [ ] scripts/lib/logging.sh日志库实现
+- [x] scripts/lib/logging.sh日志库实现
   - log_step, log_info, log_success, log_warning, log_error函数
   - 支持日志级别和彩色输出
   - 支持日志文件输出
-- [ ] scripts/lib/ssh.sh SSH库实现
+- [x] scripts/lib/ssh.sh SSH库实现
   - ssh_exec函数（远程命令执行）
   - ssh_scp函数（文件传输）
   - 连接超时和重试机制
-- [ ] scripts/lib/file.sh文件操作库实现
+- [x] scripts/lib/file.sh文件操作库实现
   - backup_file, restore_file函数
   - file_hash, file_diff函数
-- [ ] scripts/lib/error.sh错误处理库实现
+- [x] scripts/lib/error.sh错误处理库实现
   - error handler, cleanup handler
   - trap信号处理
-- [ ] 所有库函数有单元测试
+- [x] 所有库函数有单元测试
 
 **产出物**:
-- `scripts/lib/logging.sh` - 日志库
-- `scripts/lib/ssh.sh` - SSH库
-- `scripts/lib/file.sh` - 文件操作库
-- `scripts/lib/error.sh` - 错误处理库
-- `scripts/tests/test-lib-*.sh` - 库函数测试
-- `docs/development/library-reference.md` - 库函数参考文档
+- [x] `scripts/lib/logging.sh` - 日志库 (450 lines, 14 functions)
+- [x] `scripts/lib/ssh.sh` - SSH库 (570 lines, 16 functions)
+- [x] `scripts/lib/file.sh` - 文件操作库 (520 lines, 18 functions)
+- [x] `scripts/lib/error.sh` - 错误处理库 (480 lines, 25 functions)
+- [x] `scripts/tests/test-lib-*.sh` - 库函数测试 (60 tests, 100% passing)
+- [x] `docs/development/library-reference.md` - 库函数参考文档 (600+ lines)
 
 ---
 
