@@ -86,12 +86,12 @@ feishu:
   # Feishu App ID (required)
   # Get from Feishu Open Platform
   # Format: cli_xxxxxxxxxxxxx
-  app_id: ""  # PENDING: 待客户提供
+  app_id: "cli_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"  # PLACEHOLDER: 待客户替换
 
   # Feishu App Secret (required)
   # Get from Feishu Open Platform
   # Keep secret! Use environment variable
-  app_secret: ""  # PENDING: 待客户提供
+  app_secret: "PLACEHOLDER_FEISHU_APP_SECRET_32_CHARS"  # PLACEHOLDER: 待客户替换
 
   # Encryption key for data encryption (required)
   # Use a strong random string (32+ characters recommended)
@@ -218,7 +218,7 @@ agent:
 
     # API key (required)
     # Get from DeepSeek platform
-    api_key: ""  # PENDING: 待提供
+    api_key: "sk-placeholderxxxxxxxxxxxxxxxxxxxxxxxx"  # PLACEHOLDER: 待客户替换
 
     # Model name (required)
     # Values: deepseek-chat, deepseek-coder
