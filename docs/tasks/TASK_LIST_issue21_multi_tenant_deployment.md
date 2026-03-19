@@ -506,17 +506,18 @@
 
 ### TASK-012: Local Deployment Support
 
-**任务状态**: `PENDING`
+**任务状态**: `IN_PROGRESS`
+**任务开始时间**: 2026-03-19
 
 **任务描述**:
 实现本地部署支持，减少对GitHub Actions的依赖，支持本地CLI部署
 
 **前置依赖**:
-- TASK-011 (Parameterized Deployment Scripts)
+- TASK-011 (Parameterized Deployment Scripts) - ✅ 已完成
 
 **前置检查项**:
-- [ ] deploy-tenant.sh已实现
-- [ ] 本地有必要的工具（Docker, rsync等）
+- [x] deploy-tenant.sh已实现
+- [x] 本地有必要的工具（Docker, rsync等）
 
 **参考文档**:
 - FIP Section: Configuration Management Improvements → Reduced GitHub Actions Dependency
