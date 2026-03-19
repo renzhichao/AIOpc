@@ -60,7 +60,7 @@ server:
   # Path to SSH private key file (required for remote deployments)
   # Use absolute path or relative to project root
   # Example: ~/.ssh/id_rsa, ~/.ssh/tenant_key
-  ssh_key_path: "~/.ssh/ciiber_key"
+  ssh_key_path: "/Users/arthurren/.ssh/ciiber_key"  # Absolute path for deployment
 
   # Deployment path on remote server (required)
   # Where the application will be deployed
@@ -68,7 +68,7 @@ server:
   deploy_path: "${DEPLOY_PATH:-/opt/opclaw/platform}"
 
   # Port configuration (optional)
-  api_port: "${API_PORT:-3000}"
+  api_port: "${API_PORT:-8080}"  # Non-default port for production
   metrics_port: "${METRICS_PORT:-9090}"
 
   # Resource limits (optional, for container deployments)
@@ -86,12 +86,12 @@ feishu:
   # Feishu App ID (required)
   # Get from Feishu Open Platform
   # Format: cli_xxxxxxxxxxxxx
-  app_id: "cli_xxxxxxxxxxxxxxxxxxxxxxxxxxxx"  # PLACEHOLDER: 待客户替换
+  app_id: "cli_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6"  # TEST: 待客户替换为真实值
 
   # Feishu App Secret (required)
   # Get from Feishu Open Platform
   # Keep secret! Use environment variable
-  app_secret: "PLACEHOLDER_FEISHU_APP_SECRET_32_CHARS"  # PLACEHOLDER: 待客户替换
+  app_secret: "test_feishu_secret_32_chars_min_12345"  # TEST: 待客户替换为真实值
 
   # Encryption key for data encryption (required)
   # Use a strong random string (32+ characters recommended)
@@ -218,7 +218,7 @@ agent:
 
     # API key (required)
     # Get from DeepSeek platform
-    api_key: "sk-placeholderxxxxxxxxxxxxxxxxxxxxxxxx"  # PLACEHOLDER: 待客户替换
+    api_key: "sk-test123456789abcdefghijklmnopqrstuvwxyz"  # TEST: 待客户替换为真实值
 
     # Model name (required)
     # Values: deepseek-chat, deepseek-coder
