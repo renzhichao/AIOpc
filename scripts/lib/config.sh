@@ -1,105 +1,114 @@
 #!/bin/bash
 #==============================================================================
-# Configuration Drift Detection Library
-#==============================================================================
-# Purpose: Detect and report configuration drift between Git and running containers
+# Tenant Configuration Management Library
+# (租户配置管理库)
+#
+# Purpose: Load, parse, validate, and manage tenant configurations
 #
 # Features:
-# - Compare Git config vs Remote file config vs Container environment
-# - Severity classification (critical/major/minor)
+# - YAML configuration parsing (using yq)
+# - Environment variable expansion (${VAR} format)
+# - Configuration validation
 # - Placeholder detection (cli_xxxxxxxxxxxxx)
-# - Database integration for drift history
-# - JSON and human-readable output
+# - Integration with state database
+# - Configuration snapshots
 #
 # Usage:
 #   source /path/to/config.sh
-#   detect_config_drift "git_config_path" "container_name"
+#   load_tenant_config "/path/to/config.yml"
+#   get_config_value "tenant.id"
+#
+# Dependencies:
+# - yq (https://github.com/mikefarah/yq)
+# - PostgreSQL client (psql) for database integration
+#
+# Version: 1.0
+# Last Updated: 2026-03-19
 #==============================================================================
 
 #==============================================================================
 # Configuration
 #==============================================================================
 
-# Severity levels
-SEVERITY_CRITICAL=0
-SEVERITY_MAJOR=1
-SEVERITY_MINOR=2
+# Script directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 
-# Drift types
-DRIFT_TYPE_ADDED="added"
-DRIFT_TYPE_DELETED="deleted"
-DRIFT_TYPE_MODIFIED="modified"
-DRIFT_TYPE_PLACEHOLDER="placeholder"
+# Configuration directories
+CONFIG_DIR="${PROJECT_ROOT}/config/tenants"
+SCHEMA_FILE="${CONFIG_DIR}/schema.json"
+TEMPLATE_FILE="${CONFIG_DIR}/template.yml"
 
-# Known placeholder patterns
+# State database configuration
+STATE_DB_HOST="${STATE_DB_HOST:-localhost}"
+STATE_DB_PORT="${STATE_DB_PORT:-5432}"
+STATE_DB_NAME="${STATE_DB_NAME:-deployment_state}"
+STATE_DB_USER="${STATE_DB_USER:-postgres}"
+STATE_DB_PASSWORD="${STATE_DB_PASSWORD:-}"
+
+# Placeholder patterns for detection
 PLACEHOLDER_PATTERNS=(
     "cli_xxxxxxxxxxxxx"
     "CHANGE_THIS"
     "your-"
     "placeholder"
     "replace-in-config-page"
+    "\${[^}]*\:-example\}"  # ${VAR:-example}
+    "\${[^}]*\:-test\}"     # ${VAR:-test}
 )
 
-# Whitelist for expected differences (format: "variable_name:expected_value1:expected_value2")
-WHITELIST=(
-    "PATH::"  # PATH always differs
-    "HOSTNAME::"  # Container hostname varies
-    "HOME::"  # Home paths differ
-    "NODE_VERSION::"  # Build-time vars
-    "YARN_VERSION::"  # Build-time vars
-)
-
-# Critical variables that must match exactly
-CRITICAL_VARS=(
-    "FEISHU_APP_ID"
-    "FEISHU_APP_SECRET"
-    "JWT_SECRET"
-    "DB_PASSWORD"
-    "REDIS_PASSWORD"
+# Critical fields that cannot have placeholders
+CRITICAL_FIELDS=(
+    "feishu.app_id"
+    "feishu.app_secret"
+    "feishu.encrypt_key"
+    "database.password"
+    "jwt.secret"
+    "agent.deepseek.api_key"
 )
 
 # Colors for output
-JSON_OUTPUT="${JSON_OUTPUT:-false}"
-if [ "$JSON_OUTPUT" = false ]; then
+if [ -t 1 ]; then
     RED='\033[0;31m'
     GREEN='\033[0;32m'
     YELLOW='\033[1;33m'
     BLUE='\033[0;34m'
     MAGENTA='\033[0;35m'
+    CYAN='\033[0;36m'
     NC='\033[0m' # No Color
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    BLUE=''
+    MAGENTA=''
+    CYAN=''
+    NC=''
 fi
 
 #==============================================================================
 # Logging Functions
 #==============================================================================
 
-log_drift_info() {
-    if [ "$JSON_OUTPUT" = false ]; then
-        echo -e "${BLUE}[DRIFT INFO]${NC} $1" >&2
-    fi
+log_config_info() {
+    echo -e "${BLUE}[CONFIG INFO]${NC} $1" >&2
 }
 
-log_drift_critical() {
-    if [ "$JSON_OUTPUT" = false ]; then
-        echo -e "${RED}[CRITICAL DRIFT]${NC} $1" >&2
-    fi
+log_config_success() {
+    echo -e "${GREEN}[CONFIG ✓]${NC} $1" >&2
 }
 
-log_drift_major() {
-    if [ "$JSON_OUTPUT" = false ]; then
-        echo -e "${MAGENTA}[MAJOR DRIFT]${NC} $1" >&2
-    fi
+log_config_warning() {
+    echo -e "${YELLOW}[CONFIG ⚠]${NC} $1" >&2
 }
 
-log_drift_minor() {
-    if [ "$JSON_OUTPUT" = false ]; then
-        echo -e "${YELLOW}[MINOR DRIFT]${NC} $1" >&2
-    fi
+log_config_error() {
+    echo -e "${RED}[CONFIG ✗]${NC} $1" >&2
 }
 
-log_no_drift() {
-    if [ "$JSON_OUTPUT" = false ]; then
-        echo -e "${GREEN}[✓]${NC} $1" >&2
+log_config_debug() {
+    if [ "${CONFIG_DEBUG:-false}" = "true" ]; then
+        echo -e "${CYAN}[CONFIG DEBUG]${NC} $1" >&2
     fi
 }
 
@@ -112,12 +121,64 @@ get_timestamp() {
     date -u +"%Y-%m-%dT%H:%M:%SZ"
 }
 
-# Check if value is a placeholder
-is_placeholder() {
+# Check if yq is installed and accessible
+check_yq_installed() {
+    if ! command -v yq &> /dev/null; then
+        log_config_error "yq is not installed. Please install yq v4+"
+        log_config_info "Install with: brew install yq (macOS) or https://github.com/mikefarah/yq#install"
+        return 1
+    fi
+
+    # Check yq version (need v4+)
+    local yq_version
+    yq_version=$(yq --version 2>&1 | grep -oE 'version v([0-9]+)' | grep -oE '[0-9]+' || echo "0")
+    if [ "${yq_version:-0}" -lt 4 ]; then
+        log_config_error "yq version 4+ required. Current version: $yq_version"
+        return 1
+    fi
+
+    return 0
+}
+
+# Check if config file exists
+check_config_file() {
+    local config_file=$1
+
+    if [ ! -f "$config_file" ]; then
+        log_config_error "Configuration file not found: $config_file"
+        return 1
+    fi
+
+    return 0
+}
+
+# Expand environment variables in a string
+expand_env_vars() {
+    local value=$1
+    local max_iterations=10
+    local iteration=0
+
+    while [[ "$value" == *'${'*'}'* ]] && [ $iteration -lt $max_iterations ]; do
+        local new_value
+        new_value=$(eval echo "$value" 2>/dev/null || echo "$value")
+
+        if [ "$new_value" = "$value" ]; then
+            break
+        fi
+
+        value="$new_value"
+        ((iteration++))
+    done
+
+    echo "$value"
+}
+
+# Check if value contains placeholder pattern
+is_placeholder_value() {
     local value=$1
 
     for pattern in "${PLACEHOLDER_PATTERNS[@]}"; do
-        if [[ "$value" == *"$pattern"* ]]; then
+        if [[ "$value" =~ $pattern ]]; then
             return 0  # Is placeholder
         fi
     done
@@ -125,34 +186,12 @@ is_placeholder() {
     return 1  # Not a placeholder
 }
 
-# Check if variable is in whitelist
-is_whitelisted() {
-    local var_name=$1
-    local git_value=$2
-    local running_value=$3
+# Check if field is critical
+is_critical_field() {
+    local field_path=$1
 
-    for entry in "${WHITELIST[@]}"; do
-        IFS=':' read -r whitelist_var whitelist_git whitelist_running <<< "$entry"
-
-        if [ "$var_name" = "$whitelist_var" ]; then
-            # Check if both values match whitelist expectations
-            if [ -z "$whitelist_git" ] || [ "$git_value" = "$whitelist_git" ]; then
-                if [ -z "$whitelist_running" ] || [ "$running_value" = "$whitelist_running" ]; then
-                    return 0  # Is whitelisted
-                fi
-            fi
-        fi
-    done
-
-    return 1  # Not whitelisted
-}
-
-# Check if variable is critical
-is_critical_var() {
-    local var_name=$1
-
-    for critical_var in "${CRITICAL_VARS[@]}"; do
-        if [ "$var_name" = "$critical_var" ]; then
+    for critical_field in "${CRITICAL_FIELDS[@]}"; do
+        if [[ "$field_path" == *"$critical_field"* ]]; then
             return 0  # Is critical
         fi
     done
@@ -160,331 +199,446 @@ is_critical_var() {
     return 1  # Not critical
 }
 
-# Sanitize value for logging (hide secrets)
-sanitize_value() {
-    local var_name=$1
-    local value=$2
+#==============================================================================
+# Configuration Loading Functions
+#==============================================================================
 
-    # Don't log sensitive values
-    if [[ "$var_name" =~ *(SECRET|PASSWORD|KEY|TOKEN)* ]]; then
-        if [ ${#value} -gt 8 ]; then
-            echo "${value:0:4}****${value: -4}"
-        else
-            echo "****"
-        fi
-    else
-        echo "$value"
-    fi
-}
+# Load tenant configuration from YAML file
+# Usage: load_tenant_config <config_file> [prefix]
+# Returns: 0 on success, 1 on error
+load_tenant_config() {
+    local config_file=$1
+    local prefix=${2:-"CONFIG"}
 
-# Parse .env file and output as "VAR_NAME|value" lines (using | as delimiter to avoid = in values)
-parse_env_file() {
-    local file_path=$1
+    check_yq_installed || return 1
+    check_config_file "$config_file" || return 1
 
-    if [ ! -f "$file_path" ]; then
+    log_config_info "Loading configuration from: $config_file"
+
+    # Use yq to parse YAML and export as environment variables
+    # This creates variables like CONFIG_TENANT_ID, CONFIG_SERVER_HOST, etc.
+    local yaml_content
+    yaml_content=$(cat "$config_file")
+
+    # Extract tenant ID first
+    local tenant_id
+    tenant_id=$(echo "$yaml_content" | yq eval '.tenant.id // "unknown"' - 2>/dev/null)
+
+    if [ "$tenant_id" = "null" ] || [ "$tenant_id" = "unknown" ]; then
+        log_config_error "Invalid configuration: tenant.id is missing"
         return 1
     fi
 
-    # Use grep to find lines with VAR=VALUE pattern, skip comments
-    grep -E '^[A-Z_][A-Z0-9_]*=' "$file_path" 2>/dev/null | while IFS='=' read -r name value; do
-        # Skip comments
-        [[ "$name" =~ ^#.*$ ]] && continue
+    # Export tenant ID
+    export "${prefix}_TENANT_ID=$tenant_id"
+    log_config_debug "Tenant ID: $tenant_id"
 
-        # Remove leading/trailing whitespace from value and name
-        name=$(echo "$name" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-        value=$(echo "$value" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+    # Extract all configuration values and create environment variables
+    # Format: CONFIG_<SECTION>_<KEY> (e.g., CONFIG_TENANT_NAME, CONFIG_SERVER_HOST)
+    local sections
+    sections=$(echo "$yaml_content" | yq eval 'keys | .[]' - 2>/dev/null)
 
-        # Skip if name or value is empty
-        [ -z "$name" ] && continue
-        [ -z "$value" ] && continue
-
-        # Output with | delimiter to avoid issues with = in values
-        echo "$name|$value"
-    done
-
-    return 0
-}
-
-# Compare two values and determine drift type and severity
-compare_values() {
-    local var_name=$1
-    local git_value=$2
-    local running_value=$3
-
-    # Check if value is placeholder
-    if is_placeholder "$git_value"; then
-        echo "$DRIFT_TYPE_PLACEHOLDER:$SEVERITY_CRITICAL"
-        return 0
-    fi
-
-    # Check if values are the same
-    if [ "$git_value" = "$running_value" ]; then
-        echo "none:$SEVERITY_MINOR"
-        return 0
-    fi
-
-    # Check if whitelisted
-    if is_whitelisted "$var_name" "$git_value" "$running_value"; then
-        echo "whitelisted:$SEVERITY_MINOR"
-        return 0
-    fi
-
-    # Determine severity based on variable type
-    if is_critical_var "$var_name"; then
-        echo "$DRIFT_TYPE_MODIFIED:$SEVERITY_CRITICAL"
-    elif [[ "$var_name" =~ *(REDIRECT_URI|CORS|ORIGIN)* ]]; then
-        echo "$DRIFT_TYPE_MODIFIED:$SEVERITY_MAJOR"
-    else
-        echo "$DRIFT_TYPE_MODIFIED:$SEVERITY_MINOR"
-    fi
-
-    return 0
-}
-
-#==============================================================================
-# Configuration Comparison Functions
-#==============================================================================
-
-# Load environment variables from a source (file or container)
-load_env_vars() {
-    local source=$1
-    local source_type=$2  # "file" or "container"
-
-    declare -A env_vars
-
-    if [ "$source_type" = "file" ]; then
-        # Load from file
-        if [ -f "$source" ]; then
-            while IFS='=' read -r name value; do
-                [[ "$name" =~ ^#.*$ ]] && continue
-                [[ -z "$name" ]] && continue
-                value=$(echo "$value" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-                [ -z "$value" ] && continue
-                env_vars["$name"]="$value"
-            done < "$source"
-        fi
-    elif [ "$source_type" = "container" ]; then
-        # Load from container
-        local container_vars
-        container_vars=$(docker exec "$source" printenv 2>/dev/null || echo "")
-
-        while IFS='=' read -r name value; do
-            [[ -z "$name" ]] && continue
-            env_vars["$name"]="$value"
-        done <<< "$container_vars"
-    fi
-
-    # Return associative array as space-separated list
-    for name in "${!env_vars[@]}"; do
-        echo "$name|${env_vars[$name]}"
-    done
-}
-
-# Detect configuration drift
-detect_config_drift() {
-    local git_config_path=$1
-    local remote_config_path=$2
-    local container_name=$3
-    local output_file=${4:-""}
-
-    # Load configurations
-    local git_vars=()
-    local remote_vars=()
-    local container_vars=()
-
-    log_drift_info "Loading Git configuration from: $git_config_path"
-    while IFS='|' read -r name value; do
-        git_vars["$name"]="$value"
-    done < <(parse_env_file "$git_config_path")
-
-    log_drift_info "Loading remote file configuration from: $remote_config_path"
-    if [ -f "$remote_config_path" ]; then
-        while IFS='|' read -r name value; do
-            remote_vars["$name"]="$value"
-        done < <(parse_env_file "$remote_config_path")
-    fi
-
-    log_drift_info "Loading container environment from: $container_name"
-    while IFS='|' read -r name value; do
-        container_vars["$name"]="$value"
-    done < <(load_env_vars "$container_name" "container")
-
-    # Compare configurations
-    local drift_detected=false
-    local drift_count=0
-    local critical_count=0
-    local major_count=0
-    local minor_count=0
-
-    declare -a drift_reports
-
-    # Check for variables in Git vs Container
-    for var_name in "${!git_vars[@]}"; do
-        local git_value="${git_vars[$var_name]}"
-        local container_value="${container_vars[$var_name]:-}"
-
-        if [ -z "$container_value" ]; then
-            # Variable exists in Git but not in container
-            if is_critical_var "$var_name"; then
-                drift_reports+=("DELETED|$var_name|$git_value||critical|Variable exists in Git but missing from container")
-                ((critical_count++))
-            else
-                drift_reports+=("DELETED|$var_name|$git_value||minor|Variable exists in Git but missing from container")
-                ((minor_count++))
-            fi
-            ((drift_count++))
-            drift_detected=true
-        else
-            # Variable exists in both, compare values
-            local comparison
-            comparison=$(compare_values "$var_name" "$git_value" "$container_value")
-            IFS=':' read -r drift_type severity <<< "$comparison"
-
-            if [ "$drift_type" != "none" ] && [ "$drift_type" != "whitelisted" ]; then
-                local severity_text
-                case $severity in
-                    $SEVERITY_CRITICAL) severity_text="critical" ;;
-                    $SEVERITY_MAJOR) severity_text="major" ;;
-                    $SEVERITY_MINOR) severity_text="minor" ;;
-                esac
-
-                drift_reports+=("$drift_type|$var_name|$git_value|$container_value|$severity_text|Configuration drift detected")
-                ((drift_count++))
-                drift_detected=true
-
-                case $severity in
-                    $SEVERITY_CRITICAL) ((critical_count++)) ;;
-                    $SEVERITY_MAJOR) ((major_count++)) ;;
-                    $SEVERITY_MINOR) ((minor_count++)) ;;
-                esac
-            fi
-        fi
-    done
-
-    # Check for variables in Container but not in Git (added variables)
-    for var_name in "${!container_vars[@]}"; do
-        if [ -z "${git_vars[$var_name]:-}" ]; then
-            local container_value="${container_vars[$var_name]}"
-            if ! is_whitelisted "$var_name" "" "$container_value"; then
-                drift_reports+=("ADDED|$var_name||$container_value|minor|Variable exists in container but not in Git config")
-                ((drift_count++))
-                ((minor_count++))
-                drift_detected=true
-            fi
-        fi
-    done
-
-    # Generate report
-    if [ "$JSON_OUTPUT" = false ]; then
-        echo
-        echo "============================================================"
-        echo "  Configuration Drift Detection Report"
-        echo "============================================================"
-        echo "Check Time: $(get_timestamp)"
-        echo "Git Config: $git_config_path"
-        echo "Remote Config: $remote_config_path"
-        echo "Container: $container_name"
-        echo
-        echo "Summary:"
-        echo "  Total Drifts: $drift_count"
-        echo "  - Critical: $critical_count"
-        echo "  - Major: $major_count"
-        echo "  - Minor: $minor_count"
-        echo
-    fi
-
-    # Output drift details
-    if [ $drift_detected = true ]; then
-        if [ "$JSON_OUTPUT" = false ]; then
-            echo "Drift Details:"
-            echo "------------------------------------------------------------"
+    for section in $sections; do
+        # Skip metadata sections
+        if [[ "$section" == _* ]]; then
+            continue
         fi
 
-        # Sort drift reports by severity (critical first)
-        IFS=$'\n' sorted_reports=($(sort -t'|' -k5 -r <<<"${drift_reports[*]}"))
+        local keys
+        keys=$(echo "$yaml_content" | yq eval ".$section | keys | .[]" - 2>/dev/null)
 
-        for report in "${sorted_reports[@]}"; do
-            IFS='|' read -r drift_type var_name git_val running_val severity message <<< "$report"
+        for key in $keys; do
+            local value
+            value=$(echo "$yaml_content" | yq eval ".$section.$key" - 2>/dev/null)
 
-            if [ "$JSON_OUTPUT" = false ]; then
-                # Human-readable output
-                case $severity in
-                    critical)
-                        log_drift_critical "$var_name"
-                        ;;
-                    major)
-                        log_drift_major "$var_name"
-                        ;;
-                    minor)
-                        log_drift_minor "$var_name"
-                        ;;
-                esac
-
-                echo "  Type: $drift_type"
-                echo "  Git Value: $(sanitize_value "$var_name" "$git_val")"
-                [ -n "$running_val" ] && echo "  Running Value: $(sanitize_value "$var_name" "$running_val")"
-                echo "  Message: $message"
-                echo
-            else
-                # JSON output
-                cat <<EOF
-  {
-    "variable": "$var_name",
-    "drift_type": "$drift_type",
-    "severity": "$severity",
-    "git_value": "$(sanitize_value "$var_name" "$git_val")",
-    "running_value": "$(sanitize_value "$var_name" "$running_val")",
-    "message": "$message"
-  },
-EOF
+            # Skip null values
+            if [ "$value" = "null" ]; then
+                continue
             fi
+
+            # Expand environment variables
+            value=$(expand_env_vars "$value")
+
+            # Create variable name (uppercase, with underscores)
+            local var_name="${prefix}_${section^^}_${key^^}"
+            var_name=${var_name//./_}  # Replace dots with underscores
+            var_name=${var_name//-/_}  # Replace hyphens with underscores
+
+            # Export variable
+            export "$var_name=$value"
+            log_config_debug "$var_name=$value"
         done
-    else
-        log_no_drift "No configuration drift detected"
+    done
+
+    log_config_success "Configuration loaded successfully"
+    return 0
+}
+
+# Get a specific configuration value
+# Usage: get_config_value <config_file> <yaml_path>
+# Example: get_config_value config.yml "tenant.id"
+get_config_value() {
+    local config_file=$1
+    local yaml_path=$2
+
+    check_yq_installed || return 1
+    check_config_file "$config_file" || return 1
+
+    local value
+    value=$(yq eval ".$yaml_path" "$config_file" 2>/dev/null)
+
+    if [ "$value" = "null" ]; then
+        log_config_warning "Value not found: $yaml_path"
+        return 1
     fi
 
-    # Write to output file if specified
-    if [ -n "$output_file" ]; then
-        {
-            echo "# Configuration Drift Report"
-            echo "# Generated: $(get_timestamp)"
-            echo
-            echo "Summary:"
-            echo "  Total Drifts: $drift_count"
-            echo "  - Critical: $critical_count"
-            echo "  - Major: $major_count"
-            echo "  - Minor: $minor_count"
-            echo
-            if [ $drift_detected = true ]; then
-                echo "Drift Details:"
-                for report in "${drift_reports[@]}"; do
-                    IFS='|' read -r drift_type var_name git_val running_val severity message <<< "$report"
-                    echo "  [$severity] $var_name"
-                    echo "    Type: $drift_type"
-                    echo "    Git: $(sanitize_value "$var_name" "$git_val")"
-                    [ -n "$running_val" ] && echo "    Running: $(sanitize_value "$var_name" "$running_val")"
-                    echo "    Message: $message"
-                    echo
-                done
+    # Expand environment variables
+    value=$(expand_env_vars "$value")
+
+    echo "$value"
+    return 0
+}
+
+# Get all configuration values as JSON
+# Usage: get_config_json <config_file>
+get_config_json() {
+    local config_file=$1
+
+    check_yq_installed || return 1
+    check_config_file "$config_file" || return 1
+
+    # Convert YAML to JSON and expand environment variables
+    yq eval -o=json -I=0 "$config_file" 2>/dev/null
+}
+
+# List all tenant configurations
+# Usage: list_tenant_configs [config_dir]
+list_tenant_configs() {
+    local config_dir=${1:-"$CONFIG_DIR"}
+
+    if [ ! -d "$config_dir" ]; then
+        log_config_error "Configuration directory not found: $config_dir"
+        return 1
+    fi
+
+    log_config_info "Available tenant configurations:"
+
+    # Find all .yml files (excluding template and test files)
+    local configs
+    configs=$(find "$config_dir" -maxdepth 1 -name "*.yml" -type f | grep -v -E "(template|test_)" | sort)
+
+    if [ -z "$configs" ]; then
+        log_config_warning "No tenant configurations found"
+        return 0
+    fi
+
+    for config in $configs; do
+        local basename
+        basename=$(basename "$config" .yml)
+
+        local tenant_id
+        tenant_id=$(get_config_value "$config" "tenant.id" 2>/dev/null || echo "unknown")
+
+        local tenant_name
+        tenant_name=$(get_config_value "$config" "tenant.name" 2>/dev/null || echo "unknown")
+
+        local environment
+        environment=$(get_config_value "$config" "tenant.environment" 2>/dev/null || echo "unknown")
+
+        echo "  - $basename (ID: $tenant_id, Name: $tenant_name, Env: $environment)"
+    done
+
+    return 0
+}
+
+#==============================================================================
+# Configuration Validation Functions
+#==============================================================================
+
+# Validate configuration file
+# Usage: validate_config <config_file>
+validate_config() {
+    local config_file=$1
+
+    check_yq_installed || return 1
+    check_config_file "$config_file" || return 1
+
+    log_config_info "Validating configuration: $config_file"
+
+    local has_errors=false
+    local has_warnings=false
+
+    # Check 1: Required top-level sections
+    log_config_debug "Checking required sections..."
+    local required_sections=("tenant" "server" "feishu" "database" "redis" "jwt" "agent")
+    for section in "${required_sections[@]}"; do
+        if ! yq eval ".$section" "$config_file" &>/dev/null; then
+            log_config_error "Missing required section: $section"
+            has_errors=true
+        fi
+    done
+
+    # Check 2: Required fields in tenant section
+    log_config_debug "Checking tenant section..."
+    local tenant_required=("id" "name" "environment")
+    for field in "${tenant_required[@]}"; do
+        local value
+        value=$(get_config_value "$config_file" "tenant.$field")
+        if [ -z "$value" ] || [ "$value" = "null" ]; then
+            log_config_error "Missing required field: tenant.$field"
+            has_errors=true
+        fi
+    done
+
+    # Check 3: Environment validation
+    log_config_debug "Checking environment..."
+    local environment
+    environment=$(get_config_value "$config_file" "tenant.environment")
+    if [[ ! "$environment" =~ ^(production|staging|development)$ ]]; then
+        log_config_error "Invalid environment: $environment (must be production, staging, or development)"
+        has_errors=true
+    fi
+
+    # Check 4: Feishu App ID format
+    log_config_debug "Checking Feishu App ID..."
+    local feishu_app_id
+    feishu_app_id=$(get_config_value "$config_file" "feishu.app_id")
+    if [[ ! "$feishu_app_id" =~ ^cli_[a-zA-Z0-9]+$ ]]; then
+        log_config_error "Invalid Feishu App ID format: $feishu_app_id"
+        has_errors=true
+    fi
+
+    # Check 5: Placeholder detection
+    log_config_debug "Checking for placeholder values..."
+    check_placeholders "$config_file" || has_warnings=true
+
+    # Check 6: Critical fields validation
+    log_config_debug "Checking critical fields..."
+    check_critical_fields "$config_file" || has_errors=true
+
+    # Check 7: Port numbers
+    log_config_debug "Checking port numbers..."
+    check_port_numbers "$config_file" || has_warnings=true
+
+    # Check 8: URL formats
+    log_config_debug "Checking URL formats..."
+    check_url_formats "$config_file" || has_warnings=true
+
+    # Summary
+    echo
+    if [ "$has_errors" = true ]; then
+        log_config_error "Configuration validation FAILED with errors"
+        return 1
+    elif [ "$has_warnings" = true ]; then
+        log_config_warning "Configuration validation PASSED with warnings"
+        return 0
+    else
+        log_config_success "Configuration validation PASSED"
+        return 0
+    fi
+}
+
+# Check for placeholder values in configuration
+check_placeholders() {
+    local config_file=$1
+    local has_placeholders=false
+
+    log_config_debug "Scanning for placeholder patterns..."
+
+    # Get all string values from YAML
+    local values
+    values=$(yq eval '.. | select(kind == "Scalar") | select(style == "single") | select(string_value != "null") | path' "$config_file" 2>/dev/null)
+
+    # Check each value for placeholder patterns
+    while IFS= read -r path; do
+        if [ -z "$path" ]; then
+            continue
+        fi
+
+        local value
+        value=$(yq eval "$path" "$config_file" 2>/dev/null)
+
+        if is_placeholder_value "$value"; then
+            if is_critical_field "$path"; then
+                log_config_error "CRITICAL: Placeholder value in $path: $value"
+                has_placeholders=true
+            else
+                log_config_warning "Placeholder value in $path: $value"
+                has_placeholders=true
             fi
-        } > "$output_file"
-        log_drift_info "Report saved to: $output_file"
+        fi
+    done <<< "$values"
+
+    if [ "$has_placeholders" = true ]; then
+        return 1
     fi
 
-    # Return exit code based on severity
-    if [ $critical_count -gt 0 ]; then
-        return 2  # Critical drift detected
-    elif [ $major_count -gt 0 ]; then
-        return 1  # Major drift detected
-    else
-        return 0  # No significant drift
+    return 0
+}
+
+# Check critical fields
+check_critical_fields() {
+    local config_file=$1
+    local has_issues=false
+
+    for field in "${CRITICAL_FIELDS[@]}"; do
+        local value
+        value=$(get_config_value "$config_file" "$field" 2>/dev/null)
+
+        if [ -z "$value" ] || [ "$value" = "null" ]; then
+            log_config_error "CRITICAL: Missing value for $field"
+            has_issues=true
+            continue
+        fi
+
+        if is_placeholder_value "$value"; then
+            log_config_error "CRITICAL: Placeholder value in $field: $value"
+            has_issues=true
+        fi
+    done
+
+    if [ "$has_issues" = true ]; then
+        return 1
     fi
+
+    return 0
+}
+
+# Check port number validity
+check_port_numbers() {
+    local config_file=$1
+    local has_issues=false
+
+    local port_fields=(
+        "server.api_port"
+        "server.metrics_port"
+        "database.port"
+        "redis.port"
+    )
+
+    for field in "${port_fields[@]}"; do
+        local value
+        value=$(get_config_value "$config_file" "$field" 2>/dev/null)
+
+        if [ -n "$value" ] && [ "$value" != "null" ]; then
+            if ! [[ "$value" =~ ^[0-9]+$ ]] || [ "$value" -lt 1 ] || [ "$value" -gt 65535 ]; then
+                log_config_warning "Invalid port number for $field: $value"
+                has_issues=true
+            fi
+        fi
+    done
+
+    if [ "$has_issues" = true ]; then
+        return 1
+    fi
+
+    return 0
+}
+
+# Check URL format validity
+check_url_formats() {
+    local config_file=$1
+    local has_issues=false
+
+    local url_fields=(
+        "feishu.oauth_redirect_uri"
+        "feishu.event_callback_url"
+        "feishu.api_base_url"
+    )
+
+    for field in "${url_fields[@]}"; do
+        local value
+        value=$(get_config_value "$config_file" "$field" 2>/dev/null)
+
+        if [ -n "$value" ] && [ "$value" != "null" ]; then
+            if [[ ! "$value" =~ ^https?:// ]]; then
+                log_config_warning "Invalid URL format for $field: $value"
+                has_issues=true
+            fi
+        fi
+    done
+
+    if [ "$has_issues" = true ]; then
+        return 1
+    fi
+
+    return 0
+}
+
+#==============================================================================
+# Configuration Snapshot Functions
+#==============================================================================
+
+# Save configuration snapshot to state database
+# Usage: save_config_snapshot <config_file> <deployment_id>
+save_config_snapshot() {
+    local config_file=$1
+    local deployment_id=$2
+
+    if [ -z "$deployment_id" ]; then
+        log_config_error "Deployment ID is required for snapshot"
+        return 1
+    fi
+
+    log_config_info "Saving configuration snapshot for deployment $deployment_id"
+
+    # Read configuration file
+    local config_content
+    config_content=$(base64 < "$config_file" 2>/dev/null)
+
+    if [ -z "$config_content" ]; then
+        log_config_error "Failed to read configuration file"
+        return 1
+    fi
+
+    # Save to database
+    local sql_query
+    sql_query="
+        INSERT INTO deployment_config_snapshots (
+            deployment_id,
+            config_content,
+            created_at
+        ) VALUES (
+            $deployment_id,
+            '$config_content',
+            NOW()
+        );"
+
+    if ! execute_sql "$sql_query"; then
+        log_config_error "Failed to save configuration snapshot to database"
+        return 1
+    fi
+
+    log_config_success "Configuration snapshot saved successfully"
+    return 0
+}
+
+# Execute SQL query against state database
+execute_sql() {
+    local sql_query=$1
+
+    if [ -z "$STATE_DB_PASSWORD" ]; then
+        log_config_warning "Database password not set, skipping database operation"
+        return 1
+    fi
+
+    PGPASSWORD="$STATE_DB_PASSWORD" psql \
+        -h "$STATE_DB_HOST" \
+        -p "$STATE_DB_PORT" \
+        -U "$STATE_DB_USER" \
+        -d "$STATE_DB_NAME" \
+        -c "$sql_query" \
+        &>/dev/null
 }
 
 #==============================================================================
 # Export Functions
 #==============================================================================
 
-export -f log_drift_info log_drift_critical log_drift_major log_drift_minor log_no_drift
-export -f get_timestamp is_placeholder is_whitelisted is_critical_var sanitize_value
-export -f parse_env_file compare_values load_env_vars detect_config_drift
+export -f log_config_info log_config_success log_config_warning log_config_error log_config_debug
+export -f get_timestamp check_yq_installed check_config_file
+export -f expand_env_vars is_placeholder_value is_critical_field
+export -f load_tenant_config get_config_value get_config_json list_tenant_configs
+export -f validate_config check_placeholders check_critical_fields
+export -f check_port_numbers check_url_formats
+export -f save_config_snapshot execute_sql
