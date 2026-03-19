@@ -35,28 +35,28 @@
 #==============================================================================
 
 # Backup directory
-declare -g FILE_BACKUP_DIR="${FILE_BACKUP_DIR:-/var/backups/script_backups}"
+declare  FILE_BACKUP_DIR="${FILE_BACKUP_DIR:-/var/backups/script_backups}"
 
 # Enable compression for backups
-declare -g FILE_BACKUP_COMPRESS="${FILE_BACKUP_COMPRESS:-true}"
+declare  FILE_BACKUP_COMPRESS="${FILE_BACKUP_COMPRESS:-true}"
 
 # Number of backups to retain
-declare -g FILE_BACKUP_RETENTION="${FILE_BACKUP_RETENTION:-10}"
+declare  FILE_BACKUP_RETENTION="${FILE_BACKUP_RETENTION:-10}"
 
 # Backup file extension
-declare -g FILE_BACKUP_EXT="${FILE_BACKUP_EXT:-.backup}"
+declare  FILE_BACKUP_EXT="${FILE_BACKUP_EXT:-.backup}"
 
 # Hash algorithm (md5, sha256, sha512)
-declare -g FILE_HASH_ALGO="${FILE_HASH_ALGO:-sha256}"
+declare  FILE_HASH_ALGO="${FILE_HASH_ALGO:-sha256}"
 
 # Temporary file directory
-declare -g FILE_TMP_DIR="${FILE_TMP_DIR:-/tmp/file_ops}"
+declare  FILE_TMP_DIR="${FILE_TMP_DIR:-/tmp/file_ops}"
 
 # Atomic write buffer directory
-declare -g FILE_ATOMIC_DIR="${FILE_ATOMIC_DIR:-/tmp/atomic_writes}"
+declare  FILE_ATOMIC_DIR="${FILE_ATOMIC_DIR:-/tmp/atomic_writes}"
 
 # Verbose mode
-declare -g FILE_VERBOSE="${FILE_VERBOSE:-false}"
+declare  FILE_VERBOSE="${FILE_VERBOSE:-false}"
 
 #==============================================================================
 # Logging Integration
