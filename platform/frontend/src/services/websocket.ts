@@ -11,7 +11,7 @@
 export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
 export type WebSocketMessage =
-  | { type: 'user_message'; content: string; timestamp: string; message_id?: string; metadata?: Record<string, any> }
+  | { type: 'user_message'; content: string; timestamp: string; message_id?: string; metadata?: Record<string, any>; sendStatus?: 'sending' | 'sent' | 'failed' }
   | { type: 'assistant_message'; content: string; timestamp: string; instance_id: string; message_id?: string; metadata?: Record<string, any> }
   | { type: 'status'; status: 'connected' | 'disconnected' | 'error'; message: string; instance_id?: string }
   | { type: 'error'; error: string; code?: string; details?: Record<string, any>; timestamp: string }
