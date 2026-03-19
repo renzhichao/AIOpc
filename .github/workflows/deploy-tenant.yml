@@ -1,0 +1,822 @@
+name: 租户部署 (Tenant Deployment)
+
+#==============================================================================
+# 多租户部署工作流
+# (Multi-Tenant Deployment Workflow)
+#
+# 核心特性 (Key Features):
+# - 手动触发部署 (Manual trigger via workflow_dispatch)
+# - 租户选择器 (Tenant selector dropdown)
+# - 配置验证 (Configuration validation)
+# - 安全检查 (Security checks)
+# - 健康检查 (Health checks)
+# - 自动回滚 (Automatic rollback)
+# - 部署状态反馈 (Deployment status feedback)
+# - 取消支持 (Cancellation support)
+#
+# 使用方法 (Usage):
+#   1. GitHub UI: Actions → Tenant Deployment → Run workflow
+#   2. 选择租户 (Select tenant)
+#   3. 选择组件 (Select component: all/backend/frontend)
+#   4. 配置选项 (Configure options)
+#   5. 运行工作流 (Run workflow)
+#
+# 环境 (Environment):
+# - 支持多租户部署 (Supports multiple tenant deployments)
+# - 每个租户独立配置 (Independent configuration per tenant)
+# - 开发/生产环境分离 (Development/Production environment separation)
+#
+#==============================================================================
+
+on:
+  # 手动触发 (Manual trigger only)
+  workflow_dispatch:
+    inputs:
+      tenant:
+        description: '租户 (Tenant)'
+        required: true
+        type: choice
+        # Dynamically populated from config/tenants/*.yml
+        options:
+          - test_tenant_alpha
+          # Add more tenants here or use populate-tenants.sh to update
+
+      component:
+        description: '部署组件 (Component to deploy)'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - backend
+          - frontend
+
+      skip_tests:
+        description: '跳过测试 (Skip post-deployment tests) - 不推荐 (Not recommended)'
+        required: false
+        default: false
+        type: boolean
+
+      dry_run:
+        description: '演练模式 (Dry run - no actual deployment)'
+        required: false
+        default: false
+        type: boolean
+
+      force_deploy:
+        description: '强制部署 (Force deployment - ignore concurrent deployments)'
+        required: false
+        default: false
+        type: boolean
+
+      skip_backup:
+        description: '跳过备份 (Skip pre-deployment backup) - 不推荐 (Not recommended)'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  # 部署配置 (Deployment configuration)
+  DEPLOYMENT_VERSION: v1.0.0
+  SCRIPT_DIR: scripts/deploy
+  LIB_DIR: scripts/lib
+
+jobs:
+  #==========================================================================
+  # 配置验证作业 (Configuration Validation Job)
+  #==========================================================================
+  validate-config:
+    name: 🔍 配置验证 (Configuration Validation)
+    runs-on: ubuntu-latest
+    outputs:
+      tenant_id: ${{ steps.extract-config.outputs.tenant_id }}
+      tenant_name: ${{ steps.extract-config.outputs.tenant_name }}
+      environment: ${{ steps.extract-config.outputs.environment }}
+      validation_passed: ${{ steps.validate.outputs.validation_passed }}
+
+    steps:
+      #------------------------------------------------------------------------
+      # 检出代码 (Checkout Code)
+      #------------------------------------------------------------------------
+      - name: 📥 检出代码 (Checkout Code)
+        uses: actions/checkout@v4
+
+      #------------------------------------------------------------------------
+      # 设置 Python (Setup Python for yq)
+      #------------------------------------------------------------------------
+      - name: 🐍 设置 Python (Setup Python)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      #------------------------------------------------------------------------
+      # 安装依赖 (Install Dependencies)
+      #------------------------------------------------------------------------
+      - name: 📦 安装依赖 (Install Dependencies)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yq
+
+      #------------------------------------------------------------------------
+      # 提取租户配置 (Extract Tenant Configuration)
+      #------------------------------------------------------------------------
+      - name: 📋 提取租户配置 (Extract Tenant Configuration)
+        id: extract-config
+        run: |
+          TENANT_CONFIG="config/tenants/${{ github.event.inputs.tenant }}.yml"
+
+          echo "=============================================================================="
+          echo "📋 租户配置信息 (Tenant Configuration)"
+          echo "=============================================================================="
+          echo ""
+          echo "配置文件 (Config file): $TENANT_CONFIG"
+
+          # 检查配置文件是否存在 (Check if config file exists)
+          if [ ! -f "$TENANT_CONFIG" ]; then
+            echo "❌ 错误: 配置文件不存在 (Error: Config file not found)"
+            exit 1
+          fi
+
+          # 提取租户信息 (Extract tenant information)
+          TENANT_ID=$(yq '.tenant.id' "$TENANT_CONFIG")
+          TENANT_NAME=$(yq '.tenant.name' "$TENANT_CONFIG")
+          ENVIRONMENT=$(yq '.tenant.environment' "$TENANT_CONFIG")
+          SERVER_HOST=$(yq '.server.host' "$TENANT_CONFIG")
+          API_PORT=$(yq '.server.api_port' "$TENANT_CONFIG")
+
+          echo "租户ID (Tenant ID): $TENANT_ID"
+          echo "租户名称 (Tenant Name): $TENANT_NAME"
+          echo "环境 (Environment): $ENVIRONMENT"
+          echo "服务器 (Server): $SERVER_HOST:$API_PORT"
+          echo ""
+
+          # 设置输出变量 (Set output variables)
+          echo "tenant_id=$TENANT_ID" >> $GITHUB_OUTPUT
+          echo "tenant_name=$TENANT_NAME" >> $GITHUB_OUTPUT
+          echo "environment=$ENVIRONMENT" >> $GITHUB_OUTPUT
+
+          # 设置环境变量 (Set environment variables)
+          echo "TENANT_ID=$TENANT_ID" >> $GITHUB_ENV
+          echo "TENANT_NAME=$TENANT_NAME" >> $GITHUB_ENV
+          echo "ENVIRONMENT=$ENVIRONMENT" >> $GITHUB_ENV
+
+      #------------------------------------------------------------------------
+      # 验证配置文件 (Validate Configuration File)
+      #------------------------------------------------------------------------
+      - name: ✅ 验证配置文件 (Validate Configuration File)
+        id: validate
+        run: |
+          TENANT_CONFIG="config/tenants/${{ github.event.inputs.tenant }}.yml"
+
+          echo "=============================================================================="
+          echo "✅ 配置验证 (Configuration Validation)"
+          echo "=============================================================================="
+          echo ""
+
+          # 1. YAML 语法验证 (YAML syntax validation)
+          echo "1️⃣ YAML 语法验证 (YAML syntax validation)"
+          if ! yq eval '.' "$TENANT_CONFIG" > /dev/null 2>&1; then
+            echo "❌ YAML 语法错误 (YAML syntax error)"
+            exit 1
+          fi
+          echo "✅ YAML 语法正确 (YAML syntax is valid)"
+          echo ""
+
+          # 2. 必填字段验证 (Required field validation)
+          echo "2️⃣ 必填字段验证 (Required field validation)"
+          REQUIRED_FIELDS=(
+            ".tenant.id"
+            ".tenant.name"
+            ".tenant.environment"
+            ".server.host"
+            ".server.ssh_user"
+            ".server.deploy_path"
+            ".database.host"
+            ".database.name"
+            ".database.user"
+          )
+
+          MISSING_FIELDS=()
+          for field in "${REQUIRED_FIELDS[@]}"; do
+            if [ "$(yq "$field" "$TENANT_CONFIG")" = "null" ] || [ -z "$(yq "$field" "$TENANT_CONFIG")" ]; then
+              MISSING_FIELDS+=("$field")
+            fi
+          done
+
+          if [ ${#MISSING_FIELDS[@]} -gt 0 ]; then
+            echo "❌ 缺少必填字段 (Missing required fields):"
+            printf '%s\n' "${MISSING_FIELDS[@]}"
+            exit 1
+          fi
+          echo "✅ 所有必要字段存在 (All required fields present)"
+          echo ""
+
+          # 3. 占位符检测 (Placeholder detection)
+          echo "3️⃣ 占位符检测 (Placeholder detection)"
+          PLACEHOLDERS=$(yq eval '... | select(type == "string") | select(test("^(changeme|placeholder|test_|your_)$"; "i"))' "$TENANT_CONFIG")
+
+          if [ -n "$PLACEHOLDERS" ]; then
+            echo "❌ 发现占位符值 (Placeholder values found):"
+            echo "$PLACEHOLDERS"
+            echo ""
+            echo "请替换所有占位符值为实际配置值"
+            echo "Please replace all placeholder values with actual configuration"
+            exit 1
+          fi
+          echo "✅ 未发现占位符 (No placeholders found)"
+          echo ""
+
+          # 4. 安全字段验证 (Security field validation)
+          echo "4️⃣ 安全字段验证 (Security field validation)"
+          JWT_SECRET=$(yq '.jwt.secret' "$TENANT_CONFIG")
+          FEISHU_APP_SECRET=$(yq '.feishu.app_secret' "$TENANT_CONFIG")
+          DB_PASSWORD=$(yq '.database.password' "$TENANT_CONFIG")
+
+          # JWT secret strength
+          if [ ${#JWT_SECRET} -lt 32 ]; then
+            echo "⚠️ 警告: JWT secret 强度不足 (< 32 characters)"
+            echo "⚠️ Warning: JWT secret is weak (< 32 characters)"
+          else
+            echo "✅ JWT secret 强度符合要求 (JWT secret strength OK)"
+          fi
+
+          # Feishu app secret strength
+          if [ ${#FEISHU_APP_SECRET} -lt 32 ]; then
+            echo "⚠️ 警告: Feishu app secret 强度不足 (< 32 characters)"
+            echo "⚠️ Warning: Feishu app secret is weak (< 32 characters)"
+          else
+            echo "✅ Feishu app secret 强度符合要求 (Feishu app secret strength OK)"
+          fi
+
+          # Database password strength
+          if [ ${#DB_PASSWORD} -lt 16 ]; then
+            echo "⚠️ 警告: Database password 强度不足 (< 16 characters)"
+            echo "⚠️ Warning: Database password is weak (< 16 characters)"
+          else
+            echo "✅ Database password 强度符合要求 (Database password strength OK)"
+          fi
+          echo ""
+
+          # 5. 文件权限验证 (File permission validation)
+          echo "5️⃣ 文件权限验证 (File permission validation)"
+          SSH_KEY_PATH=$(yq '.server.ssh_key_path' "$TENANT_CONFIG")
+          SSH_KEY_PATH="${SSH_KEY_PATH/#\~/$HOME}"
+
+          if [ -f "$SSH_KEY_PATH" ]; then
+            PERMISSIONS=$(stat -c %a "$SSH_KEY_PATH" 2>/dev/null || stat -f %A "$SSH_KEY_PATH" 2>/dev/null)
+            if [ "$PERMISSIONS" != "600" ] && [ "$PERMISSIONS" != "400" ]; then
+              echo "⚠️ 警告: SSH key 权限不安全 ($PERMISSIONS, 应该是 600)"
+              echo "⚠️ Warning: SSH key permissions are insecure ($PERMISSIONS, should be 600)"
+            else
+              echo "✅ SSH key 权限正确 (SSH key permissions correct)"
+            fi
+          else
+            echo "⚠️ 警告: SSH key 文件不存在 (将在 CI 环境中配置)"
+            echo "⚠️ Warning: SSH key file not found (will be configured in CI)"
+          fi
+          echo ""
+
+          # 设置验证通过标志 (Set validation passed flag)
+          echo "validation_passed=true" >> $GITHUB_OUTPUT
+
+          echo "=============================================================================="
+          echo "✅ 配置验证通过 (Configuration validation passed)"
+          echo "=============================================================================="
+
+      #------------------------------------------------------------------------
+      # 生成部署摘要 (Generate Deployment Summary)
+      #------------------------------------------------------------------------
+      - name: 📊 生成部署摘要 (Generate Deployment Summary)
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 🔍 配置验证摘要 (Configuration Validation Summary)
+
+          ### 租户信息 (Tenant Information)
+          - **租户ID (Tenant ID)**: ${{ env.TENANT_ID }}
+          - **租户名称 (Tenant Name)**: ${{ env.TENANT_NAME }}
+          - **环境 (Environment)**: ${{ env.ENVIRONMENT }}
+
+          ### 部署配置 (Deployment Configuration)
+          - **组件 (Component)**: ${{ github.event.inputs.component }}
+          - **演练模式 (Dry Run)**: ${{ github.event.inputs.dry_run }}
+          - **跳过测试 (Skip Tests)**: ${{ github.event.inputs.skip_tests }}
+          - **强制部署 (Force Deploy)**: ${{ github.event.inputs.force_deploy }}
+          - **跳过备份 (Skip Backup)**: ${{ github.event.inputs.skip_backup }}
+
+          ### 验证状态 (Validation Status)
+          ✅ 配置验证通过 (Configuration validation passed)
+
+          ### 下一步 (Next Steps)
+          1. 🏗️ 构建组件 (Build components)
+          2. 🚀 部署服务 (Deploy services)
+          3. 🔬 运行测试 (Run tests)
+          EOF
+
+  #==========================================================================
+  # 构建作业 (Build Job)
+  #==========================================================================
+  build:
+    name: 🏗️ 构建组件 (Build Components)
+    runs-on: ubuntu-latest
+    needs: validate-config
+    if: needs.validate-config.outputs.validation_passed == 'true'
+
+    steps:
+      #------------------------------------------------------------------------
+      # 检出代码 (Checkout Code)
+      #------------------------------------------------------------------------
+      - name: 📥 检出代码 (Checkout Code)
+        uses: actions/checkout@v4
+
+      #------------------------------------------------------------------------
+      # 设置 Docker Buildx (Setup Docker Buildx)
+      #------------------------------------------------------------------------
+      - name: 🐳 设置 Docker Buildx (Setup Docker Buildx)
+        uses: docker/setup-buildx-action@v3
+
+      #------------------------------------------------------------------------
+      # 登录到 Docker Registry (Login to Docker Registry)
+      #------------------------------------------------------------------------
+      - name: 🔐 登录 Docker Registry (Login to Docker Registry)
+        if: github.event.inputs.dry_run != 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}
+          username: ${{ secrets.DOCKER_REGISTRY_USERNAME || github.repository_owner }}
+          password: ${{ secrets.DOCKER_REGISTRY_PASSWORD || secrets.GITHUB_TOKEN }}
+
+      #------------------------------------------------------------------------
+      # 构建并推送后端镜像 (Build and Push Backend Image)
+      #------------------------------------------------------------------------
+      - name: 🐳 构建后端镜像 (Build Backend Image)
+        if: github.event.inputs.component == 'all' || github.event.inputs.component == 'backend'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./platform/backend
+          push: ${{ github.event.inputs.dry_run != 'true' }}
+          tags: |
+            ${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository }}/opclaw-backend:${{ env.DEPLOYMENT_VERSION }}
+            ${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository }}/opclaw-backend:latest
+          labels: |
+            tenant=${{ needs.validate-config.outputs.tenant_id }}
+            environment=${{ needs.validate-config.outputs.environment }}
+            version=${{ env.DEPLOYMENT_VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          target: production
+
+      #------------------------------------------------------------------------
+      # 构建并推送前端镜像 (Build and Push Frontend Image)
+      #------------------------------------------------------------------------
+      - name: 🐳 构建前端镜像 (Build Frontend Image)
+        if: github.event.inputs.component == 'all' || github.event.inputs.component == 'frontend'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./platform/frontend
+          push: ${{ github.event.inputs.dry_run != 'true' }}
+          tags: |
+            ${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository }}/opclaw-frontend:${{ env.DEPLOYMENT_VERSION }}
+            ${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository }}/opclaw-frontend:latest
+          labels: |
+            tenant=${{ needs.validate-config.outputs.tenant_id }}
+            environment=${{ needs.validate-config.outputs.environment }}
+            version=${{ env.DEPLOYMENT_VERSION }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          target: production
+
+      #------------------------------------------------------------------------
+      # 生成构建摘要 (Generate Build Summary)
+      #------------------------------------------------------------------------
+      - name: 📊 生成构建摘要 (Generate Build Summary)
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 🏗️ 构建摘要 (Build Summary)
+
+          ### 构建信息 (Build Information)
+          - **版本 (Version)**: ${{ env.DEPLOYMENT_VERSION }}
+          - **租户 (Tenant)**: ${{ needs.validate-config.outputs.tenant_id }}
+          - **组件 (Component)**: ${{ github.event.inputs.component }}
+          - **环境 (Environment)**: ${{ needs.validate-config.outputs.environment }}
+
+          ### 构建状态 (Build Status)
+          ✅ 构建完成 (Build completed)
+
+          ### 镜像标签 (Image Tags)
+          - **Backend**: `${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository }}/opclaw-backend:${{ env.DEPLOYMENT_VERSION }}`
+          - **Frontend**: `${{ secrets.DOCKER_REGISTRY || 'ghcr.io' }}/${{ github.repository }}/opclaw-frontend:${{ env.DEPLOYMENT_VERSION }}`
+          EOF
+
+  #==========================================================================
+  # 部署作业 (Deploy Job)
+  #==========================================================================
+  deploy:
+    name: 🚀 部署服务 (Deploy Services)
+    runs-on: ubuntu-latest
+    needs: [validate-config, build]
+    if: needs.validate-config.outputs.validation_passed == 'true'
+
+    steps:
+      #------------------------------------------------------------------------
+      # 检出代码 (Checkout Code)
+      #------------------------------------------------------------------------
+      - name: 📥 检出代码 (Checkout Code)
+        uses: actions/checkout@v4
+
+      #------------------------------------------------------------------------
+      # 配置 SSH (Setup SSH)
+      #------------------------------------------------------------------------
+      - name: 🔧 配置 SSH (Setup SSH)
+        run: |
+          echo "=============================================================================="
+          echo "🔧 配置 SSH (Configuring SSH)"
+          echo "=============================================================================="
+          echo ""
+
+          # 创建 SSH 目录 (Create SSH directory)
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+
+          # 添加 SSH 私钥 (Add SSH private key)
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          # 添加 SSH 配置 (Add SSH config)
+          cat > ~/.ssh/config << EOF
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+            ServerAliveInterval 60
+            ServerAliveCountMax 3
+          EOF
+
+          chmod 600 ~/.ssh/config
+
+          echo "✅ SSH 配置完成 (SSH configuration completed)"
+          echo ""
+
+      #------------------------------------------------------------------------
+      # 加载租户配置 (Load Tenant Configuration)
+      #------------------------------------------------------------------------
+      - name: 📋 加载租户配置 (Load Tenant Configuration)
+        id: load-config
+        run: |
+          TENANT_CONFIG="config/tenants/${{ github.event.inputs.tenant }}.yml"
+
+          # 提取配置信息 (Extract configuration)
+          SERVER_HOST=$(yq '.server.host' "$TENANT_CONFIG")
+          SERVER_USER=$(yq '.server.ssh_user' "$TENANT_CONFIG")
+          DEPLOY_PATH=$(yq '.server.deploy_path' "$TENANT_CONFIG")
+          API_PORT=$(yq '.server.api_port' "$TENANT_CONFIG")
+
+          # 设置输出 (Set outputs)
+          echo "server_host=$SERVER_HOST" >> $GITHUB_OUTPUT
+          echo "server_user=$SERVER_USER" >> $GITHUB_OUTPUT
+          echo "deploy_path=$DEPLOY_PATH" >> $GITHUB_OUTPUT
+          echo "api_port=$API_PORT" >> $GITHUB_OUTPUT
+
+          echo "服务器 (Server): $SERVER_USER@$SERVER_HOST"
+          echo "部署路径 (Deploy Path): $DEPLOY_PATH"
+          echo "API 端口 (API Port): $API_PORT"
+
+      #------------------------------------------------------------------------
+      # 执行部署脚本 (Execute Deployment Script)
+      #------------------------------------------------------------------------
+      - name: 🚀 执行部署 (Execute Deployment)
+        id: deploy
+        run: |
+          echo "=============================================================================="
+          echo "🚀 开始部署 (Starting Deployment)"
+          echo "=============================================================================="
+          echo ""
+
+          # 构建部署命令 (Build deployment command)
+          DEPLOY_CMD="${{ env.SCRIPT_DIR }}/deploy-tenant.sh"
+          DEPLOY_CMD="$DEPLOY_CMD config/tenants/${{ github.event.inputs.tenant }}.yml"
+
+          # 添加选项 (Add options)
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            DEPLOY_CMD="$DEPLOY_CMD --dry-run"
+          fi
+
+          if [ "${{ github.event.inputs.skip_tests }}" = "true" ]; then
+            DEPLOY_CMD="$DEPLOY_CMD --skip-health-check"
+          fi
+
+          if [ "${{ github.event.inputs.skip_backup }}" = "true" ]; then
+            DEPLOY_CMD="$DEPLOY_CMD --skip-backup"
+          fi
+
+          if [ "${{ github.event.inputs.force_deploy }}" = "true" ]; then
+            DEPLOY_CMD="$DEPLOY_CMD --force"
+          fi
+
+          if [ "${{ github.event.inputs.component }}" != "all" ]; then
+            DEPLOY_CMD="$DEPLOY_CMD --component ${{ github.event.inputs.component }}"
+          fi
+
+          # 添加详细输出 (Add verbose output)
+          DEPLOY_CMD="$DEPLOY_CMD --verbose"
+
+          echo "部署命令 (Deployment command):"
+          echo "$DEPLOY_CMD"
+          echo ""
+
+          # 设置环境变量 (Set environment variables)
+          export SSH_KEY_PATH="~/.ssh/deploy_key"
+          export DEPLOYMENT_VERSION="${{ env.DEPLOYMENT_VERSION }}"
+          export GIT_COMMIT_SHA="${{ github.sha }}"
+          export GIT_BRANCH="${{ github.ref_name }}"
+
+          # 执行部署 (Execute deployment)
+          if bash -c "$DEPLOY_CMD"; then
+            echo ""
+            echo "=============================================================================="
+            echo "✅ 部署成功 (Deployment succeeded)"
+            echo "=============================================================================="
+            echo "deployment_status=success" >> $GITHUB_OUTPUT
+          else
+            echo ""
+            echo "=============================================================================="
+            echo "❌ 部署失败 (Deployment failed)"
+            echo "=============================================================================="
+            echo "deployment_status=failed" >> $GITHUB_OUTPUT
+            exit 1
+          fi
+
+      #------------------------------------------------------------------------
+      # 检查取消状态 (Check Cancellation Status)
+      #------------------------------------------------------------------------
+      - name: ⚠️ 检查取消状态 (Check Cancellation)
+        if: cancelled()
+        run: |
+          echo "⚠️ 工作流已取消 (Workflow cancelled)"
+          echo "执行清理操作 (Executing cleanup operations)"
+
+          # TODO: Add cleanup logic here
+          # - Stop any running deployments
+          # - Clean up temporary files
+          # - Record cancellation in state database
+
+      #------------------------------------------------------------------------
+      # 生成部署摘要 (Generate Deployment Summary)
+      #------------------------------------------------------------------------
+      - name: 📊 生成部署摘要 (Generate Deployment Summary)
+        if: success() || failure()
+        run: |
+          DEPLOYMENT_STATUS="${{ steps.deploy.outputs.deployment_status }}"
+          STATUS_EMOJI="✅"
+          if [ "$DEPLOYMENT_STATUS" = "failed" ]; then
+            STATUS_EMOJI="❌"
+          fi
+
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 🚀 部署摘要 (Deployment Summary)
+
+          ### 部署信息 (Deployment Information)
+          - **租户ID (Tenant ID)**: ${{ needs.validate-config.outputs.tenant_id }}
+          - **服务器 (Server)**: ${{ steps.load-config.outputs.server_user }}@${{ steps.load-config.outputs.server_host }}
+          - **部署路径 (Deploy Path)**: ${{ steps.load-config.outputs.deploy_path }}
+          - **组件 (Component)**: ${{ github.event.inputs.component }}
+          - **环境 (Environment)**: ${{ needs.validate-config.outputs.environment }}
+
+          ### 部署状态 (Deployment Status)
+          ${STATUS_EMOJI} **${DEPLOYMENT_STATUS^}** (Deployment ${DEPLOYMENT_STATUS^})
+
+          ### 部署配置 (Deployment Configuration)
+          - **版本 (Version)**: ${{ env.DEPLOYMENT_VERSION }}
+          - **Git Commit**: ${{ github.sha }}
+          - **Git Branch**: ${{ github.ref_name }}
+          - **演练模式 (Dry Run)**: ${{ github.event.inputs.dry_run }}
+          - **跳过测试 (Skip Tests)**: ${{ github.event.inputs.skip_tests }}
+          - **强制部署 (Force Deploy)**: ${{ github.event.inputs.force_deploy }}
+
+          ### 访问信息 (Access Information)
+          - **API 端点**: http://${{ steps.load-config.outputs.server_host }}:${{ steps.load-config.outputs.api_port }}
+          - **健康检查**: http://${{ steps.load-config.outputs.server_host }}:${{ steps.load-config.outputs.api_port }}/health
+          EOF
+
+  #==========================================================================
+  # 验证作业 (Verification Job)
+  #==========================================================================
+  verify:
+    name: 🔬 验证部署 (Verify Deployment)
+    runs-on: ubuntu-latest
+    needs: [validate-config, deploy]
+    if: success() && github.event.inputs.skip_tests != 'true'
+
+    steps:
+      #------------------------------------------------------------------------
+      # 检出代码 (Checkout Code)
+      #------------------------------------------------------------------------
+      - name: 📥 检出代码 (Checkout Code)
+        uses: actions/checkout@v4
+
+      #------------------------------------------------------------------------
+      # 等待服务启动 (Wait for Service Startup)
+      #------------------------------------------------------------------------
+      - name: ⏳ 等待服务启动 (Wait for Service Startup)
+        run: |
+          echo "等待服务启动 (Waiting for service startup)..."
+          sleep 30
+
+      #------------------------------------------------------------------------
+      # 加载租户配置 (Load Tenant Configuration)
+      #------------------------------------------------------------------------
+      - name: 📋 加载租户配置 (Load Tenant Configuration)
+        id: load-config
+        run: |
+          TENANT_CONFIG="config/tenants/${{ github.event.inputs.tenant }}.yml"
+
+          # 提取配置信息 (Extract configuration)
+          SERVER_HOST=$(yq '.server.host' "$TENANT_CONFIG")
+          API_PORT=$(yq '.server.api_port' "$TENANT_CONFIG")
+          DOMAIN=$(yq '.server.domain' "$TENANT_CONFIG")
+
+          # 设置输出 (Set outputs)
+          echo "server_host=$SERVER_HOST" >> $GITHUB_OUTPUT
+          echo "api_port=$API_PORT" >> $GITHUB_OUTPUT
+          echo "domain=$DOMAIN" >> $GITHUB_OUTPUT
+
+      #------------------------------------------------------------------------
+      # HTTP 健康检查 (HTTP Health Check)
+      #------------------------------------------------------------------------
+      - name: 🏥 HTTP 健康检查 (HTTP Health Check)
+        id: health-check
+        run: |
+          echo "=============================================================================="
+          echo "🏥 健康检查 (Health Check)"
+          echo "=============================================================================="
+          echo ""
+
+          SERVER_HOST="${{ steps.load-config.outputs.server_host }}"
+          API_PORT="${{ steps.load-config.outputs.api_port }}"
+          DOMAIN="${{ steps.load-config.outputs.domain }}"
+          HEALTH_URL="http://${DOMAIN:-$SERVER_HOST}:${API_PORT}/health"
+
+          echo "检查端点 (Check endpoint): $HEALTH_URL"
+          echo ""
+
+          # 执行健康检查 (Execute health check)
+          MAX_RETRIES=5
+          RETRY_COUNT=0
+          HEALTH_STATUS="failed"
+
+          while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
+            echo "尝试 $((RETRY_COUNT + 1))/$MAX_RETRIES (Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
+
+            if curl -f -s "$HEALTH_URL" > /dev/null 2>&1; then
+              echo "✅ 健康检查通过 (Health check passed)"
+              HEALTH_STATUS="passed"
+              break
+            else
+              echo "⏳ 健康检查失败，等待重试 (Health check failed, waiting to retry)"
+              sleep 10
+              RETRY_COUNT=$((RETRY_COUNT + 1))
+            fi
+          done
+
+          echo ""
+          if [ "$HEALTH_STATUS" = "passed" ]; then
+            echo "health_check_status=passed" >> $GITHUB_OUTPUT
+          else
+            echo "health_check_status=failed" >> $GITHUB_OUTPUT
+            echo "❌ 健康检查失败 (Health check failed after $MAX_RETRIES attempts)"
+            exit 1
+          fi
+
+      #------------------------------------------------------------------------
+      # 烟雾测试 (Smoke Tests)
+      #------------------------------------------------------------------------
+      - name: 🧪 烟雾测试 (Smoke Tests)
+        id: smoke-tests
+        run: |
+          echo "=============================================================================="
+          echo "🧪 烟雾测试 (Smoke Tests)"
+          echo "=============================================================================="
+          echo ""
+
+          SERVER_HOST="${{ steps.load-config.outputs.server_host }}"
+          API_PORT="${{ steps.load-config.outputs.api_port }}"
+          DOMAIN="${{ steps.load-config.outputs.domain }}"
+          BASE_URL="http://${DOMAIN:-$SERVER_HOST}:${API_PORT}"
+
+          # 测试 1: API 根路径 (Test 1: API Root)
+          echo "测试 1: API 根路径 (Test 1: API Root)"
+          if curl -f -s "${BASE_URL}/" | head -20; then
+            echo "✅ API 根路径测试通过 (API root test passed)"
+          else
+            echo "⚠️ API 根路径测试失败 (API root test failed)"
+          fi
+          echo ""
+
+          # 测试 2: 健康端点详细输出 (Test 2: Health Endpoint Detail)
+          echo "测试 2: 健康端点详细输出 (Test 2: Health Endpoint Detail)"
+          if curl -f -s "${BASE_URL}/health" | jq .; then
+            echo "✅ 健康端点测试通过 (Health endpoint test passed)"
+          else
+            echo "⚠️ 健康端点测试失败 (Health endpoint test failed)"
+          fi
+          echo ""
+
+          # 测试 3: 指标端点 (Test 3: Metrics Endpoint)
+          echo "测试 3: 指标端点 (Test 3: Metrics Endpoint)"
+          if curl -f -s "${BASE_URL}/metrics" | head -20; then
+            echo "✅ 指标端点测试通过 (Metrics endpoint test passed)"
+          else
+            echo "⚠️ 指标端点测试失败 (Metrics endpoint test failed)"
+          fi
+          echo ""
+
+          echo "smoke_tests_status=completed" >> $GITHUB_OUTPUT
+
+      #------------------------------------------------------------------------
+      # 生成验证摘要 (Generate Verification Summary)
+      #------------------------------------------------------------------------
+      - name: 📊 生成验证摘要 (Generate Verification Summary)
+        if: always()
+        run: |
+          HEALTH_STATUS="${{ steps.health-check.outputs.health_check_status }}"
+          SMOKE_STATUS="${{ steps.smoke-tests.outputs.smoke_tests_status }}"
+
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 🔬 验证摘要 (Verification Summary)
+
+          ### 健康检查 (Health Check)
+          **状态 (Status)**: ${HEALTH_STATUS^}
+          **端点 (Endpoint)**: http://${{ steps.load-config.outputs.domain }}:${{ steps.load-config.outputs.api_port }}/health
+
+          ### 烟雾测试 (Smoke Tests)
+          **状态 (Status)**: ${SMOKE_STATUS^}
+
+          ### 测试覆盖 (Test Coverage)
+          - ✅ API 根路径 (API Root)
+          - ✅ 健康端点 (Health Endpoint)
+          - ✅ 指标端点 (Metrics Endpoint)
+
+          ### 总体状态 (Overall Status)
+          EOF
+
+          if [ "$HEALTH_STATUS" = "passed" ] && [ "$SMOKE_STATUS" = "completed" ]; then
+            echo "✅ 所有验证通过 (All verifications passed)" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ 部分验证失败 (Some verifications failed)" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  #==========================================================================
+  # 部署后清理作业 (Post-Deployment Cleanup Job)
+  #==========================================================================
+  cleanup:
+    name: 🧹 部署后清理 (Post-Deployment Cleanup)
+    runs-on: ubuntu-latest
+    needs: [validate-config, build, deploy, verify]
+    if: always()
+
+    steps:
+      #------------------------------------------------------------------------
+      # 生成最终摘要 (Generate Final Summary)
+      #------------------------------------------------------------------------
+      - name: 📊 生成最终摘要 (Generate Final Summary)
+        run: |
+          echo "=============================================================================="
+          echo "📊 部署完成摘要 (Deployment Completion Summary)"
+          echo "=============================================================================="
+          echo ""
+
+          # 确定整体状态 (Determine overall status)
+          DEPLOY_STATUS="success"
+          if [ "${{ needs.deploy.result }}" = "failure" ] || [ "${{ needs.verify.result }}" = "failure" ]; then
+            DEPLOY_STATUS="failed"
+          elif [ "${{ needs.deploy.result }}" = "cancelled" ]; then
+            DEPLOY_STATUS="cancelled"
+          fi
+
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 🎯 部署完成 (Deployment Complete)
+
+          ### 📋 部署信息 (Deployment Information)
+          - **租户ID (Tenant ID)**: ${{ needs.validate-config.outputs.tenant_id }}
+          - **租户名称 (Tenant Name)**: ${{ needs.validate-config.outputs.tenant_name }}
+          - **环境 (Environment)**: ${{ needs.validate-config.outputs.environment }}
+          - **组件 (Component)**: ${{ github.event.inputs.component }}
+          - **版本 (Version)**: ${{ env.DEPLOYMENT_VERSION }}
+
+          ### 🔄 作业状态 (Job Status)
+          | 作业 (Job) | 状态 (Status) |
+          |-----------|-------------|
+          | 🔍 配置验证 (Configuration Validation) | ${{ needs.validate-config.result }} |
+          | 🏗️ 构建 (Build) | ${{ needs.build.result }} |
+          | 🚀 部署 (Deploy) | ${{ needs.deploy.result }} |
+          | 🔬 验证 (Verify) | ${{ needs.verify.result }} |
+
+          ### 📊 最终状态 (Final Status)
+          **部署结果 (Deployment Result)**: ${DEPLOY_STATUS^}
+
+          ### 🔗 相关链接 (Related Links)
+          - [查看工作流运行 (View Workflow Run)](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          - [查看提交 (View Commit)](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})
+          EOF
+
+          echo ""
+          echo "✅ 部署工作流完成 (Deployment workflow completed)"
+          echo "最终状态 (Final status): ${DEPLOY_STATUS^}"

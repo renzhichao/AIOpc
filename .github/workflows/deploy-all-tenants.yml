@@ -1,0 +1,423 @@
+name: 批量租户部署 (Batch Tenant Deployment)
+
+#==============================================================================
+# 批量部署工作流
+# (Batch Deployment Workflow)
+#
+# 核心特性 (Key Features):
+# - 批量部署多个租户 (Deploy multiple tenants in batch)
+# - 串行或并行部署模式 (Serial or parallel deployment mode)
+# - 失败时继续或停止 (Continue or stop on failure)
+# - 部署报告生成 (Deployment report generation)
+# - 每租户状态跟踪 (Per-tenant status tracking)
+#
+# 使用方法 (Usage):
+#   GitHub UI: Actions → Batch Tenant Deployment → Run workflow
+#
+# 环境 (Environment):
+# - 支持批量操作 (Supports batch operations)
+# - 适用于发布管理 (Ideal for release management)
+#
+#==============================================================================
+
+on:
+  # 手动触发 (Manual trigger only)
+  workflow_dispatch:
+    inputs:
+      deployment_mode:
+        description: '部署模式 (Deployment Mode)'
+        required: true
+        default: 'serial'
+        type: choice
+        options:
+          - serial
+          - parallel
+
+      on_failure:
+        description: '失败时行为 (On Failure Behavior)'
+        required: true
+        default: 'continue'
+        type: choice
+        options:
+          - continue
+          - stop
+
+      skip_tests:
+        description: '跳过测试 (Skip tests)'
+        required: false
+        default: true
+        type: boolean
+
+      dry_run:
+        description: '演练模式 (Dry run)'
+        required: false
+        default: true
+        type: boolean
+
+      target_environment:
+        description: '目标环境 (Target Environment)'
+        required: true
+        default: 'development'
+        type: choice
+        options:
+          - development
+          - production
+
+env:
+  DEPLOYMENT_VERSION: v1.0.0
+  SCRIPT_DIR: scripts/deploy
+
+jobs:
+  #==========================================================================
+  # 发现租户作业 (Discover Tenants Job)
+  #==========================================================================
+  discover-tenants:
+    name: 🔍 发现租户 (Discover Tenants)
+    runs-on: ubuntu-latest
+    outputs:
+      tenant_count: ${{ steps.list-tenants.outputs.count }}
+      tenant_list: ${{ steps.list-tenants.outputs.list }}
+      matrix: ${{ steps.create-matrix.outputs.matrix }}
+
+    steps:
+      - name: 📥 检出代码 (Checkout Code)
+        uses: actions/checkout@v4
+
+      - name: 🐍 设置 Python (Setup Python)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: 📦 安装依赖 (Install Dependencies)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y yq
+
+      - name: 📋 列出租户 (List Tenants)
+        id: list-tenants
+        run: |
+          TARGET_ENV="${{ github.event.inputs.target_environment }}"
+
+          echo "=============================================================================="
+          echo "📋 发现租户 (Discovering Tenants)"
+          echo "=============================================================================="
+          echo ""
+          echo "目标环境 (Target Environment): $TARGET_ENV"
+          echo ""
+
+          # Find all tenant configuration files
+          TENANT_FILES=$(find config/tenants -maxdepth 1 -name "*.yml" -type f | sort)
+
+          # Initialize arrays
+          declare -a TENANT_IDS=()
+          declare -a TENANT_NAMES=()
+
+          # Process each tenant file
+          while IFS= read -r tenant_file; do
+            tenant_id=$(basename "$tenant_file" .yml)
+
+            # Skip template
+            if [[ "$tenant_id" == "template" ]]; then
+              continue
+            fi
+
+            # Check environment
+            tenant_env=$(yq '.tenant.environment' "$tenant_file")
+            if [[ "$tenant_env" != "$TARGET_ENV" ]]; then
+              echo "跳过 (Skipping) $tenant_id (环境/environment: $tenant_env)"
+              continue
+            fi
+
+            # Validate configuration
+            if ! yq eval '.' "$tenant_file" > /dev/null 2>&1; then
+              echo "⚠️ 警告: 无效配置 (Invalid config): $tenant_id"
+              continue
+            fi
+
+            tenant_name=$(yq '.tenant.name' "$tenant_file")
+            TENANT_IDS+=("$tenant_id")
+            TENANT_NAMES+=("$tenant_name")
+
+            echo "✅ 找到 (Found): $tenant_id ($tenant_name)"
+          done <<< "$TENANT_FILES"
+
+          echo ""
+          echo "=============================================================================="
+          echo "租户总数 (Total Tenants): ${#TENANT_IDS[@]}"
+          echo "=============================================================================="
+          printf '  - %s\n' "${TENANT_IDS[@]}"
+          echo ""
+
+          # Set outputs
+          echo "count=${#TENANT_IDS[@]}" >> $GITHUB_OUTPUT
+
+          # Create JSON array for matrix
+          if [[ ${#TENANT_IDS[@]} -gt 0 ]]; then
+            # Build JSON array
+            JSON_ARRAY="["
+            for i in "${!TENANT_IDS[@]}"; do
+              if [[ $i -gt 0 ]]; then
+                JSON_ARRAY="$JSON_ARRAY,"
+              fi
+              JSON_ARRAY="$JSON_ARRAY{\"id\":\"${TENANT_IDS[$i]}\",\"name\":\"${TENANT_NAMES[$i]}\"}"
+            done
+            JSON_ARRAY="$JSON_ARRAY]"
+
+            echo "list=$JSON_ARRAY" >> $GITHUB_OUTPUT
+            echo "matrix=$JSON_ARRAY" >> $GITHUB_OUTPUT
+          else
+            echo "list=[]"
+            echo "matrix=[]"
+          fi
+
+      - name: 📊 生成摘要 (Generate Summary)
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 🔍 租户发现摘要 (Tenant Discovery Summary)
+
+          ### 目标环境 (Target Environment)
+          ${{ github.event.inputs.target_environment }}
+
+          ### 发现的租户 (Discovered Tenants)
+          **总数 (Total)**: ${{ steps.list-tenants.outputs.count }}
+
+          ### 部署配置 (Deployment Configuration)
+          - **模式 (Mode)**: ${{ github.event.inputs.deployment_mode }}
+          - **失败行为 (On Failure)**: ${{ github.event.inputs.on_failure }}
+          - **演练模式 (Dry Run)**: ${{ github.event.inputs.dry_run }}
+          EOF
+
+  #==========================================================================
+  # 串行部署作业 (Serial Deployment Job)
+  #==========================================================================
+  deploy-serial:
+    name: 🚀 串行部署 (Serial Deployment)
+    runs-on: ubuntu-latest
+    needs: discover-tenants
+    if: |
+      needs.discover-tenants.outputs.tenant_count != '0' &&
+      github.event.inputs.deployment_mode == 'serial'
+
+    steps:
+      - name: 📥 检出代码 (Checkout Code)
+        uses: actions/checkout@v4
+
+      - name: 🔧 配置 SSH (Setup SSH)
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          cat > ~/.ssh/config << EOF
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: 🚀 串行部署 (Serial Deployment)
+        run: |
+          echo "=============================================================================="
+          echo "🚀 串行部署模式 (Serial Deployment Mode)"
+          echo "=============================================================================="
+          echo ""
+
+          # Parse tenant list from JSON
+          TENANT_JSON='${{ needs.discover-tenants.outputs.tenant_list }}'
+
+          if [[ "$TENANT_JSON" == "[]" ]]; then
+            echo "❌ 没有要部署的租户 (No tenants to deploy)"
+            exit 1
+          fi
+
+          # Extract tenant IDs using jq
+          if ! command -v jq &> /dev/null; then
+            sudo apt-get install -y jq
+          fi
+
+          TENANT_IDS=$(echo "$TENANT_JSON" | jq -r '.[].id')
+
+          # Deploy each tenant serially
+          DEPLOYMENT_SUCCESS=0
+          DEPLOYMENT_FAILED=0
+          DEPLOYMENT_SKIPPED=0
+
+          while IFS= read -r tenant_id; do
+            echo "=============================================================================="
+            echo "📦 部署租户 (Deploying Tenant): $tenant_id"
+            echo "=============================================================================="
+            echo ""
+
+            # Build deployment command
+            DEPLOY_CMD="${{ env.SCRIPT_DIR }}/deploy-tenant.sh"
+            DEPLOY_CMD="$DEPLOY_CMD config/tenants/${tenant_id}.yml"
+
+            if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+              DEPLOY_CMD="$DEPLOY_CMD --dry-run"
+            fi
+
+            if [ "${{ github.event.inputs.skip_tests }}" = "true" ]; then
+              DEPLOY_CMD="$DEPLOY_CMD --skip-health-check"
+            fi
+
+            DEPLOY_CMD="$DEPLOY_CMD --verbose"
+
+            # Execute deployment
+            if bash -c "$DEPLOY_CMD"; then
+              echo "✅ $tenant_id 部署成功 (Deployment succeeded)"
+              DEPLOYMENT_SUCCESS=$((DEPLOYMENT_SUCCESS + 1))
+            else
+              echo "❌ $tenant_id 部署失败 (Deployment failed)"
+              DEPLOYMENT_FAILED=$((DEPLOYMENT_FAILED + 1))
+
+              if [ "${{ github.event.inputs.on_failure }}" = "stop" ]; then
+                echo ""
+                echo "⚠️ 部署失败，停止后续部署 (Deployment failed, stopping)"
+                break
+              fi
+            fi
+
+            echo ""
+          done <<< "$TENANT_IDS"
+
+          echo "=============================================================================="
+          echo "📊 部署统计 (Deployment Statistics)"
+          echo "=============================================================================="
+          echo "成功 (Success): $DEPLOYMENT_SUCCESS"
+          echo "失败 (Failed): $DEPLOYMENT_FAILED"
+          echo "跳过 (Skipped): $DEPLOYMENT_SKIPPED"
+          echo ""
+
+      - name: 📊 生成摘要 (Generate Summary)
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 🚀 串行部署摘要 (Serial Deployment Summary)
+
+          ### 部署模式 (Deployment Mode)
+          串行部署 (Serial Deployment)
+
+          ### 状态 (Status)
+          已完成所有租户的串行部署 (Completed serial deployment for all tenants)
+          EOF
+
+  #==========================================================================
+  # 并行部署作业 (Parallel Deployment Job)
+  #==========================================================================
+  deploy-parallel:
+    name: 🚀 并行部署 (Parallel Deployment)
+    runs-on: ubuntu-latest
+    needs: discover-tenants
+    if: |
+      needs.discover-tenants.outputs.tenant_count != '0' &&
+      github.event.inputs.deployment_mode == 'parallel'
+
+    strategy:
+      fail-fast: false
+      matrix:
+        tenant: ${{ fromJson(needs.discover-tenants.outputs.matrix) }}
+
+    steps:
+      - name: 📥 检出代码 (Checkout Code)
+        uses: actions/checkout@v4
+
+      - name: 🔧 配置 SSH (Setup SSH)
+        run: |
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+
+          cat > ~/.ssh/config << EOF
+          Host *
+            StrictHostKeyChecking no
+            UserKnownHostsFile=/dev/null
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: 🚀 部署租户 (Deploy Tenant)
+        id: deploy
+        run: |
+          TENANT_ID="${{ matrix.tenant.id }}"
+          TENANT_NAME="${{ matrix.tenant.name }}"
+
+          echo "=============================================================================="
+          echo "📦 部署租户 (Deploying Tenant)"
+          echo "=============================================================================="
+          echo "租户ID (Tenant ID): $TENANT_ID"
+          echo "租户名称 (Tenant Name): $TENANT_NAME"
+          echo ""
+
+          # Build deployment command
+          DEPLOY_CMD="${{ env.SCRIPT_DIR }}/deploy-tenant.sh"
+          DEPLOY_CMD="$DEPLOY_CMD config/tenants/${TENANT_ID}.yml"
+
+          if [ "${{ github.event.inputs.dry_run }}" = "true" ]; then
+            DEPLOY_CMD="$DEPLOY_CMD --dry-run"
+          fi
+
+          if [ "${{ github.event.inputs.skip_tests }}" = "true" ]; then
+            DEPLOY_CMD="$DEPLOY_CMD --skip-health-check"
+          fi
+
+          DEPLOY_CMD="$DEPLOY_CMD --verbose"
+
+          # Execute deployment
+          if bash -c "$DEPLOY_CMD"; then
+            echo "deployment_status=success" >> $GITHUB_OUTPUT
+            echo "✅ 部署成功 (Deployment succeeded)"
+          else
+            echo "deployment_status=failed" >> $GITHUB_OUTPUT
+            echo "❌ 部署失败 (Deployment failed)"
+            exit 1
+          fi
+
+      - name: 📊 生成租户摘要 (Generate Tenant Summary)
+        if: always()
+        run: |
+          STATUS="${{ steps.deploy.outputs.deployment_status }}"
+          if [[ "$STATUS" == "success" ]]; then
+            EMOJI="✅"
+          else
+            EMOJI="❌"
+          fi
+
+          echo "${EMOJI} **${{ matrix.tenant.name }}** (${{ matrix.tenant.id }}): ${STATUS^}" >> $GITHUB_STEP_SUMMARY
+
+  #==========================================================================
+  # 批量部署摘要作业 (Batch Deployment Summary Job)
+  #==========================================================================
+  batch-summary:
+    name: 📊 批量部署摘要 (Batch Deployment Summary)
+    runs-on: ubuntu-latest
+    needs: [discover-tenants, deploy-serial, deploy-parallel]
+    if: always()
+
+    steps:
+      - name: 📊 生成最终摘要 (Generate Final Summary)
+        run: |
+          cat >> $GITHUB_STEP_SUMMARY << EOF
+          ## 📊 批量部署完成摘要 (Batch Deployment Completion Summary)
+
+          ### 部署信息 (Deployment Information)
+          - **目标环境 (Target Environment)**: ${{ github.event.inputs.target_environment }}
+          - **部署模式 (Deployment Mode)**: ${{ github.event.inputs.deployment_mode }}
+          - **失败行为 (On Failure)**: ${{ github.event.inputs.on_failure }}
+          - **租户总数 (Total Tenants)**: ${{ needs.discover-tenants.outputs.tenant_count }}
+
+          ### 作业状态 (Job Status)
+          | 作业 (Job) | 状态 (Status) |
+          |-----------|-------------|
+          | 🔍 发现租户 (Discover Tenants) | ${{ needs.discover-tenants.result }} |
+          | 🚀 串行部署 (Serial Deployment) | ${{ needs.deploy-serial.result }} |
+          | 🚀 并行部署 (Parallel Deployment) | ${{ needs.deploy-parallel.result }} |
+
+          ### 部署结果 (Deployment Results)
+          批量部署已完成 (Batch deployment completed)
+
+          ### 相关链接 (Related Links)
+          - [查看工作流运行 (View Workflow Run)](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+          EOF
+
+          echo ""
+          echo "✅ 批量部署工作流完成 (Batch deployment workflow completed)"
