@@ -589,8 +589,10 @@
 
 ### TASK-014: Security Integration in Deployment
 
-**任务状态**: `IN_PROGRESS`
+**任务状态**: `COMPLETED`
 **任务开始时间**: 2026-03-19
+**任务完成时间**: 2026-03-19
+**任务提交记录**: Commit ID: `9fe019b`
 
 **任务描述**:
 在部署流程中集成安全检查，包括配置安全、SSH密钥安全、密钥验证等
@@ -600,27 +602,29 @@
 
 **前置检查项**:
 - [x] 部署脚本已实现
-- [ ] 安全测试脚本已准备
+- [x] 安全测试脚本已准备
 
 **参考文档**:
 - FIP Section: Security Testing Strategy
 
 **Acceptance Criteria**:
-- [ ] Placeholder值检测（cli_xxxxxxxxxxxxx等）
-- [ ] 密钥强度验证（DB密码>16字符，JWT>32字符）
-- [ ] 配置文件权限检查（600）
-- [ ] SSH密钥权限检查（600）
-- [ ] 日志扫描防止密钥泄露
-- [ ] 安全测试集成到部署流程
-- [ ] 安全测试失败阻止部署
-- [ ] 安全事件记录到state database
+- [x] Placeholder值检测（cli_xxxxxxxxxxxxx等）
+- [x] 密钥强度验证（DB密码>16字符，JWT>32字符）
+- [x] 配置文件权限检查（600）
+- [x] SSH密钥权限检查（600）
+- [x] 日志扫描防止密钥泄露
+- [x] 安全测试集成到部署流程
+- [x] 安全测试失败阻止部署
+- [x] 安全事件记录到state database
 
 **产出物**:
-- `scripts/security/check-config-security.sh` - 配置安全检查
-- `scripts/security/check-secret-strength.sh` - 密钥强度检查
-- `scripts/security/scan-log-for-secrets.sh` - 日志密钥扫描
-- `scripts/security/integration-test.sh` - 安全集成测试
-- `docs/operations/security-in-deployment.md` - 部署安全文档
+- [x] `scripts/security/check-config-security.sh` - 配置安全检查
+- [x] `scripts/security/check-secret-strength.sh` - 密钥强度检查
+- [x] `scripts/security/check-file-permissions.sh` - 文件权限检查
+- [x] `scripts/security/scan-logs.sh` - 日志密钥扫描
+- [x] `scripts/security/security-check-suite.sh` - 安全检查套件
+- [x] `scripts/tests/test-security-checks.sh` - 安全集成测试
+- [x] `docs/operations/security-checks-guide.md` - 部署安全文档
 
 ---
 
