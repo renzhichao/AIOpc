@@ -582,12 +582,51 @@ jobs:
 
           # CIIBER 特定环境变量 (CIIBER-specific environment variables)
           if [ "${{ github.event.inputs.tenant }}" = "CIIBER" ]; then
+            # Strategy: Use secrets if provided, otherwise read from config file
+            # This allows flexibility: secrets override config file defaults
+
+            # Read credentials from CIIBER.yml config file as fallback
+            TENANT_CONFIG="config/tenants/CIIBER.yml"
+
+            # Extract values from config file using yq
+            CONFIG_DB_PASSWORD=$(yq '.database.password' "$TENANT_CONFIG")
+            CONFIG_REDIS_PASSWORD=$(yq '.redis.password' "$TENANT_CONFIG")
+            CONFIG_JWT_SECRET=$(yq '.jwt.secret' "$TENANT_CONFIG")
+            CONFIG_FEISHU_ENCRYPT_KEY=$(yq '.feishu.encrypt_key' "$TENANT_CONFIG")
+            CONFIG_FEISHU_APP_ID=$(yq '.feishu.app_id' "$TENANT_CONFIG")
+            CONFIG_FEISHU_APP_SECRET=$(yq '.feishu.app_secret' "$TENANT_CONFIG")
+
+            # Use GitHub secrets if provided (non-empty), otherwise use config file values
+            # This allows secrets to override config file defaults while maintaining fallback
             export DB_PASSWORD="${{ secrets.CIIBER_DB_PASSWORD }}"
+            export DB_PASSWORD="${DB_PASSWORD:-$CONFIG_DB_PASSWORD}"
+
             export REDIS_PASSWORD="${{ secrets.CIIBER_REDIS_PASSWORD }}"
+            export REDIS_PASSWORD="${REDIS_PASSWORD:-$CONFIG_REDIS_PASSWORD}"
+
             export JWT_SECRET="${{ secrets.CIIBER_JWT_SECRET }}"
+            export JWT_SECRET="${JWT_SECRET:-$CONFIG_JWT_SECRET}"
+
             export FEISHU_ENCRYPT_KEY="${{ secrets.CIIBER_FEISHU_ENCRYPT_KEY }}"
+            export FEISHU_ENCRYPT_KEY="${FEISHU_ENCRYPT_KEY:-$CONFIG_FEISHU_ENCRYPT_KEY}"
+
             export FEISHU_APP_ID="${{ secrets.CIIBER_FEISHU_APP_ID }}"
+            export FEISHU_APP_ID="${FEISHU_APP_ID:-$CONFIG_FEISHU_APP_ID}"
+
             export FEISHU_APP_SECRET="${{ secrets.CIIBER_FEISHU_APP_SECRET }}"
+            export FEISHU_APP_SECRET="${FEISHU_APP_SECRET:-$CONFIG_FEISHU_APP_SECRET}"
+
+            # Validate that Feishu credentials are not placeholder values
+            if [[ "$FEISHU_APP_ID" =~ ^cli_ ]] && [ ${#FEISHU_APP_ID} -lt 10 ]; then
+              echo "⚠️  Warning: FEISHU_APP_ID appears to be a placeholder value"
+            fi
+
+            if [[ "$FEISHU_APP_SECRET" =~ ^(placeholder|changeme|test_|ciiber_prod) ]]; then
+              echo "⚠️  Warning: FEISHU_APP_SECRET appears to be a placeholder value"
+              echo "   OAuth functionality may not work correctly"
+            fi
+
+            echo "✓ CIIBER credentials loaded (secrets override config file defaults)"
           fi
 
           # 执行部署 (Execute deployment)
