@@ -1,5 +1,5 @@
 import { Service } from 'typedi';
-import { JsonController, Get, Post, Patch, Delete, Body, Param, Query, Req, UseBefore } from 'routing-controllers';
+import { JsonController, Get, Post, Patch, Delete, Body, Param, QueryParam, Req, UseBefore } from 'routing-controllers';
 import { AuthMiddleware, AuthRequest } from '../middleware/AuthMiddleware';
 import { ConversationService, CreateConversationDto, UpdateConversationDto } from '../services/ConversationService';
 import { logger } from '../config/logger';
@@ -104,9 +104,9 @@ export class ConversationController {
    */
   @Get('/')
   async getConversations(
-    @Query('instanceId') instanceId?: number,
-    @Query('page') page: number = 1,
-    @Query('pageSize') pageSize: number = 20,
+    @QueryParam('instanceId') instanceId?: number,
+    @QueryParam('page') page: number = 1,
+    @QueryParam('pageSize') pageSize: number = 20,
     @Req() req?: AuthRequest
   ) {
     try {

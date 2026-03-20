@@ -1,5 +1,5 @@
 import { Service } from 'typedi';
-import { JsonController, Get, Post, Body, Param, Query, Req, UseBefore } from 'routing-controllers';
+import { JsonController, Get, Post, Body, Param, QueryParam, Req, UseBefore } from 'routing-controllers';
 import { AuthMiddleware, AuthRequest } from '../middleware/AuthMiddleware';
 import { MessageService, CreateMessageDto } from '../services/MessageService';
 import { logger } from '../config/logger';
@@ -115,8 +115,8 @@ export class MessageController {
   @Get('/:conversationId/messages')
   async getMessages(
     @Param('conversationId') conversationId: string,
-    @Query('page') page: number = 1,
-    @Query('pageSize') pageSize: number = 50,
+    @QueryParam('page') page: number = 1,
+    @QueryParam('pageSize') pageSize: number = 50,
     @Req() req: AuthRequest
   ) {
     try {
@@ -326,7 +326,7 @@ export class MessageController {
   @Get('/:conversationId/messages/sync')
   async syncMessages(
     @Param('conversationId') conversationId: string,
-    @Query('timestamp') timestamp: string,
+    @QueryParam('timestamp') timestamp: string,
     @Req() req: AuthRequest
   ) {
     try {

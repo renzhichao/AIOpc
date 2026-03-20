@@ -73,8 +73,8 @@ export class MessageService {
       conversation_id: dto.conversationId,
       role: dto.role,
       content: dto.content,
-      tool_calls: dto.toolCalls || null,
-      tool_results: dto.toolResults || null,
+      tool_calls: dto.toolCalls ?? undefined,
+      tool_results: dto.toolResults ?? undefined,
       metadata: dto.metadata || {}
     });
 
