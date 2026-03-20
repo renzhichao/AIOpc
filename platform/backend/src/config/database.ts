@@ -8,20 +8,26 @@ import { Conversation, ConversationMessage } from '../entities';
  *
  * Synchronization Behavior:
  * - Development (NODE_ENV=development): synchronize=true unless DB_SYNC=false
- * - Production (NODE_ENV=production): synchronize=false, migrations required
+ * - Production (NODE_ENV=production): synchronize=false by default
+ * - Override: Set DB_SYNC=true to force synchronize in any environment
+ *
+ * ⚠️ WARNING: DB_SYNC=true should only be used for:
+ * - Quick testing/validation
+ * - Initial setup
+ * - NEVER in long-term production use
  *
  * For production deployment:
  * 1. Set NODE_ENV=production
  * 2. Run migrations: npm run db:migrate
- * 3. Or use initialization script: npm run db:init
+ * 3. Or use DB_SYNC=true for initial setup, then disable
  */
 const isDevelopment = process.env.NODE_ENV === 'development';
 const isProduction = process.env.NODE_ENV === 'production';
 const dbSyncEnabled = process.env.DB_SYNC === 'true';
 
-// In development, allow sync unless explicitly disabled
-// In production, never use sync - always use migrations
-const synchronize = isDevelopment ? dbSyncEnabled : false;
+// Allow DB_SYNC to override synchronize behavior in any environment
+// This is useful for quick validation, but should be disabled for production
+const synchronize = dbSyncEnabled;
 
 // Configure logging based on environment
 const logging = isDevelopment
