@@ -1,5 +1,6 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index, ManyToOne, JoinColumn, OneToMany } from 'typeorm';
 import { User } from './User.entity';
+import { Conversation } from './Conversation.entity';
 
 @Entity('instances')
 export class Instance {
@@ -139,4 +140,10 @@ export class Instance {
    */
   @Column({ name: 'remote_metadata', type: 'jsonb', nullable: true })
   remote_metadata: Record<string, any>;
+
+  /**
+   * Relationship to conversations in this instance
+   */
+  @OneToMany(() => Conversation, (conversation) => conversation.instance)
+  conversations: Conversation[];
 }

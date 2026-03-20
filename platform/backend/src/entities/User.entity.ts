@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index, OneToMany } from 'typeorm';
+import { Conversation } from './Conversation.entity';
 
 @Entity('users')
 export class User {
@@ -26,4 +27,10 @@ export class User {
 
   @Column({ type: 'timestamp', nullable: true })
   last_login_at: Date;
+
+  /**
+   * Relationship to user's conversations
+   */
+  @OneToMany(() => Conversation, (conversation) => conversation.user)
+  conversations: Conversation[];
 }

@@ -6,3 +6,5 @@ export { DocumentChunk } from './DocumentChunk.entity';
 export { QRCode } from './QRCode.entity';
 export { InstanceRenewal } from './InstanceRenewal.entity';
 export { InstanceMetric } from './InstanceMetric.entity';
+export { Conversation } from './Conversation.entity';
+export { ConversationMessage } from './ConversationMessage.entity';

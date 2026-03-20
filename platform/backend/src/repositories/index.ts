@@ -5,3 +5,5 @@ export { ApiKeyRepository } from './ApiKeyRepository';
 export { QRCodeRepository } from './QRCodeRepository';
 export { InstanceRenewalRepository } from './InstanceRenewalRepository';
 export { InstanceMetricRepository } from './InstanceMetricRepository';
+export { ConversationRepository } from './ConversationRepository';
+export { ConversationMessageRepository } from './ConversationMessageRepository';
