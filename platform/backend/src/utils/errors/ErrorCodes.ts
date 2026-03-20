@@ -312,6 +312,64 @@ export const ErrorCodes = {
     code: 'FEISHU_MESSAGE_SEND_FAILED',
     message: 'Failed to send message to Feishu',
     userMessage: '回复发送失败，请稍后重试'
+  },
+
+  // ==================== Conversation Errors ====================
+
+  CONVERSATION_NOT_FOUND: {
+    statusCode: 404,
+    code: 'CONVERSATION_NOT_FOUND',
+    message: 'Conversation not found',
+    userMessage: '会话不存在'
+  },
+
+  CONVERSATION_ACCESS_DENIED: {
+    statusCode: 403,
+    code: 'CONVERSATION_ACCESS_DENIED',
+    message: 'Access denied to conversation',
+    userMessage: '您没有权限访问此会话'
+  },
+
+  INVALID_TITLE: {
+    statusCode: 400,
+    code: 'INVALID_TITLE',
+    message: 'Invalid conversation title',
+    userMessage: '会话标题格式不正确'
+  },
+
+  INVALID_MESSAGE_CONTENT: {
+    statusCode: 400,
+    code: 'INVALID_MESSAGE_CONTENT',
+    message: 'Invalid message content',
+    userMessage: '消息内容不能为空'
+  },
+
+  INSTANCE_NOT_OWNED: {
+    statusCode: 403,
+    code: 'INSTANCE_NOT_OWNED',
+    message: 'Instance not owned by user',
+    userMessage: '您没有权限访问此实例'
+  },
+
+  INVALID_INSTANCE_NAME: {
+    statusCode: 400,
+    code: 'INVALID_INSTANCE_NAME',
+    message: 'Invalid instance name',
+    userMessage: '实例名称格式不正确'
+  },
+
+  CONVERSATION_CREATE_FAILED: {
+    statusCode: 500,
+    code: 'CONVERSATION_CREATE_FAILED',
+    message: 'Failed to create conversation',
+    userMessage: '创建会话失败，请稍后重试'
+  },
+
+  MESSAGE_SAVE_FAILED: {
+    statusCode: 500,
+    code: 'MESSAGE_SAVE_FAILED',
+    message: 'Failed to save message',
+    userMessage: '保存消息失败，请稍后重试'
   }
 } as const;
 
