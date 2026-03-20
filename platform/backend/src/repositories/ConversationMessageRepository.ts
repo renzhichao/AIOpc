@@ -1,5 +1,6 @@
 import { Service } from 'typedi';
 import { Repository, FindManyOptions } from 'typeorm';
+import { Not, IsNull } from 'typeorm';
 import { ConversationMessage } from '../entities/ConversationMessage.entity';
 import { BaseRepository } from './BaseRepository';
 import { AppDataSource } from '../config/database';
@@ -140,7 +141,7 @@ export class ConversationMessageRepository extends BaseRepository<ConversationMe
     return this.repository.find({
       where: {
         conversation_id: conversationId,
-        tool_calls: $ne: null
+        tool_calls: Not(IsNull())
       } as any,
       order: {
         created_at: 'ASC'
