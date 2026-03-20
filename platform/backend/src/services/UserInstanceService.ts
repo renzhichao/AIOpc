@@ -49,11 +49,11 @@ export class UserInstanceService {
    */
   async getUserInstances(userId: number): Promise<UserInstanceResponse[]> {
     // 1. Get all instances owned by user
-    const instances = await this.instanceRepository.findByOwner(userId);
+    const instances = await this.instanceRepository.findByOwnerId(userId);
 
     // 2. Get conversation count for each instance
     const instancesWithCount = await Promise.all(
-      instances.map(async (instance) => {
+      instances.map(async (instance: Instance) => {
         const conversationCount = await this.conversationRepository.countByInstanceId(instance.id);
 
         return {
@@ -74,7 +74,7 @@ export class UserInstanceService {
     );
 
     // 3. Sort by last accessed time (most recent first)
-    instancesWithCount.sort((a, b) => {
+    instancesWithCount.sort((a: UserInstanceResponse, b: UserInstanceResponse) => {
       const aTime = a.lastAccessedAt?.getTime() || 0;
       const bTime = b.lastAccessedAt?.getTime() || 0;
       return bTime - aTime;
