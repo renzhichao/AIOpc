@@ -38,6 +38,10 @@ REDIS_PASSWORD="${REDIS_PASSWORD:-8wqP09459CRNAahiGHCn}"
 JWT_SECRET="${JWT_SECRET:-StoSs7OeYmRwmxuBe8Lh50mRRGiYolDcTPY6HRvoPhD7rdaj8vHW1rE4Vp9VWQ4}"
 FEISHU_ENCRYPT_KEY="${FEISHU_ENCRYPT_KEY:-DoZ9NxC523OFphRtNnPdHDjk3OUHtsNZ}"
 
+# ⚠️ TEMPORARY: Enable DB_SYNC for quick migration validation
+# TODO: Remove this after proper migration implementation
+DB_SYNC="${DB_SYNC:-true}"
+
 echo -e "${BLUE}=== CIIBER 租户部署脚本 ===${NC}"
 echo ""
 
@@ -317,6 +321,8 @@ FEISHU_ENCRYPT_KEY=${FEISHU_ENCRYPT_KEY}
 FEISHU_APP_ID=${FEISHU_APP_ID_ENV}
 FEISHU_APP_SECRET=${FEISHU_APP_SECRET_ENV}
 FEISHU_OAUTH_REDIRECT_URI=https://ciiber.example.com/api/auth/feishu/callback
+# ⚠️ TEMPORARY: Enable DB_SYNC for conversation tables auto-creation
+DB_SYNC=true
 ENV_EOF
 
     chmod 600 /opt/opclaw/platform/.env

@@ -1,6 +1,7 @@
 import { DataSource } from 'typeorm';
 import { join } from 'path';
 import { User, Instance, ApiKey, Document, DocumentChunk, QRCode, InstanceRenewal, InstanceMetric } from '../entities';
+import { Conversation, ConversationMessage } from '../entities';
 
 /**
  * Database Configuration
@@ -44,7 +45,7 @@ export const AppDataSource = new DataSource({
   database: process.env.DB_NAME || 'opclaw',
   synchronize,
   logging,
-  entities: [User, Instance, ApiKey, Document, DocumentChunk, QRCode, InstanceRenewal, InstanceMetric],
+  entities: [User, Instance, ApiKey, Document, DocumentChunk, QRCode, InstanceRenewal, InstanceMetric, Conversation, ConversationMessage],
   // Migrations should be run explicitly via CLI, not loaded during app startup
   // This prevents TypeDI container initialization issues
   // Use: npm run db:migrate to run migrations
