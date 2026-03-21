@@ -109,7 +109,8 @@ feishu:
   # OAuth redirect URI (required)
   # Must match what's configured in Feishu app settings
   # Format: https://your-domain.com/api/auth/feishu/callback
-  oauth_redirect_uri: "https://ciiber.example.com/api/auth/feishu/callback"  # PENDING: 待客户提供域名
+  # Note: Using public IP with nginx proxy port (20180 -> 80)
+  oauth_redirect_uri: "http://113.105.103.165:20180/api/auth/feishu/callback"  # CORRECTED: 使用公网IP+nginx端口
 
   # Event callback URL (optional, for bot integration)
   # Feishu will send events to this URL
@@ -142,7 +143,8 @@ dingtalk:
   # OAuth redirect URI (required)
   # Must match what's configured in DingTalk app settings
   # Format: https://your-domain.com/api/auth/dingtalk/callback
-  oauth_redirect_uri: "https://ciiber.example.com/api/auth/dingtalk/callback"  # PENDING: 待客户提供域名
+  # Note: Using public IP with nginx proxy port (20180 -> 80)
+  oauth_redirect_uri: "http://113.105.103.165:20180/api/auth/dingtalk/callback"  # CORRECTED: 使用公网IP+nginx端口
 
   # CorpId for enterprise integration (optional)
   # Required for some enterprise features
