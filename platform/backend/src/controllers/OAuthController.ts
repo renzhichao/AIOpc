@@ -250,7 +250,7 @@ export class OAuthController {
         );
       }
 
-      const url = this.oauthService.getAuthorizationUrl(undefined, { redirect_uri: redirectUri });
+      const url = await this.oauthService.getAuthorizationUrl(undefined, { redirect_uri: redirectUri });
 
       return {
         success: true,
