@@ -1,11 +1,16 @@
 /**
- * DingTalk OAuth Provider Exports
+ * OAuth Providers Module
  *
- * Exports DingTalk OAuth provider and related types.
+ * Exports all OAuth provider implementations and related types.
+ * Supports multiple platforms: Feishu, DingTalk.
  *
  * @module auth/providers
  */
 
+// Feishu OAuth Provider
+export { FeishuOAuthProvider } from './FeishuOAuthProvider';
+
+// DingTalk OAuth Provider
 export { DingTalkOAuthProvider } from './DingTalkOAuthProvider';
 export { DingTalkErrorHandler } from './DingTalkErrorHandler';
 export {
