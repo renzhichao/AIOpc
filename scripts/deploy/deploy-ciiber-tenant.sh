@@ -368,7 +368,7 @@ ENV_EOF
 
     echo ''
     echo '=== 更新 docker-compose.yml ==='
-    cat > /opt/opclaw/platform/docker-compose.yml << 'COMPOSE_EOF'
+    cat > /opt/opclaw/platform/docker-compose.yml << COMPOSE_EOF
 version: '3.8'
 
 services:
