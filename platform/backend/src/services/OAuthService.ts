@@ -5,6 +5,7 @@ import { UserRepository } from '../repositories/UserRepository';
 import { InstanceRepository } from '../repositories/InstanceRepository';
 import { User } from '../entities/User.entity';
 import { logger } from '../config/logger';
+import { LogSanitizer } from '../utils/LogSanitizer';
 import type { StringValue } from 'ms';
 import {
   FeishuAuthUrlOptions,
@@ -77,14 +78,14 @@ export class OAuthService {
 
     // 验证生成的 URL 不包含 "undefined"
     if (url.includes('undefined')) {
-      logger.error('Generated OAuth URL contains "undefined"', { url });
+      LogSanitizer.log('error', 'Generated OAuth URL contains "undefined"', { url });
       throw new Error(
         'Failed to generate valid OAuth URL: URL contains undefined values. ' +
         'Please check your environment configuration.'
       );
     }
 
-    logger.info('Generated Feishu authorization URL', { state });
+    LogSanitizer.log('info', 'Generated Feishu authorization URL', { state });
     return url;
   }
 
@@ -121,7 +122,7 @@ export class OAuthService {
         open_id: feishuUserData.open_id
       };
 
-      logger.info('User info extracted from token response', {
+      LogSanitizer.log('info', 'User info extracted from token response', {
         open_id: userInfo.open_id,
         union_id: userInfo.union_id,
         name: userInfo.name
@@ -149,7 +150,7 @@ export class OAuthService {
           avatar_url: userInfo.avatar_url
         });
         user = newUser;
-        logger.info('New user created', { userId: user.id, name: user.name });
+        LogSanitizer.log('info', 'New user created', { userId: user.id, name: user.name });
       } else {
         // 更新现有用户数据
         const updateData: Partial<User> = {
@@ -167,7 +168,7 @@ export class OAuthService {
         if (updatedUser) {
           user = updatedUser;
         }
-        logger.info('Existing user updated', { userId: user.id, name: user.name });
+        LogSanitizer.log('info', 'Existing user updated', { userId: user.id, name: user.name });
       }
       // ======================================================================
       // END TEMPORARY HACK
@@ -191,7 +192,7 @@ export class OAuthService {
       const accessToken = this.generateJWTToken(jwtPayload);
       const refreshToken = this.generateRefreshToken(jwtPayload);
 
-      logger.info('OAuth callback successful', { userId: user.id });
+      LogSanitizer.log('info', 'OAuth callback successful', { userId: user.id });
 
       return {
         access_token: accessToken,
@@ -210,7 +211,7 @@ export class OAuthService {
         redirect_to: claimedInstance ? '/chat' : '/no-instance'
       };
     } catch (error) {
-      logger.error('OAuth callback failed', error);
+      LogSanitizer.log('error', 'OAuth callback failed', error);
       throw new Error('OAuth callback failed');
     }
   }
@@ -239,11 +240,11 @@ export class OAuthService {
         email: payload.email
       });
 
-      logger.info('Token refresh successful', { userId: payload.userId });
+      LogSanitizer.log('info', 'Token refresh successful', { userId: payload.userId });
 
       return { access_token: newAccessToken };
     } catch (error) {
-      logger.error('Token refresh failed', error);
+      LogSanitizer.log('error', 'Token refresh failed', error);
       throw new Error('Invalid refresh token');
     }
   }
@@ -261,7 +262,7 @@ export class OAuthService {
       const payload = jwt.verify(token, process.env.JWT_SECRET!) as JwtPayload;
       return payload;
     } catch (error) {
-      logger.error('Token verification failed', error);
+      LogSanitizer.log('error', 'Token verification failed', error);
       throw new Error('Invalid token');
     }
   }
@@ -284,7 +285,7 @@ export class OAuthService {
         );
       }
 
-      logger.info('Exchanging code for token', {
+      LogSanitizer.log('info', 'Exchanging code for token', {
         appId,
         codeLength: authCode?.length
       });
@@ -307,18 +308,16 @@ export class OAuthService {
         }
       );
 
-      // 详细记录飞书 API 响应
-      logger.info('Feishu token API response', {
+      // 详细记录飞书 API 响应（脱敏）
+      LogSanitizer.log('info', 'Feishu token API response', {
         status: response.status,
         statusText: response.statusText,
-        rawData: JSON.stringify(response.data),
         dataType: typeof response.data,
         dataKeys: Object.keys(response.data),
         hasCode: 'code' in response.data,
         codeValue: (response.data as any).code,
         hasMsg: 'msg' in response.data,
         msgValue: (response.data as any).msg,
-        hasAccessToken: 'access_token' in response.data,
         hasData: 'data' in response.data
       });
 
@@ -328,7 +327,7 @@ export class OAuthService {
 
       return response.data;
     } catch (error) {
-      logger.error('Failed to exchange code for token', {
+      LogSanitizer.log('error', 'Failed to exchange code for token', {
         error: error instanceof Error ? error.message : String(error),
         stack: error instanceof Error ? error.stack : undefined,
       });
@@ -367,7 +366,7 @@ export class OAuthService {
 
       return response.data.data;
     } catch (error) {
-      logger.error('Failed to get user info', error);
+      LogSanitizer.log('error', 'Failed to get user info', error);
       throw new Error('Failed to fetch user information');
     }
   }
@@ -416,7 +415,7 @@ export class OAuthService {
           userId
         );
 
-        logger.info('Auto-claimed instance for user', {
+        LogSanitizer.log('info', 'Auto-claimed instance for user', {
           userId: userId,
           instanceId: unclaimedInstance.instance_id
         });
@@ -427,7 +426,7 @@ export class OAuthService {
       return null;
     } catch (error) {
       // 如果自动认领失败，记录错误但不中断登录流程
-      logger.error('Failed to auto-claim instance for user', {
+      LogSanitizer.log('error', 'Failed to auto-claim instance for user', {
         userId: userId,
         error: error instanceof Error ? error.message : 'Unknown error'
       });
@@ -485,7 +484,7 @@ export class OAuthService {
         if (tempUser) {
           // 检查是否是临时用户（feishu_user_id 以 pending_recover_ 开头）
           if (tempUser.feishu_user_id && tempUser.feishu_user_id.startsWith('pending_recover_')) {
-            logger.info('Found recovered user, updating with real Feishu credentials', {
+            LogSanitizer.log('info', 'Found recovered user, updating with real Feishu credentials', {
               userId: tempUser.id,
               userName: tempUser.name,
               oldFeishuId: tempUser.feishu_user_id,
@@ -504,7 +503,7 @@ export class OAuthService {
             // 重新获取更新后的用户
             const updatedUser = await this.userRepository.findById(tempUser.id);
 
-            logger.info('Successfully merged recovered user account', {
+            LogSanitizer.log('info', 'Successfully merged recovered user account', {
               userId: updatedUser?.id,
               feishuUserId: updatedUser?.feishu_user_id
             });
@@ -518,7 +517,7 @@ export class OAuthService {
       return null;
     } catch (error) {
       // 如果处理失败，记录错误但不中断登录流程
-      logger.error('Failed to handle recovered user', {
+      LogSanitizer.log('error', 'Failed to handle recovered user', {
         userName: userInfo.name,
         error: error instanceof Error ? error.message : 'Unknown error'
       });

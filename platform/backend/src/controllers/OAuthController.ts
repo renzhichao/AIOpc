@@ -3,6 +3,7 @@ import { Service } from 'typedi';
 import { OAuthService } from '../services/OAuthService';
 import { logger } from '../config/logger';
 import { AppError, ErrorCodes } from '../utils/errors';
+import { LogSanitizer } from '../utils/LogSanitizer';
 
 /**
  * OAuth 2.0 Controller
@@ -56,7 +57,7 @@ export class OAuthController {
 
       return { url };
     } catch (error) {
-      logger.error('Failed to generate authorization URL', error);
+      LogSanitizer.log('error', 'Failed to generate authorization URL', error);
 
       if (error instanceof AppError) {
         throw error;
@@ -114,7 +115,7 @@ export class OAuthController {
         message: 'Authentication successful'
       };
     } catch (error) {
-      logger.error('OAuth callback failed', error);
+      LogSanitizer.log('error', 'OAuth callback failed', error);
 
       throw new AppError(
         401,
@@ -167,7 +168,7 @@ export class OAuthController {
         message: 'Token refreshed successfully'
       };
     } catch (error) {
-      logger.error('Token refresh failed', error);
+      LogSanitizer.log('error', 'Token refresh failed', error);
 
       throw new AppError(
         401,
@@ -222,7 +223,7 @@ export class OAuthController {
         }
       };
     } catch (error) {
-      logger.error('Token verification failed', error);
+      LogSanitizer.log('error', 'Token verification failed', error);
 
       return {
         success: true,
