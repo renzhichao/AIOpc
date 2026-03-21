@@ -153,12 +153,12 @@ jobs:
           TENANT_NAME=$(yq '.tenant.name' "$TENANT_CONFIG")
           ENVIRONMENT=$(yq '.tenant.environment' "$TENANT_CONFIG")
           SERVER_HOST=$(yq '.server.host' "$TENANT_CONFIG")
-          API_PORT=$(yq '.server.api_port' "$TENANT_CONFIG")
+          HTTP_PORT=$(yq '.server.http_port' "$TENANT_CONFIG")
 
           echo "租户ID (Tenant ID): $TENANT_ID"
           echo "租户名称 (Tenant Name): $TENANT_NAME"
           echo "环境 (Environment): $ENVIRONMENT"
-          echo "服务器 (Server): $SERVER_HOST:$API_PORT"
+          echo "服务器 (Server): $SERVER_HOST:$HTTP_PORT"
           echo ""
 
           # 设置输出变量 (Set output variables)
@@ -588,17 +588,20 @@ jobs:
           SERVER_HOST=$(yq '.server.host' "$TENANT_CONFIG")
           SERVER_USER=$(yq '.server.ssh_user' "$TENANT_CONFIG")
           DEPLOY_PATH=$(yq '.server.deploy_path' "$TENANT_CONFIG")
-          API_PORT=$(yq '.server.api_port' "$TENANT_CONFIG")
+          HTTP_PORT=$(yq '.server.http_port' "$TENANT_CONFIG")
+          BACKEND_PORT=$(yq '.server.backend_port' "$TENANT_CONFIG")
 
           # 设置输出 (Set outputs)
           echo "server_host=$SERVER_HOST" >> $GITHUB_OUTPUT
           echo "server_user=$SERVER_USER" >> $GITHUB_OUTPUT
           echo "deploy_path=$DEPLOY_PATH" >> $GITHUB_OUTPUT
-          echo "api_port=$API_PORT" >> $GITHUB_OUTPUT
+          echo "http_port=$HTTP_PORT" >> $GITHUB_OUTPUT
+          echo "backend_port=$BACKEND_PORT" >> $GITHUB_OUTPUT
 
           echo "服务器 (Server): $SERVER_USER@$SERVER_HOST"
           echo "部署路径 (Deploy Path): $DEPLOY_PATH"
-          echo "API 端口 (API Port): $API_PORT"
+          echo "Frontend HTTP端口 (HTTP Port): $HTTP_PORT"
+          echo "Backend API端口 (Backend Port): $BACKEND_PORT"
 
       #------------------------------------------------------------------------
       # 执行部署脚本 (Execute Deployment Script)
@@ -785,8 +788,9 @@ jobs:
           - **强制部署 (Force Deploy)**: ${{ github.event.inputs.force_deploy }}
 
           ### 访问信息 (Access Information)
-          - **API 端点**: http://${{ steps.load-config.outputs.server_host }}:${{ steps.load-config.outputs.api_port }}
-          - **健康检查**: http://${{ steps.load-config.outputs.server_host }}:${{ steps.load-config.outputs.api_port }}/health
+          - **Frontend**: http://${{ steps.load-config.outputs.server_host }}:${{ steps.load-config.outputs.http_port }}
+          - **Backend API**: http://${{ steps.load-config.outputs.server_host }}:${{ steps.load-config.outputs.backend_port }}
+          - **健康检查 (Health Check)**: http://${{ steps.load-config.outputs.server_host }}:${{ steps.load-config.outputs.backend_port }}/health
           EOF
 
   #==========================================================================
@@ -823,12 +827,14 @@ jobs:
 
           # 提取配置信息 (Extract configuration)
           SERVER_HOST=$(yq '.server.host' "$TENANT_CONFIG")
-          API_PORT=$(yq '.server.api_port' "$TENANT_CONFIG")
+          HTTP_PORT=$(yq '.server.http_port' "$TENANT_CONFIG")
+          BACKEND_PORT=$(yq '.server.backend_port' "$TENANT_CONFIG")
           DOMAIN=$(yq '.server.domain' "$TENANT_CONFIG")
 
           # 设置输出 (Set outputs)
           echo "server_host=$SERVER_HOST" >> $GITHUB_OUTPUT
-          echo "api_port=$API_PORT" >> $GITHUB_OUTPUT
+          echo "http_port=$HTTP_PORT" >> $GITHUB_OUTPUT
+          echo "backend_port=$BACKEND_PORT" >> $GITHUB_OUTPUT
           echo "domain=$DOMAIN" >> $GITHUB_OUTPUT
 
       #------------------------------------------------------------------------
@@ -843,20 +849,16 @@ jobs:
           echo ""
 
           SERVER_HOST="${{ steps.load-config.outputs.server_host }}"
-          API_PORT="${{ steps.load-config.outputs.api_port }}"
-          DOMAIN="${{ steps.load-config.outputs.domain }}"
+          BACKEND_PORT="${{ steps.load-config.outputs.backend_port }}"
 
           # 健康检查策略 (Health check strategy):
-          # - 使用SSH连接到服务器后在本地执行健康检查
-          # - 直接访问localhost:3000 (backend容器内部端口)
-          # - backend的/health端点在3000端口，而不是80端口(frontend)
-          HEALTH_HOST="localhost"
-          HEALTH_PORT="3000"  # Backend容器内部端口
-
-          HEALTH_URL="http://${HEALTH_HOST}:${HEALTH_PORT}/health"
+          # - 直接从GitHub Actions访问外网IP+backend端口
+          # - 不需要SSH登录到服务器
+          # - Backend的/health端点暴露在BACKEND_PORT端口
+          HEALTH_URL="http://${SERVER_HOST}:${BACKEND_PORT}/health"
 
           echo "检查端点 (Check endpoint): $HEALTH_URL"
-          echo "注意 (Note): 通过SSH连接后在服务器本地执行检查"
+          echo "说明 (Note): 从GitHub Actions直接访问外网IP+端口"
           echo ""
 
           # 执行健康检查 (Execute health check)
@@ -867,7 +869,7 @@ jobs:
           while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
             echo "尝试 $((RETRY_COUNT + 1))/$MAX_RETRIES (Attempt $((RETRY_COUNT + 1))/$MAX_RETRIES)"
 
-            if curl -f -s "$HEALTH_URL" > /dev/null 2>&1; then
+            if curl -f -s --connect-timeout 10 "$HEALTH_URL" > /dev/null 2>&1; then
               echo "✅ 健康检查通过 (Health check passed)"
               HEALTH_STATUS="passed"
               break
@@ -899,41 +901,40 @@ jobs:
           echo ""
 
           SERVER_HOST="${{ steps.load-config.outputs.server_host }}"
-          API_PORT="${{ steps.load-config.outputs.api_port }}"
+          HTTP_PORT="${{ steps.load-config.outputs.http_port }}"
+          BACKEND_PORT="${{ steps.load-config.outputs.backend_port }}"
           DOMAIN="${{ steps.load-config.outputs.domain }}"
 
           # 烟雾测试策略 (Smoke test strategy):
-          # - 使用SSH连接到服务器后在本地执行测试
-          # - 直接访问localhost:容器内部端口(80)，避免端口映射问题
-          BASE_HOST="localhost"
-          BASE_PORT="80"  # 容器内部端口
+          # - 直接从GitHub Actions访问外网IP+端口
+          # - 不需要SSH登录到服务器
+          FRONTEND_URL="http://${SERVER_HOST}:${HTTP_PORT}"
+          BACKEND_URL="http://${SERVER_HOST}:${BACKEND_PORT}"
 
-          BASE_URL="http://${BASE_HOST}:${BASE_PORT}"
-
-          # 测试 1: API 根路径 (Test 1: API Root)
-          echo "测试 1: API 根路径 (Test 1: API Root)"
-          if curl -f -s "${BASE_URL}/" | head -20; then
-            echo "✅ API 根路径测试通过 (API root test passed)"
+          # 测试 1: Frontend根路径 (Test 1: Frontend Root)
+          echo "测试 1: Frontend根路径 (Test 1: Frontend Root)"
+          if curl -f -s "${FRONTEND_URL}/" | head -20; then
+            echo "✅ Frontend根路径测试通过 (Frontend root test passed)"
           else
-            echo "⚠️ API 根路径测试失败 (API root test failed)"
+            echo "⚠️ Frontend根路径测试失败 (Frontend root test failed)"
           fi
           echo ""
 
-          # 测试 2: 健康端点详细输出 (Test 2: Health Endpoint Detail)
-          echo "测试 2: 健康端点详细输出 (Test 2: Health Endpoint Detail)"
-          if curl -f -s "${BASE_URL}/health" | jq .; then
-            echo "✅ 健康端点测试通过 (Health endpoint test passed)"
+          # 测试 2: Backend健康端点 (Test 2: Backend Health Endpoint)
+          echo "测试 2: Backend健康端点 (Test 2: Backend Health Endpoint)"
+          if curl -f -s "${BACKEND_URL}/health" | jq .; then
+            echo "✅ Backend健康端点测试通过 (Backend health endpoint test passed)"
           else
-            echo "⚠️ 健康端点测试失败 (Health endpoint test failed)"
+            echo "⚠️ Backend健康端点测试失败 (Backend health endpoint test failed)"
           fi
           echo ""
 
-          # 测试 3: 指标端点 (Test 3: Metrics Endpoint)
-          echo "测试 3: 指标端点 (Test 3: Metrics Endpoint)"
-          if curl -f -s "${BASE_URL}/metrics" | head -20; then
-            echo "✅ 指标端点测试通过 (Metrics endpoint test passed)"
+          # 测试 3: Backend指标端点 (Test 3: Backend Metrics Endpoint)
+          echo "测试 3: Backend指标端点 (Test 3: Backend Metrics Endpoint)"
+          if curl -f -s "${BACKEND_URL}/metrics" | head -20; then
+            echo "✅ Backend指标端点测试通过 (Backend metrics endpoint test passed)"
           else
-            echo "⚠️ 指标端点测试失败 (Metrics endpoint test failed)"
+            echo "⚠️ Backend指标端点测试失败 (Backend metrics endpoint test failed)"
           fi
           echo ""
 
@@ -953,7 +954,7 @@ jobs:
 
           ### 健康检查 (Health Check)
           **状态 (Status)**: ${HEALTH_STATUS^}
-          **端点 (Endpoint)**: http://${{ steps.load-config.outputs.domain }}:${{ steps.load-config.outputs.api_port }}/health
+          **端点 (Endpoint)**: http://${{ steps.load-config.outputs.server_host }}:${{ steps.load-config.outputs.backend_port }}/health
 
           ### 烟雾测试 (Smoke Tests)
           **状态 (Status)**: ${SMOKE_STATUS^}
