@@ -124,7 +124,7 @@ async function testOAuthUrlGeneration() {
   console.log('Test 5: Test with custom redirect URI');
   try {
     const customRedirectUri = 'https://custom.example.com/oauth/callback';
-    const url = await oauthService.getAuthorizationUrl({ redirect_uri: customRedirectUri });
+    const url = await oauthService.getAuthorizationUrl(undefined, { redirect_uri: customRedirectUri });
     console.log('✅ SUCCESS: Generated OAuth URL with custom redirect URI');
     console.log('URL:', url);
 
