@@ -17,6 +17,22 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+#==============================================================================
+# Sudo 辅助函数 (Sudo Helper Function)
+#==============================================================================
+
+# 运行 sudo 命令，如果配置了 SUDO_PASSWORD 环境变量则使用它
+# 使用方法: run_sudo command [args...]
+run_sudo() {
+    if [[ -n "${SUDO_PASSWORD:-}" ]]; then
+        # 使用 -S 选项从标准输入读取密码
+        echo "$SUDO_PASSWORD" | sudo -S "$@"
+    else
+        # 没有配置密码，直接调用 sudo（假设用户有免密码权限）
+        run_sudo "$@"
+    fi
+}
+
 # 配置
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
@@ -72,8 +88,8 @@ ssh_exec "
     if ! command -v docker &> /dev/null; then
         echo '安装 Docker...'
         curl -fsSL https://get.docker.com -o /tmp/get-docker.sh
-        sudo sh /tmp/get-docker.sh
-        sudo usermod -aG docker ${SSH_USER}
+        run_sudo sh /tmp/get-docker.sh
+        run_sudo usermod -aG docker ${SSH_USER}
         echo '✓ Docker 安装完成'
     else
         echo '✓ Docker 已安装'
@@ -88,12 +104,12 @@ echo ""
 # 步骤 3: 创建部署目录结构
 echo -e "${YELLOW}步骤 3: 创建部署目录结构...${NC}"
 ssh_exec "
-    sudo mkdir -p /opt/opclaw/platform
-    sudo mkdir -p /opt/opclaw/data/postgres
-    sudo mkdir -p /opt/opclaw/data/redis
-    sudo mkdir -p /etc/opclaw
-    sudo chown -R ${SSH_USER}:${SSH_USER} /opt/opclaw
-    sudo chown -R ${SSH_USER}:${SSH_USER} /etc/opclaw
+    run_sudo mkdir -p /opt/opclaw/platform
+    run_sudo mkdir -p /opt/opclaw/data/postgres
+    run_sudo mkdir -p /opt/opclaw/data/redis
+    run_sudo mkdir -p /etc/opclaw
+    run_sudo chown -R ${SSH_USER}:${SSH_USER} /opt/opclaw
+    run_sudo chown -R ${SSH_USER}:${SSH_USER} /etc/opclaw
     echo '✓ 目录结构创建完成'
     ls -la /opt/opclaw/
 "
@@ -242,7 +258,7 @@ echo ""
 # 步骤 8: 创建健康检查脚本
 echo -e "${YELLOW}步骤 8: 创建健康检查脚本...${NC}"
 ssh_exec "
-    sudo tee /usr/local/bin/opclaw-health.sh > /dev/null << 'HEALTH_EOF'
+    run_sudo tee /usr/local/bin/opclaw-health.sh > /dev/null << 'HEALTH_EOF'
 #!/bin/bash
 echo '=== OpenClaw 服务健康检查 ==='
 echo ''
@@ -265,7 +281,7 @@ echo '=== 磁盘空间 ==='
 df -h /opt/opclaw
 HEALTH_EOF
 
-    sudo chmod +x /usr/local/bin/opclaw-health.sh
+    run_sudo chmod +x /usr/local/bin/opclaw-health.sh
     echo '✓ 健康检查脚本创建完成'
 "
 echo ""
