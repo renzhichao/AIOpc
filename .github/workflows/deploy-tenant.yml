@@ -350,11 +350,16 @@ jobs:
       #------------------------------------------------------------------------
       - name: Set Image Tags
         id: image-tags
+        env:
+          DEFAULT_REGISTRY: docker.io
+          ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY || '' }}
         run: |
           # Support multiple registries
           # Priority: GitHub Secrets > Aliyun ACR > Docker Hub (default)
           REGISTRY="${{ secrets.DOCKER_REGISTRY }}"
-          REGISTRY="${REGISTRY:-${{ secrets.ALIYUN_ACR_REGISTRY || 'docker.io' }}"
+          if [ -z "$REGISTRY" ]; then
+            REGISTRY="${ACR_REGISTRY:-$DEFAULT_REGISTRY}"
+          fi
           REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
 
           # Aliyun ACR namespace
