@@ -58,6 +58,17 @@ FEISHU_ENCRYPT_KEY="${FEISHU_ENCRYPT_KEY:-DoZ9NxC523OFphRtNnPdHDjk3OUHtsNZ}"
 # TODO: Remove this after proper migration implementation
 DB_SYNC="${DB_SYNC:-true}"
 
+# Docker镜像配置 - 从环境变量读取（由GitHub Actions传递）
+# 默认使用Docker Hub镜像，支持通过环境变量覆盖
+BACKEND_TAG="${BACKEND_TAG:-renzhichao/opclaw-backend:latest}"
+FRONTEND_TAG="${FRONTEND_TAG:-renzhichao/opclaw-frontend:latest}"
+BACKEND_IMAGE="${BACKEND_IMAGE:-$BACKEND_TAG}"
+FRONTEND_IMAGE="${FRONTEND_IMAGE:-$FRONTEND_TAG}"
+
+echo "使用镜像配置:"
+echo "  Backend:  $BACKEND_IMAGE"
+echo "  Frontend: $FRONTEND_IMAGE"
+
 echo -e "${BLUE}=== CIIBER 租户部署脚本 ===${NC}"
 echo ""
 
@@ -313,16 +324,16 @@ ssh_exec "
 
     echo ''
     echo '=== 拉取应用镜像 ==='
-    echo '拉取后端镜像...'
-    docker pull ghcr.io/renzhichao/aiopc/opclaw-backend:latest || {
-        echo '⚠ 后端镜像拉取失败，可能需要 GHCR 认证'
+    echo "拉取后端镜像: ${BACKEND_IMAGE}"
+    docker pull "${BACKEND_IMAGE}" || {
+        echo "⚠ 后端镜像拉取失败: ${BACKEND_IMAGE}"
         exit 1
     }
     echo '✓ 后端镜像拉取完成'
 
-    echo '拉取前端镜像...'
-    docker pull ghcr.io/renzhichao/aiopc/opclaw-frontend:latest || {
-        echo '⚠ 前端镜像拉取失败，可能需要 GHCR 认证'
+    echo "拉取前端镜像: ${FRONTEND_IMAGE}"
+    docker pull "${FRONTEND_IMAGE}" || {
+        echo "⚠ 前端镜像拉取失败: ${FRONTEND_IMAGE}"
         exit 1
     }
     echo '✓ 前端镜像拉取完成'
@@ -388,7 +399,7 @@ services:
       - opclaw-network
 
   backend:
-    image: ghcr.io/renzhichao/aiopc/opclaw-backend:latest
+    image: ${BACKEND_IMAGE}
     container_name: opclaw-backend
     restart: unless-stopped
     depends_on:
@@ -429,7 +440,7 @@ services:
       - opclaw-network
 
   frontend:
-    image: ghcr.io/renzhichao/aiopc/opclaw-frontend:latest
+    image: ${FRONTEND_IMAGE}
     container_name: opclaw-frontend
     restart: unless-stopped
     depends_on:
