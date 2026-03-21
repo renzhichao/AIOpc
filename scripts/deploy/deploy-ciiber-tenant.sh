@@ -355,6 +355,13 @@ ssh_exec "
     }
     echo '✓ 前端镜像拉取完成'
 
+    echo "拉取Nginx镜像: nginx:alpine"
+    docker pull nginx:alpine || {
+        echo "⚠ Nginx镜像拉取失败"
+        exit 1
+    }
+    echo '✓ Nginx镜像拉取完成'
+
     echo ''
     echo '=== 创建 docker-compose .env 文件 ==='
     cat > /opt/opclaw/platform/.env << 'ENV_EOF'
@@ -462,10 +469,30 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
-    ports:
-      - \"80:5173\"
+    # No port binding - only accessible via nginx
+    expose:
+      - "5173"
     healthcheck:
       test: [\"CMD\", \"wget\", \"--no-verbose\", \"--tries=1\", \"--spider\", \"http://localhost:5173/\"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - opclaw-network
+
+  nginx:
+    image: nginx:alpine
+    container_name: opclaw-nginx
+    restart: unless-stopped
+    depends_on:
+      - frontend
+      - backend
+    ports:
+      - \"80:80\"
+    volumes:
+      - /opt/opclaw/platform/nginx.conf:/etc/nginx/nginx.conf:ro
+    healthcheck:
+      test: [\"CMD\", \"wget\", \"--no-verbose\", \"--tries=1\", \"--spider\", \"http://localhost/\"]
       interval: 30s
       timeout: 10s
       retries: 3
