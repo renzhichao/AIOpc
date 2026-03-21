@@ -83,7 +83,8 @@ on:
 
 env:
   # 部署配置 (Deployment configuration)
-  DEPLOYMENT_VERSION: v1.0.0
+  # Use short commit SHA to ensure unique image tags per build
+  DEPLOYMENT_VERSION: v1.0.0-${{ github.sha }}
   SCRIPT_DIR: scripts/deploy
   LIB_DIR: scripts/lib
 
