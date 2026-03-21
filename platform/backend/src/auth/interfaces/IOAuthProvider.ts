@@ -55,14 +55,14 @@ export interface IOAuthProvider {
    *
    * @example
    * ```typescript
-   * const url = provider.getAuthorizationUrl(
+   * const url = await provider.getAuthorizationUrl(
    *   'https://myapp.com/oauth/callback',
    *   'random-state-123'
    * );
    * // Returns: 'https://open.feishu.cn/authen/v1/authorize?app_id=xxx&redirect_uri=...'
    * ```
    */
-  getAuthorizationUrl(redirectUri: string, state?: string): string;
+  getAuthorizationUrl(redirectUri: string, state?: string): Promise<string> | string;
 
   /**
    * Exchange authorization code for access token
