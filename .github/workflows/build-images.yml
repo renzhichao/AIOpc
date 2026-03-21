@@ -1,0 +1,194 @@
+name: Build and Push Docker Images
+
+on:
+  push:
+    branches: [main, develop]
+    paths:
+      - 'platform/backend/**'
+      - 'platform/frontend/**'
+      - '.github/workflows/build-images.yml'
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - 'platform/backend/**'
+      - 'platform/frontend/**'
+  workflow_dispatch:
+    inputs:
+      component:
+        description: 'Component to build (backend, frontend, or all)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - backend
+          - frontend
+          - all
+
+# Cancel in-progress runs for the same branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOCKER_REGISTRY: docker.io
+  BACKEND_IMAGE: renzhichao/opclaw-backend
+  FRONTEND_IMAGE: renzhichao/opclaw-frontend
+
+jobs:
+  ##############################################################################
+  # Job: Determine which components changed
+  ##############################################################################
+  detect-changes:
+    name: Detect Changes
+    runs-on: ubuntu-latest
+    outputs:
+      backend: ${{ steps.changes.outputs.backend }}
+      frontend: ${{ steps.changes.outputs.frontend }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Detect changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            backend:
+              - 'platform/backend/**'
+            frontend:
+              - 'platform/frontend/**'
+
+  ##############################################################################
+  # Job: Build and push backend image
+  ##############################################################################
+  build-backend:
+    name: Build Backend Image
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.backend == 'true' ||
+      github.event.inputs.component == 'backend' ||
+      github.event.inputs.component == 'all'
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.BACKEND_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: platform/backend
+          file: platform/backend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      - name: Image digest
+        run: echo "Backend image digest is ${{ steps.build.outputs.digest }}"
+
+  ##############################################################################
+  # Job: Build and push frontend image
+  ##############################################################################
+  build-frontend:
+    name: Build Frontend Image
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: |
+      needs.detect-changes.outputs.frontend == 'true' ||
+      github.event.inputs.component == 'frontend' ||
+      github.event.inputs.component == 'all'
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.FRONTEND_IMAGE }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: platform/frontend
+          file: platform/frontend/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+          build-args: |
+            VITE_API_BASE_URL=/api
+
+      - name: Image digest
+        run: echo "Frontend image digest is ${{ steps.build.outputs.digest }}"
+
+  ##############################################################################
+  # Job: Trigger deployment (optional - for future use)
+  ##############################################################################
+  trigger-deployment:
+    name: Trigger Deployment
+    runs-on: ubuntu-latest
+    needs: [build-backend, build-frontend]
+    if: |
+      always() &&
+      (needs.build-backend.result == 'success' || needs.build-frontend.result == 'success') &&
+      github.ref == 'refs/heads/main'
+    steps:
+      - name: Deploy to CIIBER
+        run: |
+          echo "Images built successfully!"
+          echo "Backend: ${{ needs.build-backend.outputs.image-tag }}"
+          echo "Frontend: ${{ needs.build-frontend.outputs.image-tag }}"
+          echo "Deployment would be triggered here"
