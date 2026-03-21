@@ -38,6 +38,51 @@ export class UserRepository extends BaseRepository<User> {
   }
 
   /**
+   * 根据钉钉用户 ID 查找用户 (TASK-008)
+   */
+  async findByDingtalkUserId(dingtalkUserId: string): Promise<User | null> {
+    const result = await this.repository.findOne({
+      where: { dingtalk_user_id: dingtalkUserId }
+    });
+    return result || null;
+  }
+
+  /**
+   * 根据钉钉 Union ID 查找用户 (TASK-008)
+   */
+  async findByDingtalkUnionId(dingtalkUnionId: string): Promise<User | null> {
+    const result = await this.repository.findOne({
+      where: { dingtalk_union_id: dingtalkUnionId }
+    });
+    return result || null;
+  }
+
+  /**
+   * 根据平台和用户ID查找用户 (TASK-008 - 通用方法)
+   *
+   * @param platform OAuth平台 (feishu/dingtalk)
+   * @param userId 平台用户ID
+   * @returns 用户实例或null
+   */
+  async findByPlatformAndUserId(
+    platform: 'feishu' | 'dingtalk',
+    userId: string
+  ): Promise<User | null> {
+    const whereClause: any = {};
+
+    if (platform === 'feishu') {
+      whereClause.feishu_user_id = userId;
+    } else if (platform === 'dingtalk') {
+      whereClause.dingtalk_user_id = userId;
+    }
+
+    const result = await this.repository.findOne({
+      where: whereClause
+    });
+    return result || null;
+  }
+
+  /**
    * 根据邮箱查找用户
    */
   async findByEmail(email: string): Promise<User | null> {
