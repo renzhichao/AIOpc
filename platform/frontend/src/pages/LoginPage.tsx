@@ -1,5 +1,5 @@
 /**
- * 登录页面 - 显示二维码进行扫码登录
+ * 登录页面 - 支持多平台OAuth登录
  */
 
 import { useState, useEffect } from 'react';
@@ -7,8 +7,14 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useNavigate } from 'react-router-dom';
 import { authService } from '../services/auth';
 import { useAuth } from '../contexts/AuthContext';
+import PlatformSelector from '../components/PlatformSelector';
+import type { OAuthPlatform } from '../types/auth';
+
+type LoginStep = 'platform-selection' | 'qr-code';
 
 export default function LoginPage() {
+  const [currentStep, setCurrentStep] = useState<LoginStep>('platform-selection');
+  const [selectedPlatform, setSelectedPlatform] = useState<OAuthPlatform>('feishu');
   const [qrCodeUrl, setQrCodeUrl] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string>('');
@@ -24,12 +30,17 @@ export default function LoginPage() {
 
   // 获取授权 URL（生成二维码）
   useEffect(() => {
+    // 只有在选择平台后才获取二维码
+    if (currentStep === 'platform-selection') {
+      return;
+    }
+
     const fetchAuthUrl = async () => {
       try {
         setLoading(true);
         setError('');
 
-        const data = await authService.getAuthorizationUrl();
+        const data = await authService.getAuthorizationUrl(selectedPlatform);
         setQrCodeUrl(data.url);
       } catch (err) {
         const message = err instanceof Error ? err.message : '获取二维码失败，请稍后重试';
@@ -41,7 +52,20 @@ export default function LoginPage() {
     };
 
     fetchAuthUrl();
-  }, []);
+  }, [currentStep, selectedPlatform]);
+
+  // 处理平台选择
+  const handlePlatformSelect = (platform: OAuthPlatform) => {
+    setSelectedPlatform(platform);
+    setCurrentStep('qr-code');
+  };
+
+  // 返回平台选择
+  const handleBackToPlatformSelect = () => {
+    setCurrentStep('platform-selection');
+    setQrCodeUrl('');
+    setError('');
+  };
 
   // 刷新二维码
   const handleRefresh = () => {
@@ -50,7 +74,7 @@ export default function LoginPage() {
         setLoading(true);
         setError('');
 
-        const data = await authService.getAuthorizationUrl();
+        const data = await authService.getAuthorizationUrl(selectedPlatform);
         setQrCodeUrl(data.url);
       } catch (err) {
         const message = err instanceof Error ? err.message : '获取二维码失败，请稍后重试';
@@ -80,76 +104,117 @@ export default function LoginPage() {
         {/* Logo 和标题 */}
         <div className="text-center mb-8">
           <div className="text-6xl mb-4">🦞</div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2" data-testid="login-title">OpenClaw</h1>
-          <p className="text-gray-600" data-testid="login-subtitle">扫码即用 AI 智能体平台</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2" data-testid="login-title">
+            OpenClaw
+          </h1>
+          <p className="text-gray-600" data-testid="login-subtitle">
+            扫码即用 AI 智能体平台
+          </p>
         </div>
 
-        {/* 错误提示 */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-sm text-red-600">{error}</p>
+        {/* 平台选择步骤 */}
+        {currentStep === 'platform-selection' && (
+          <PlatformSelector
+            onPlatformSelect={handlePlatformSelect}
+            showRememberOption={true}
+          />
+        )}
+
+        {/* 二维码显示步骤 */}
+        {currentStep === 'qr-code' && (
+          <>
+            {/* 返回按钮 */}
             <button
-              onClick={handleRefresh}
-              className="mt-2 text-sm text-red-700 hover:text-red-800 underline"
+              onClick={handleBackToPlatformSelect}
+              className="mb-4 flex items-center text-sm text-gray-600 hover:text-gray-900 transition-colors"
+              data-testid="back-button"
             >
-              重新获取二维码
+              <svg
+                className="w-5 h-5 mr-1"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M15 19l-7-7 7-7"
+                />
+              </svg>
+              返回选择平台
             </button>
-          </div>
-        )}
 
-        {/* 加载状态 */}
-        {loading && (
-          <div className="flex flex-col items-center justify-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
-            <p className="text-gray-600">正在生成二维码...</p>
-          </div>
-        )}
-
-        {/* 二维码显示 */}
-        {!loading && qrCodeUrl && (
-          <div className="flex flex-col items-center" data-testid="qr-container">
-            <div className="bg-white p-6 rounded-lg shadow-inner border-2 border-gray-200 mb-6">
-              <QRCodeSVG
-                value={qrCodeUrl}
-                size={200}
-                level="M"
-                includeMargin={false}
-                className="block"
-                data-testid="qr-code"
-              />
-            </div>
-
-            <div className="text-center space-y-2 mb-6">
-              <p className="text-gray-700 font-medium">使用飞书扫码登录</p>
-              <p className="text-sm text-gray-500">
-                打开飞书APP，扫描上方二维码
-              </p>
-              <div className="mt-3 p-3 bg-blue-50 rounded-lg">
-                <p className="text-xs text-blue-600" data-testid="qr-code-expiry">
-                  有效期至: {timeRemaining}
-                </p>
+            {/* 错误提示 */}
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{error}</p>
+                <button
+                  onClick={handleRefresh}
+                  className="mt-2 text-sm text-red-700 hover:text-red-800 underline"
+                >
+                  重新获取二维码
+                </button>
               </div>
+            )}
+
+            {/* 加载状态 */}
+            {loading && (
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
+                <p className="text-gray-600">正在生成二维码...</p>
+              </div>
+            )}
+
+            {/* 二维码显示 */}
+            {!loading && qrCodeUrl && (
+              <div className="flex flex-col items-center" data-testid="qr-container">
+                <div className="bg-white p-6 rounded-lg shadow-inner border-2 border-gray-200 mb-6">
+                  <QRCodeSVG
+                    value={qrCodeUrl}
+                    size={200}
+                    level="M"
+                    includeMargin={false}
+                    className="block"
+                    data-testid="qr-code"
+                  />
+                </div>
+
+                <div className="text-center space-y-2 mb-6">
+                  <p className="text-gray-700 font-medium">
+                    使用{selectedPlatform === 'feishu' ? '飞书' : '钉钉'}扫码登录
+                  </p>
+                  <p className="text-sm text-gray-500">
+                    打开{selectedPlatform === 'feishu' ? '飞书' : '钉钉'}APP，扫描上方二维码
+                  </p>
+                  <div className="mt-3 p-3 bg-blue-50 rounded-lg">
+                    <p className="text-xs text-blue-600" data-testid="qr-code-expiry">
+                      有效期至: {timeRemaining}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleRefresh}
+                  className="w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors duration-200 text-sm font-medium"
+                >
+                  刷新二维码
+                </button>
+              </div>
+            )}
+
+            {/* 使用说明 */}
+            <div className="mt-8 pt-6 border-t border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">登录说明</h3>
+              <ol className="text-sm text-gray-600 space-y-2 list-decimal list-inside">
+                <li>打开{selectedPlatform === 'feishu' ? '飞书' : '钉钉'}移动应用</li>
+                <li>点击右上角扫描图标</li>
+                <li>扫描上方二维码</li>
+                <li>确认登录授权</li>
+              </ol>
             </div>
-
-            <button
-              onClick={handleRefresh}
-              className="w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors duration-200 text-sm font-medium"
-            >
-              刷新二维码
-            </button>
-          </div>
+          </>
         )}
-
-        {/* 使用说明 */}
-        <div className="mt-8 pt-6 border-t border-gray-200">
-          <h3 className="text-sm font-semibold text-gray-700 mb-3">登录说明</h3>
-          <ol className="text-sm text-gray-600 space-y-2 list-decimal list-inside">
-            <li>打开飞书移动应用</li>
-            <li>点击右上角扫描图标</li>
-            <li>扫描上方二维码</li>
-            <li>确认登录授权</li>
-          </ol>
-        </div>
 
         {/* 底部信息 */}
         <div className="mt-6 text-center">

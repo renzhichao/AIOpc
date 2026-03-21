@@ -2,9 +2,37 @@
  * 认证相关类型定义
  */
 
+/**
+ * OAuth 平台类型
+ */
+export type OAuthPlatform = 'feishu' | 'dingtalk';
+
+/**
+ * OAuth 平台信息
+ */
+export interface OAuthPlatformInfo {
+  platform: OAuthPlatform;
+  enabled: boolean;
+  isDefault: boolean;
+}
+
+/**
+ * 平台显示配置
+ */
+export interface PlatformDisplayConfig {
+  id: OAuthPlatform;
+  name: string;
+  description: string;
+  iconUrl: string;
+  color: string;
+  bgColor: string;
+}
+
 export interface User {
   id: string;
-  feishu_user_id: string;
+  feishu_user_id?: string;
+  dingtalk_user_id?: string;
+  oauth_platform: OAuthPlatform;
   name: string;
   email?: string;
   avatar_url?: string;
