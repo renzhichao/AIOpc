@@ -120,6 +120,72 @@ feishu:
   api_base_url: "${FEISHU_API_BASE_URL:-https://open.feishu.cn}"
 
 #==============================================================================
+# DingTalk Integration Configuration
+# (钉钉集成配置)
+#==============================================================================
+
+dingtalk:
+  # DingTalk AppKey (required)
+  # Get from DingTalk Open Platform
+  # Format: dingxxxxxxxxxxxxxxxx
+  app_key: "ding6fgvcdmcdigtazrm"  # CREDENTIAL: CIIBER钉钉AppKey
+
+  # DingTalk AppSecret (required)
+  # Get from DingTalk Open Platform
+  # Keep secret! Use environment variable
+  app_secret: "wRJsPR2nWnLiuYYhAspWsQX_hPQjyrmLRfbuZbV3LEzGqAAGG9Ca1rXKz27bgiSq"  # CREDENTIAL: CIIBER钉钉AppSecret
+
+  # Encryption key for data encryption (required)
+  # Use a strong random string (32+ characters recommended)
+  encrypt_key: "DingTalkEncryptKey32CharsHere123456"  # Generated 2026-03-21
+
+  # OAuth redirect URI (required)
+  # Must match what's configured in DingTalk app settings
+  # Format: https://your-domain.com/api/auth/dingtalk/callback
+  oauth_redirect_uri: "https://ciiber.example.com/api/auth/dingtalk/callback"  # PENDING: 待客户提供域名
+
+  # CorpId for enterprise integration (optional)
+  # Required for some enterprise features
+  corp_id: "${DINGTALK_CORP_ID:-}"
+
+  # Event callback URL (optional, for bot integration)
+  # DingTalk will send events to this URL
+  event_callback_url: "${DINGTALK_EVENT_CALLBACK_URL:-https://localhost/api/dingtalk/events}"
+
+  # API base URL (optional, defaults to DingTalk production)
+  api_base_url: "${DINGTALK_API_BASE_URL:-https://api.dingtalk.com}"
+
+#==============================================================================
+# Multi-Platform OAuth Configuration
+# (多平台OAuth配置)
+#==============================================================================
+
+oauth:
+  # Enabled OAuth platforms (required)
+  # Values: feishu, dingtalk
+  enabled_platforms:
+    - "feishu"
+    - "dingtalk"
+
+  # Default OAuth platform (optional)
+  # Used when user doesn't specify a platform
+  default_platform: "feishu"
+
+  # OAuth redirect URI whitelist (required)
+  # Domains allowed for OAuth callbacks
+  redirect_uri_whitelist:
+    - "ciiber.example.com"
+    - "localhost"
+    - "127.0.0.1"
+
+  # OAuth allowed domains (required)
+  # Domains allowed for OAuth operations (for validation)
+  allowed_domains:
+    - "ciiber.example.com"
+    - "localhost"
+    - "127.0.0.1"
+
+#==============================================================================
 # Database Configuration
 # (数据库配置)
 #==============================================================================
