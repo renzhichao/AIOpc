@@ -515,8 +515,14 @@ jobs:
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
+          # 从输入参数读取租户 ID (Read tenant ID from input parameter)
+          TENANT_ID="${{ github.event.inputs.tenant }}"
+          TENANT_CONFIG="config/tenants/${TENANT_ID}.yml"
+
+          echo "租户 ID (Tenant ID): $TENANT_ID"
+          echo "配置文件 (Config file): $TENANT_CONFIG"
+
           # 从租户配置读取 SSH key 路径作为参考 (Read SSH key path from config for reference)
-          TENANT_CONFIG="config/tenants/${{ env.TENANT_ID }}.yml"
           SSH_KEY_PATH=$(yq '.server.ssh_key_path' "$TENANT_CONFIG")
 
           echo "参考 SSH key 路径 (Reference SSH key path): $SSH_KEY_PATH"
@@ -525,7 +531,7 @@ jobs:
           # 根据租户 ID 选择对应的 SSH key secret
           # 租户专用 secret 命名格式: <TENANT_ID>_SSH_PRIVATE_KEY
           # 例如: CIIBER_SSH_PRIVATE_KEY, OMNITECH_SSH_PRIVATE_KEY
-          case "${{ env.TENANT_ID }}" in
+          case "$TENANT_ID" in
             CIIBER)
               if [ -n "${{ secrets.CIIBER_SSH_PRIVATE_KEY }}" ]; then
                 echo "${{ secrets.CIIBER_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
@@ -553,7 +559,7 @@ jobs:
                 echo "⚠️ 使用通用 SSH key（建议配置租户专用 key）"
                 echo "⚠️ Using fallback SSH key (tenant-specific key recommended)"
               else
-                echo "❌ 错误: 未找到 ${{ env.TENANT_ID }}_SSH_PRIVATE_KEY 或 SSH_PRIVATE_KEY"
+                echo "❌ 错误: 未找到 ${TENANT_ID}_SSH_PRIVATE_KEY 或 SSH_PRIVATE_KEY"
                 echo "请在 GitHub Secrets 中配置对应的 SSH key"
                 exit 1
               fi
