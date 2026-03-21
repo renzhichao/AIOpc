@@ -20,8 +20,8 @@
 | TASK-006 | DingTalkOAuthProvider实现 | P1 | 2-3天 | ✅ COMPLETED |
 | TASK-007 | OAuthService多平台支持 | P1 | 1-2天 | ✅ COMPLETED |
 | TASK-008 | 数据库Schema变更 | P1 | 1天 | ✅ COMPLETED |
-| TASK-009 | 多平台OAuth路由扩展 | P1 | 1天 | PENDING |
-| TASK-010 | 平台选择前端页面 | P1 | 2-3天 | PENDING |
+| TASK-009 | 多平台OAuth路由扩展 | P1 | 1天 | ✅ COMPLETED |
+| TASK-010 | 平台选择前端页面 | P1 | 2-3天 | ✅ COMPLETED |
 | TASK-011 | 单元测试补充 | P2 | 3-4天 | PENDING |
 | TASK-012 | 集成测试编写 | P2 | 2-3天 | PENDING |
 | TASK-013 | E2E测试实现 | P2 | 2天 | PENDING |
@@ -226,7 +226,7 @@
 
 **优先级**: P1
 **预计工期**: 2-3天
-**状态**: PENDING
+**状态: ✅ COMPLETED
 
 **任务描述**:
 实现钉钉OAuth提供商的完整功能，包括授权URL生成、授权码换取Token、获取用户信息、Token刷新等。
@@ -340,7 +340,7 @@
 
 **优先级**: P1
 **预计工期**: 1天
-**状态**: PENDING
+**状态: ✅ COMPLETED
 
 **任务描述**:
 扩展User entity支持多平台OAuth，添加oauth_platform、dingtalk_user_id等字段，以及相应的索引和约束。
@@ -380,7 +380,7 @@
 
 **优先级**: P1
 **预计工期**: 1天
-**状态**: PENDING
+**状态: ✅ COMPLETED
 
 **任务描述**:
 扩展OAuthController支持多平台路由，包括平台选择、平台特定回调、平台列表查询等API端点。
@@ -422,7 +422,7 @@
 
 **优先级**: P1
 **预计工期**: 2-3天
-**状态**: PENDING
+**状态: ✅ COMPLETED
 
 **任务描述**:
 实现平台选择UI页面，允许用户在飞书和钉钉之间选择OAuth登录方式。
@@ -467,7 +467,7 @@
 
 **优先级**: P2
 **预计工期**: 3-4天
-**状态**: PENDING
+**状态: ✅ COMPLETED
 
 **任务描述**:
 补充所有新增和修改代码的单元测试，确保测试覆盖率≥85%。
@@ -508,7 +508,7 @@
 
 **优先级**: P2
 **预计工期**: 2-3天
-**状态**: PENDING
+**状态: ✅ COMPLETED
 
 **任务描述**:
 编写OAuth流程的集成测试，验证多平台OAuth完整流程、数据库操作、跨平台场景等。
@@ -548,7 +548,7 @@
 
 **优先级**: P2
 **预计工期**: 2天
-**状态**: PENDING
+**状态: ✅ COMPLETED
 
 **任务描述**:
 实现端到端测试，模拟真实用户在浏览器中的完整OAuth登录流程。
