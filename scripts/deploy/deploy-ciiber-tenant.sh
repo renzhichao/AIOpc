@@ -156,7 +156,7 @@ JWT_ISSUER=CIIBER
 FEISHU_APP_ID=${FEISHU_APP_ID_ENV}
 FEISHU_APP_SECRET=${FEISHU_APP_SECRET_ENV}
 FEISHU_ENCRYPT_KEY=${FEISHU_ENCRYPT_KEY}
-FEISHU_OAUTH_REDIRECT_URI=https://ciiber.example.com/api/auth/feishu/callback
+FEISHU_OAUTH_REDIRECT_URI=http://113.105.103.165:20180/api/auth/feishu/callback
 
 # Server Configuration
 PORT=3000
@@ -318,7 +318,7 @@ ssh_exec "
     export FEISHU_ENCRYPT_KEY=\"${FEISHU_ENCRYPT_KEY}\"
     export FEISHU_APP_ID=\"${FEISHU_APP_ID_ENV}\"
     export FEISHU_APP_SECRET=\"${FEISHU_APP_SECRET_ENV}\"
-    export FEISHU_OAUTH_REDIRECT_URI='http://113.105.103.165:3000/api/auth/feishu/callback'
+    export FEISHU_OAUTH_REDIRECT_URI='http://113.105.103.165:20180/api/auth/feishu/callback'
 
     # Debug: Verify variables are set
     echo '=== Debug: Image Variables ==='
@@ -364,7 +364,7 @@ JWT_SECRET=${JWT_SECRET}
 FEISHU_ENCRYPT_KEY=${FEISHU_ENCRYPT_KEY}
 FEISHU_APP_ID=${FEISHU_APP_ID_ENV}
 FEISHU_APP_SECRET=${FEISHU_APP_SECRET_ENV}
-FEISHU_OAUTH_REDIRECT_URI=https://ciiber.example.com/api/auth/feishu/callback
+FEISHU_OAUTH_REDIRECT_URI=http://113.105.103.165:20180/api/auth/feishu/callback
 # ⚠️ TEMPORARY: Enable DB_SYNC for conversation tables auto-creation
 DB_SYNC=true
 ENV_EOF
