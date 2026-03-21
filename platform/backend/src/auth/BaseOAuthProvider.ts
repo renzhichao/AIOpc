@@ -65,13 +65,23 @@ export abstract class BaseOAuthProvider {
         return false;
       }
 
-      // 2. Production environment: force HTTPS
-      if (process.env.NODE_ENV === 'production' && url.protocol !== 'https:') {
+      // 2. Production environment: force HTTPS (unless explicitly allowed for testing)
+      const allowHttp = process.env.OAUTH_ALLOW_HTTP === 'true';
+      if (process.env.NODE_ENV === 'production' && url.protocol !== 'https:' && !allowHttp) {
         console.warn('[OAuth Security] HTTP redirect URI rejected in production (HTTPS required)', {
+          protocol: url.protocol,
+          uri: this.sanitizeUri(uri),
+          hint: 'Set OAUTH_ALLOW_HTTP=true to allow HTTP for testing'
+        });
+        return false;
+      }
+
+      // Log if HTTP is allowed in production (for security audit)
+      if (process.env.NODE_ENV === 'production' && url.protocol === 'http:' && allowHttp) {
+        console.warn('[OAuth Security] HTTP redirect URI allowed in production (OAUTH_ALLOW_HTTP=true)', {
           protocol: url.protocol,
           uri: this.sanitizeUri(uri)
         });
-        return false;
       }
 
       // 3. Domain whitelist validation
