@@ -23,7 +23,7 @@ import type { IOAuthProvider } from '../auth/interfaces/IOAuthProvider';
 /**
  * OAuth Platform Information
  */
-interface OAuthPlatformInfo {
+export interface OAuthPlatformInfo {
   platform: OAuthPlatform;
   enabled: boolean;
   isDefault: boolean;
@@ -216,8 +216,8 @@ export class OAuthService {
    * ```
    */
   async handleCallback(
-    platform?: OAuthPlatform,
-    authCode: string
+    authCode: string,
+    platform?: OAuthPlatform
   ): Promise<OAuthTokenResponse> {
     // Default to Feishu for backward compatibility
     const targetPlatform: OAuthPlatform = platform || this.defaultPlatform;
@@ -270,7 +270,7 @@ export class OAuthService {
       // Generate JWT tokens
       const jwtPayload: JwtPayload = {
         userId: user.id,
-        feishuUserId: targetPlatform === OAuthPlatform.FEISHU ? userProfile.user_id : undefined,
+        feishuUserId: targetPlatform === OAuthPlatform.FEISHU ? userProfile.user_id : '',
         feishuUnionId: targetPlatform === OAuthPlatform.FEISHU ? userProfile.union_id : undefined,
         name: user.name,
         email: user.email || undefined
