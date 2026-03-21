@@ -515,8 +515,51 @@ jobs:
           mkdir -p ~/.ssh
           chmod 700 ~/.ssh
 
-          # 添加 SSH 私钥 (Add SSH private key)
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+          # 从租户配置读取 SSH key 路径作为参考 (Read SSH key path from config for reference)
+          TENANT_CONFIG="config/tenants/${{ env.TENANT_ID }}.yml"
+          SSH_KEY_PATH=$(yq '.server.ssh_key_path' "$TENANT_CONFIG")
+
+          echo "参考 SSH key 路径 (Reference SSH key path): $SSH_KEY_PATH"
+          echo ""
+
+          # 根据租户 ID 选择对应的 SSH key secret
+          # 租户专用 secret 命名格式: <TENANT_ID>_SSH_PRIVATE_KEY
+          # 例如: CIIBER_SSH_PRIVATE_KEY, OMNITECH_SSH_PRIVATE_KEY
+          case "${{ env.TENANT_ID }}" in
+            CIIBER)
+              if [ -n "${{ secrets.CIIBER_SSH_PRIVATE_KEY }}" ]; then
+                echo "${{ secrets.CIIBER_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+                echo "✅ 使用 CIIBER 专用 SSH key (Using CIIBER-specific SSH key)"
+              else
+                echo "❌ 错误: 未找到 CIIBER_SSH_PRIVATE_KEY"
+                echo "请在 GitHub Secrets 中配置此 secret"
+                exit 1
+              fi
+              ;;
+            OMNITECH)
+              if [ -n "${{ secrets.OMNITECH_SSH_PRIVATE_KEY }}" ]; then
+                echo "${{ secrets.OMNITECH_SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+                echo "✅ 使用 OMNITECH 专用 SSH key (Using OMNITECH-specific SSH key)"
+              else
+                echo "❌ 错误: 未找到 OMNITECH_SSH_PRIVATE_KEY"
+                echo "请在 GitHub Secrets 中配置此 secret"
+                exit 1
+              fi
+              ;;
+            *)
+              # 对于其他租户，尝试使用通用 secret（向后兼容）
+              if [ -n "${{ secrets.SSH_PRIVATE_KEY }}" ]; then
+                echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/deploy_key
+                echo "⚠️ 使用通用 SSH key（建议配置租户专用 key）"
+                echo "⚠️ Using fallback SSH key (tenant-specific key recommended)"
+              else
+                echo "❌ 错误: 未找到 ${{ env.TENANT_ID }}_SSH_PRIVATE_KEY 或 SSH_PRIVATE_KEY"
+                echo "请在 GitHub Secrets 中配置对应的 SSH key"
+                exit 1
+              fi
+              ;;
+          esac
+
           chmod 600 ~/.ssh/deploy_key
 
           # 添加 SSH 配置 (Add SSH config)
@@ -611,6 +654,19 @@ jobs:
           export DEPLOYMENT_VERSION="${{ env.DEPLOYMENT_VERSION }}"
           export GIT_COMMIT_SHA="${{ github.sha }}"
           export GIT_BRANCH="${{ github.ref_name }}"
+
+          # 读取租户配置中的 sudo 密码 (Read sudo password from tenant config)
+          TENANT_CONFIG="config/tenants/${{ github.event.inputs.tenant }}.yml"
+          SUDO_PASSWORD=$(yq '.server.sudo_password' "$TENANT_CONFIG")
+
+          # 如果配置了sudo密码，设置环境变量 (Set env var if sudo password is configured)
+          if [ -n "$SUDO_PASSWORD" ] && [ "$SUDO_PASSWORD" != "null" ]; then
+            export SUDO_PASSWORD="$SUDO_PASSWORD"
+            echo "✅ Sudo 密码已配置 (Sudo password configured)"
+          else
+            echo "⚠️ 未配置 sudo 密码，假设用户有免密码 sudo 权限"
+            echo "⚠️ No sudo password configured, assuming passwordless sudo"
+          fi
 
           # GHCR 登录凭证 (GHCR login credentials)
           export GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
@@ -789,7 +845,22 @@ jobs:
           SERVER_HOST="${{ steps.load-config.outputs.server_host }}"
           API_PORT="${{ steps.load-config.outputs.api_port }}"
           DOMAIN="${{ steps.load-config.outputs.domain }}"
-          HEALTH_URL="http://${DOMAIN:-$SERVER_HOST}:${API_PORT}/health"
+
+          # Use DOMAIN if set and not "null", otherwise use SERVER_HOST
+          if [ -z "$DOMAIN" ] || [ "$DOMAIN" = "null" ]; then
+            HEALTH_HOST="$SERVER_HOST"
+          else
+            HEALTH_HOST="$DOMAIN"
+          fi
+
+          # Use API_PORT if set and not "null", otherwise use default 8080
+          if [ -z "$API_PORT" ] || [ "$API_PORT" = "null" ]; then
+            HEALTH_PORT="8080"
+          else
+            HEALTH_PORT="$API_PORT"
+          fi
+
+          HEALTH_URL="http://${HEALTH_HOST}:${HEALTH_PORT}/health"
 
           echo "检查端点 (Check endpoint): $HEALTH_URL"
           echo ""
@@ -836,7 +907,22 @@ jobs:
           SERVER_HOST="${{ steps.load-config.outputs.server_host }}"
           API_PORT="${{ steps.load-config.outputs.api_port }}"
           DOMAIN="${{ steps.load-config.outputs.domain }}"
-          BASE_URL="http://${DOMAIN:-$SERVER_HOST}:${API_PORT}"
+
+          # Use DOMAIN if set and not "null", otherwise use SERVER_HOST
+          if [ -z "$DOMAIN" ] || [ "$DOMAIN" = "null" ]; then
+            BASE_HOST="$SERVER_HOST"
+          else
+            BASE_HOST="$DOMAIN"
+          fi
+
+          # Use API_PORT if set and not "null", otherwise use default 8080
+          if [ -z "$API_PORT" ] || [ "$API_PORT" = "null" ]; then
+            BASE_PORT="8080"
+          else
+            BASE_PORT="$API_PORT"
+          fi
+
+          BASE_URL="http://${BASE_HOST}:${BASE_PORT}"
 
           # 测试 1: API 根路径 (Test 1: API Root)
           echo "测试 1: API 根路径 (Test 1: API Root)"
