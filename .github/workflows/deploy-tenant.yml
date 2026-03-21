@@ -396,7 +396,12 @@ jobs:
           echo "FRONTEND_TAG=${FRONTEND_TAG}" >> $GITHUB_OUTPUT
           echo "REGISTRY=${REGISTRY}" >> $GITHUB_OUTPUT
 
-          echo "📦 镜像仓库 (Docker Registry): ${REGISTRY:-Docker Hub}"
+          # Display image tags
+          if [ -z "$REGISTRY" ]; then
+            echo "📦 镜像仓库 (Docker Registry): Docker Hub"
+          else
+            echo "📦 镜像仓库 (Docker Registry): ${REGISTRY}"
+          fi
           echo "Backend: ${BACKEND_TAG}"
           echo "Backend Latest: ${BACKEND_LATEST}"
           echo "Frontend: ${FRONTEND_TAG}"
