@@ -348,38 +348,37 @@ jobs:
       #------------------------------------------------------------------------
       # 设置 Docker 镜像标签 (Setup Docker Image Tags)
       #------------------------------------------------------------------------
-      - name: 🏷️ 设置镜像标签 (Set Image Tags)
+      - name: Set Image Tags
         id: image-tags
         run: |
-          # 支持多个镜像仓库 (Support multiple registries)
-          # Priority: GitHub Secrets > 阿里云ACR > Docker Hub (默认)
+          # Support multiple registries
+          # Priority: GitHub Secrets > Aliyun ACR > Docker Hub (default)
           REGISTRY="${{ secrets.DOCKER_REGISTRY }}"
           REGISTRY="${REGISTRY:-${{ secrets.ALIYUN_ACR_REGISTRY || 'docker.io' }}"
           REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
 
-          # 阿里云ACR命名空间 (Aliyun ACR namespace)
+          # Aliyun ACR namespace
           ACR_NAMESPACE="${{ secrets.ALIYUN_ACR_NAMESPACE || 'aiopc' }}"
 
-          # Docker Hub用户名 (Docker Hub username)
+          # Docker Hub username
           DOCKERHUB_USERNAME="${{ secrets.DOCKERHUB_USERNAME || 'renzhichao' }}"
 
-          # 根据不同仓库设置不同的镜像路径
+          # Set image tags based on registry type
           if [[ "$REGISTRY" == *"aliyuncs.com" ]]; then
-            # 阿里云ACR格式: registry.cn-hangzhou.aliyuncs.com/namespace/image:tag
+            # Aliyun ACR format
             BACKEND_TAG="${REGISTRY}/${ACR_NAMESPACE}/opclaw-backend:${{ env.DEPLOYMENT_VERSION }}"
             BACKEND_LATEST="${REGISTRY}/${ACR_NAMESPACE}/opclaw-backend:latest"
             FRONTEND_TAG="${REGISTRY}/${ACR_NAMESPACE}/opclaw-frontend:${{ env.DEPLOYMENT_VERSION }}"
             FRONTEND_LATEST="${REGISTRY}/${ACR_NAMESPACE}/opclaw-frontend:latest"
           elif [[ "$REGISTRY" == "docker.io" ]] || [[ "$REGISTRY" == "index.docker.io" ]]; then
-            # Docker Hub格式: username/image:tag (不包含docker.io前缀)
+            # Docker Hub format (no docker.io prefix)
             BACKEND_TAG="${DOCKERHUB_USERNAME}/opclaw-backend:${{ env.DEPLOYMENT_VERSION }}"
             BACKEND_LATEST="${DOCKERHUB_USERNAME}/opclaw-backend:latest"
             FRONTEND_TAG="${DOCKERHUB_USERNAME}/opclaw-frontend:${{ env.DEPLOYMENT_VERSION }}"
             FRONTEND_LATEST="${DOCKERHUB_USERNAME}/opclaw-frontend:latest"
-            # 对于Docker Hub，不设置REGISTRY环境变量（docker会自动处理）
             REGISTRY=""
           else
-            # GHCR或其他仓库格式: registry/owner/repo/image:tag
+            # GHCR or other registries
             BACKEND_TAG="${REGISTRY}/${REPO_LOWER}/opclaw-backend:${{ env.DEPLOYMENT_VERSION }}"
             BACKEND_LATEST="${REGISTRY}/${REPO_LOWER}/opclaw-backend:latest"
             FRONTEND_TAG="${REGISTRY}/${REPO_LOWER}/opclaw-frontend:${{ env.DEPLOYMENT_VERSION }}"
@@ -398,14 +397,15 @@ jobs:
 
           # Display image tags
           if [ -z "$REGISTRY" ]; then
-            echo "📦 镜像仓库 (Docker Registry): Docker Hub"
+            echo "Docker Registry: Docker Hub"
           else
-            echo "📦 镜像仓库 (Docker Registry): ${REGISTRY}"
+            echo "Docker Registry: ${REGISTRY}"
           fi
           echo "Backend: ${BACKEND_TAG}"
           echo "Backend Latest: ${BACKEND_LATEST}"
           echo "Frontend: ${FRONTEND_TAG}"
           echo "Frontend Latest: ${FRONTEND_LATEST}"
+
 
       #------------------------------------------------------------------------
       # 登录到 Docker Registry (Login to Docker Registry)
