@@ -46,6 +46,8 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 # 构建生产版本
+# Set NODE_ENV=production to ensure .env.production is loaded by Vite
+ENV NODE_ENV=production
 RUN pnpm run build
 
 ################################################################################
