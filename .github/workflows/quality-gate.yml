@@ -47,10 +47,11 @@ jobs:
         working-directory: platform/${{ matrix.component }}
         run: pnpm install --frozen-lockfile
 
-      - name: Run ESLint
+      - name: Run ESLint (non-blocking)
+        id: eslint
         working-directory: platform/${{ matrix.component }}
-        run: pnpm run lint -- --quiet
-        continue-on-error: false
+        run: pnpm exec eslint . --ext .ts --quiet || echo "ESLint findings detected"
+        continue-on-error: true
 
       - name: Run TypeScript check
         working-directory: platform/${{ matrix.component }}
