@@ -320,6 +320,12 @@ ssh_exec "
     export FEISHU_APP_SECRET=\"${FEISHU_APP_SECRET_ENV}\"
     export FEISHU_OAUTH_REDIRECT_URI='http://113.105.103.165:3000/api/auth/feishu/callback'
 
+    # Debug: Verify variables are set
+    echo '=== Debug: Image Variables ==='
+    echo \"BACKEND_IMAGE=\${BACKEND_IMAGE}\"
+    echo \"FRONTEND_IMAGE=\${FRONTEND_IMAGE}\"
+    echo '====================================='
+
     echo '=== 登录 GitHub Container Registry ==='
     if [ -n \"${GITHUB_TOKEN}\" ]; then
         # Use the GitHub token to login to GHCR
