@@ -889,16 +889,22 @@ jobs:
           echo ""
 
           SERVER_HOST="${{ steps.load-config.outputs.server_host }}"
-          BACKEND_PORT="${{ steps.load-config.outputs.backend_port }}"
+          HTTP_PORT="${{ steps.load-config.outputs.http_port }}"
 
           # 健康检查策略 (Health check strategy):
-          # - 直接从GitHub Actions访问外网IP+backend端口
-          # - 不需要SSH登录到服务器
-          # - Backend的/health端点暴露在BACKEND_PORT端口
-          HEALTH_URL="http://${SERVER_HOST}:${BACKEND_PORT}/health"
+          # - 直接从GitHub Actions访问外网IP+HTTP端口
+          # - 通过nginx反向代理访问后端API
+          # - 使用OAuth平台端点验证后端服务是否正常
+          #
+          # 架构说明 (Architecture):
+          # - 公网 20180 → 内网 80 (nginx)
+          # - nginx /api/* → Backend (3000)
+          # - nginx /* → Frontend (5173)
+          HEALTH_URL="http://${SERVER_HOST}:${HTTP_PORT}/api/oauth/platforms"
 
           echo "检查端点 (Check endpoint): $HEALTH_URL"
-          echo "说明 (Note): 从GitHub Actions直接访问外网IP+端口"
+          echo "说明 (Note): 通过nginx反向代理验证后端API"
+          echo "架构: 公网${HTTP_PORT} → nginx(80) → backend(3000)"
           echo ""
 
           # 执行健康检查 (Execute health check)
