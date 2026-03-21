@@ -414,6 +414,31 @@ jobs:
 
 
       #------------------------------------------------------------------------
+      # 计算源文件哈希 (Calculate Source Hash for Cache Busting)
+      #------------------------------------------------------------------------
+      - name: 🔢 计算后端源文件哈希 (Calculate Backend Source Hash)
+        if: github.event.inputs.component == 'all' || github.event.inputs.component == 'backend'
+        id: backend-hash
+        run: |
+          echo "Calculating backend source file hash..."
+          cd platform/backend
+          # Calculate hash of all source files (excluding node_modules and dist)
+          BACKEND_HASH=$(find src -type f -name "*.ts" | sort | xargs cat | sha256sum | cut -d' ' -f1)
+          echo "hash=${BACKEND_HASH}" >> $GITHUB_OUTPUT
+          echo "Backend source hash: ${BACKEND_HASH}"
+
+      - name: 🔢 计算前端源文件哈希 (Calculate Frontend Source Hash)
+        if: github.event.inputs.component == 'all' || github.event.inputs.component == 'frontend'
+        id: frontend-hash
+        run: |
+          echo "Calculating frontend source file hash..."
+          cd platform/frontend
+          # Calculate hash of all source files
+          FRONTEND_HASH=$(find src -type f \( -name "*.ts" -o -name "*.tsx" -o -name "*.vue" \) | sort | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1)
+          echo "hash=${FRONTEND_HASH}" >> $GITHUB_OUTPUT
+          echo "Frontend source hash: ${FRONTEND_HASH}"
+
+      #------------------------------------------------------------------------
       # 登录到 Docker Registry (Login to Docker Registry)
       #------------------------------------------------------------------------
       - name: 🔐 登录 Docker Registry (Login to Docker Registry)
@@ -440,8 +465,12 @@ jobs:
             tenant=${{ needs.validate-config.outputs.tenant_id }}
             environment=${{ needs.validate-config.outputs.environment }}
             version=${{ env.DEPLOYMENT_VERSION }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          build-args: |
+            COMMIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            BUILD_TIMESTAMP=${{ github.event.head_commit.timestamp }}
+          cache-from: type=gha,ref=backend-${{ steps.backend-hash.outputs.hash }}
+          cache-to: type=gha,ref=backend-${{ steps.backend-hash.outputs.hash }},mode=max
           target: production
 
       #------------------------------------------------------------------------
@@ -460,8 +489,12 @@ jobs:
             tenant=${{ needs.validate-config.outputs.tenant_id }}
             environment=${{ needs.validate-config.outputs.environment }}
             version=${{ env.DEPLOYMENT_VERSION }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          build-args: |
+            COMMIT_SHA=${{ github.sha }}
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            BUILD_TIMESTAMP=${{ github.event.head_commit.timestamp }}
+          cache-from: type=gha,ref=frontend-${{ steps.frontend-hash.outputs.hash }}
+          cache-to: type=gha,ref=frontend-${{ steps.frontend-hash.outputs.hash }},mode=max
           target: production
 
       #------------------------------------------------------------------------

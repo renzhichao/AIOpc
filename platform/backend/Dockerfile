@@ -31,9 +31,9 @@ CMD ["pnpm", "run", "dev"]
 ################################################################################
 FROM node:22-alpine AS build
 
-# Add build timestamp for cache busting
+# Build arguments for cache busting
 ARG BUILD_TIMESTAMP
-ENV BUILD_TIMESTAMP=${BUILD_TIMESTAMP}
+ARG COMMIT_SHA
 
 WORKDIR /app
 
@@ -49,7 +49,12 @@ RUN pnpm install --frozen-lockfile
 # 复制源代码
 COPY . .
 
-# 构建 TypeScript
+# Cache-busting step: create a file with build timestamp to force rebuild when source changes
+RUN mkdir -p /tmp/build-info && \
+    echo "${BUILD_TIMESTAMP}" > /tmp/build-info/timestamp && \
+    echo "${COMMIT_SHA}" > /tmp/build-info/commit
+
+# 构建 TypeScript - this will now rerun when BUILD_TIMESTAMP changes
 RUN pnpm run build
 
 ################################################################################
