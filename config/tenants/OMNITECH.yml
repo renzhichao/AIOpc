@@ -69,8 +69,14 @@ server:
   # 镜像仓库配置 (可选)
   docker_registry:
     # Registry type (optional)
-    # Values: ghcr (GitHub Container Registry), aliyun (Aliyun ACR), custom
-    type: "${DOCKER_REGISTRY_TYPE:-aliyun}"
+    # Values: dockerhub (Docker Hub), ghcr (GitHub Container Registry), aliyun (Aliyun ACR), custom
+    type: "${DOCKER_REGISTRY_TYPE:-dockerhub}"
+
+    # Docker Hub configuration (when type: dockerhub)
+    # Docker Hub配置
+    dockerhub:
+      # Docker Hub username (required for Docker Hub)
+      username: "${DOCKERHUB_USERNAME:-renzhichao}"
 
     # Aliyun ACR configuration (when type: aliyun)
     # 阿里云容器镜像服务配置
