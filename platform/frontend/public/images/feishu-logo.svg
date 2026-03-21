@@ -1,0 +1,13 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="100" fill="#00D6B9"/>
+
+  <!-- Feishu logo icon (simplified) -->
+  <path d="M60 70 H90 V90 H70 V110 H90 V130 H60 V70Z" fill="white"/>
+  <path d="M80 70 H110 V90 H90 V110 H110 V130 H80 V70Z" fill="white" opacity="0.8"/>
+  <path d="M100 70 H130 V90 H110 V110 H130 V130 H100 V70Z" fill="white" opacity="0.6"/>
+
+  <!-- Flying bird symbol -->
+  <path d="M140 80 Q160 70 170 90 Q175 100 165 105 Q155 110 145 100 Q140 90 140 80Z" fill="white"/>
+  <path d="M130 100 Q150 90 160 110 Q165 120 155 125 Q145 130 135 120 Q130 110 130 100Z" fill="white" opacity="0.7"/>
+</svg>

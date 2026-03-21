@@ -1,0 +1,15 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background circle -->
+  <circle cx="100" cy="100" r="100" fill="#0089FF"/>
+
+  <!-- DingTalk logo icon (simplified) -->
+  <path d="M70 60 H130 V80 H110 V100 H130 V120 H110 V140 H70 V60Z" fill="white"/>
+
+  <!-- Checkmark symbol -->
+  <path d="M140 70 L170 100 L140 130" stroke="white" stroke-width="8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M170 100 L130 100" stroke="white" stroke-width="8" stroke-linecap="round"/>
+
+  <!-- Notification dots -->
+  <circle cx="150" cy="60" r="8" fill="white"/>
+  <circle cx="160" cy="75" r="6" fill="white" opacity="0.8"/>
+</svg>

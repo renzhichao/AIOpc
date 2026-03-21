@@ -2,7 +2,13 @@
  * 认证服务 - 处理与后端 API 的交互
  */
 
-import type { LoginResponse, ApiError, ClaimQRCodeResponse } from '../types/auth';
+import type {
+  LoginResponse,
+  ApiError,
+  ClaimQRCodeResponse,
+  OAuthPlatformInfo,
+  OAuthPlatform
+} from '../types/auth';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
@@ -14,16 +20,40 @@ export class AuthService {
   }
 
   /**
-   * 获取授权 URL（用于生成二维码）
+   * 获取启用的OAuth平台列表
    */
-  async getAuthorizationUrl(): Promise<{ url: string }> {
-    const redirectUri = `${window.location.origin}/oauth/callback`;
-    const response = await fetch(`${this.baseUrl}/oauth/authorize?redirect_uri=${encodeURIComponent(redirectUri)}`, {
+  async getEnabledPlatforms(): Promise<OAuthPlatformInfo[]> {
+    const response = await fetch(`${this.baseUrl}/oauth/platforms`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
       },
     });
+
+    if (!response.ok) {
+      const error: ApiError = await response.json();
+      throw new Error(error.message || '获取平台列表失败');
+    }
+
+    const result = await response.json();
+    // 后端返回格式: { success: true, data: [...] }
+    return result.data || result;
+  }
+
+  /**
+   * 获取指定平台的授权 URL
+   */
+  async getAuthorizationUrl(platform: OAuthPlatform = 'feishu'): Promise<{ url: string }> {
+    const redirectUri = `${window.location.origin}/oauth/callback`;
+    const response = await fetch(
+      `${this.baseUrl}/oauth/authorize/${platform}?redirect_uri=${encodeURIComponent(redirectUri)}`,
+      {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
 
     if (!response.ok) {
       const error: ApiError = await response.json();
