@@ -392,6 +392,27 @@ ssh -i ~/.ssh/aiopclaw_remote_agent root@101.34.254.52 "cat /etc/openclaw-agent/
 - Systemd service: `/etc/systemd/system/openclaw-agent.service`
 - Log file: `/var/log/openclaw-agent.log`
 
+#### CIIBER Tenant Server (113.105.103.165)
+```bash
+# SSH Access
+ssh -i ~/.ssh/ciiber_key -p 20122 openclaw@113.105.103.165
+
+# Local SSH Key Location
+~/.ssh/ciiber_key
+
+# Sudo Password (for privilege escalation)
+openclaw
+
+# Quick Commands
+ssh -i ~/.ssh/ciiber_key -p 20122 openclaw@113.105.103.165 "docker ps"
+ssh -i ~/.ssh/ciiber_key -p 20122 openclaw@113.105.103.165 "sudo systemctl restart docker"
+```
+
+**CIIBER Server Configuration Files**:
+- Docker config: `/etc/docker/daemon.json` (owned by openclaw user)
+- Tenant config: `config/tenants/CIIBER.yml`
+- Deploy path: `/opt/opclaw/platform`
+
 ### Quick Reference Commands
 
 **Platform Operations** (118.25.0.190):

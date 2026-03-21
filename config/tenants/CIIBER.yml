@@ -62,6 +62,10 @@ server:
   # Example: ~/.ssh/id_rsa, ~/.ssh/tenant_key
   ssh_key_path: "/Users/arthurren/.ssh/ciiber_key"  # Absolute path for deployment
 
+  # Sudo password for openclaw user (required for privilege escalation)
+  # CREDENTIAL: CIIBER server sudo password
+  sudo_password: "openclaw"
+
   # Deployment path on remote server (required)
   # Where the application will be deployed
   # Default: /opt/opclaw/platform
