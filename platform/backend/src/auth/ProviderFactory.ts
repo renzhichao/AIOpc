@@ -15,10 +15,13 @@
 
 import type {
   IOAuthProvider,
-  IOAuthProviderFactory,
-  OAuthPlatform
+  IOAuthProviderFactory
 } from './interfaces/IOAuthProvider';
-import { OAuthError, OAuthErrorType } from './interfaces/OAuthTypes';
+import {
+  OAuthPlatform,
+  OAuthError,
+  OAuthErrorType
+} from './interfaces/OAuthTypes';
 import { logger } from '../config/logger';
 
 /**
@@ -124,7 +127,7 @@ export class ProviderFactory implements IOAuthProviderFactory {
         OAuthErrorType.CONFIG_MISSING,
         platform,
         `No provider registered for platform: ${platform}. ` +
-        `Available platforms: ${availablePlugins || 'none'}`
+        `Available platforms: ${availablePlatforms || 'none'}`
       );
     }
 

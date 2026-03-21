@@ -44,7 +44,7 @@ async function testOAuthUrlGeneration() {
   // Test 2: Generate OAuth URL with default configuration
   console.log('Test 2: Generate OAuth URL with default configuration');
   try {
-    const url = oauthService.getAuthorizationUrl();
+    const url = await oauthService.getAuthorizationUrl();
     console.log('✅ SUCCESS: Generated OAuth URL');
     console.log('URL:', url);
     console.log('');
@@ -124,7 +124,7 @@ async function testOAuthUrlGeneration() {
   console.log('Test 5: Test with custom redirect URI');
   try {
     const customRedirectUri = 'https://custom.example.com/oauth/callback';
-    const url = oauthService.getAuthorizationUrl({ redirect_uri: customRedirectUri });
+    const url = await oauthService.getAuthorizationUrl({ redirect_uri: customRedirectUri });
     console.log('✅ SUCCESS: Generated OAuth URL with custom redirect URI');
     console.log('URL:', url);
 
