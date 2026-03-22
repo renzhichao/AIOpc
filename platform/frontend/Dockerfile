@@ -32,7 +32,7 @@ CMD ["pnpm", "run", "dev", "--", "--host", "0.0.0.0"]
 FROM node:22-alpine AS build
 
 # 接受构建参数
-ARG VITE_API_URL=http://localhost:3000
+ARG VITE_API_BASE_URL=/api
 ARG VITE_APP_NAME=AIOpc
 
 WORKDIR /app
@@ -53,7 +53,7 @@ COPY . .
 # Set NODE_ENV=production to ensure .env.production is loaded by Vite
 # 将构建参数设置为环境变量，供Vite使用
 ENV NODE_ENV=production
-ENV VITE_API_URL=${VITE_API_URL}
+ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 ENV VITE_APP_NAME=${VITE_APP_NAME}
 RUN pnpm run build
 
