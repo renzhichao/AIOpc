@@ -102,5 +102,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=20s --retries=3 \
 
 # 生产模式启动命令
 # -s dist: 服务静态文件目录
-# -l 0.0.0.0:5173: 监听所有网络接口的5173端口
-CMD ["npx", "serve", "-s", "dist", "-l", "0.0.0.0:5173"]
+# -l tcp://0.0.0.0:5173: 监听所有网络接口的5173端口
+CMD ["npx", "serve", "-s", "dist", "-l", "tcp://0.0.0.0:5173"]
