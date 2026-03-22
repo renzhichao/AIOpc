@@ -546,7 +546,8 @@ ssh_exec "
 
     # Start all services with fresh containers
     echo '  → 启动所有服务...'
-    docker compose up -d
+    # Use --env-file for variable interpolation phase, env_file directive for container runtime
+    docker compose --env-file /etc/opclaw/.env.production up -d
     echo '✓ 所有服务启动完成'
 " || {
     echo -e "${RED}✗ 服务启动失败${NC}"
