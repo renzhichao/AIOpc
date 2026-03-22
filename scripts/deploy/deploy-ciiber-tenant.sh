@@ -510,11 +510,22 @@ COMPOSE_EOF
 echo -e "${YELLOW}  9.7: 启动所有服务...${NC}"
 ssh_exec "
     cd /opt/opclaw/platform
-    # Stop containers first to avoid name conflicts with --force-recreate
-    docker compose down
+    # Stop and remove existing containers that may have been started manually
+    # (docker compose down only manages containers started by compose)
+    echo '  → 停止现有容器...'
+    docker stop opclaw-frontend opclaw-backend opclaw-nginx 2>/dev/null || true
+    docker rm opclaw-frontend opclaw-backend opclaw-nginx 2>/dev/null || true
+
+    # Stop compose-managed containers
+    echo '  → 停止 compose 管理的容器...'
+    docker compose down 2>/dev/null || true
+
     # Pull latest images
+    echo '  → 拉取最新镜像...'
     docker compose pull
+
     # Start all services with fresh containers
+    echo '  → 启动所有服务...'
     docker compose up -d
     echo '✓ 所有服务启动完成'
 " || {
