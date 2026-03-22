@@ -510,7 +510,7 @@ COMPOSE_EOF
 echo -e "${YELLOW}  9.7: 启动所有服务...${NC}"
 ssh_exec "
     cd /opt/opclaw/platform
-    docker compose up -d
+    docker compose up -d --force-recreate
     echo '✓ 所有服务启动完成'
 " || {
     echo -e "${RED}✗ 服务启动失败${NC}"
