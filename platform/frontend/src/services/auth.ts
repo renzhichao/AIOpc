@@ -60,7 +60,9 @@ export class AuthService {
       throw new Error(error.message || '获取授权 URL 失败');
     }
 
-    return response.json();
+    const result = await response.json();
+    // 后端返回格式: { success: true, data: { url: "...", platform: "..." } }
+    return result.data || result;
   }
 
   /**
