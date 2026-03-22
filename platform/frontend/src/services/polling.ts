@@ -40,7 +40,7 @@ export interface PollingService {
 }
 
 const DEFAULT_CONFIG: Required<PollingServiceConfig> = {
-  apiUrl: import.meta.env.VITE_API_URL || import.meta.env.VITE_API_BASE_URL || '/api',
+  apiUrl: import.meta.env.VITE_API_URL || '/api',
   pollInterval: 2000, // Start with 2 seconds
   maxPollInterval: 10000, // Max 10 seconds
   enableLongPolling: true,
