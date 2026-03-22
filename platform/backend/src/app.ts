@@ -163,6 +163,8 @@ class Application {
       'http://renava.cn',
       'http://118.25.0.190',
       'http://118.25.0.190:3000',
+      'http://113.105.103.165',
+      'http://113.105.103.165:20180',
       'http://localhost:3000',
       'http://localhost:5173', // Vite dev server
     ];
@@ -176,6 +178,10 @@ class Application {
         }
         // Allow requests from same origin
         if (origin.startsWith('http://118.25.0.190')) {
+          return callback(null, true);
+        }
+        // Allow requests from CIIBER server IP
+        if (origin.startsWith('http://113.105.103.165')) {
           return callback(null, true);
         }
         // Allow requests from renava.cn subdomains

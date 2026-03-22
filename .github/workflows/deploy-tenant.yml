@@ -341,6 +341,45 @@ jobs:
         uses: actions/checkout@v4
 
       #------------------------------------------------------------------------
+      # 设置 Python (Setup Python for yq)
+      #------------------------------------------------------------------------
+      - name: 🐍 设置 Python (Setup Python)
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      #------------------------------------------------------------------------
+      # 安装 yq (Install yq)
+      #------------------------------------------------------------------------
+      - name: 📦 安装 yq (Install yq)
+        run: |
+          YQ_VERSION="v4.47.1"
+          wget https://github.com/mikefarah/yq/releases/download/${YQ_VERSION}/yq_linux_amd64 -O /tmp/yq
+          sudo chmod +x /tmp/yq
+          sudo mv /tmp/yq /usr/local/bin/yq
+
+      #------------------------------------------------------------------------
+      # 加载租户配置 (Load Tenant Configuration for Build)
+      #------------------------------------------------------------------------
+      - name: 📋 加载租户配置 (Load Tenant Config)
+        id: load-build-config
+        run: |
+          TENANT_CONFIG="config/tenants/${{ github.event.inputs.tenant }}.yml"
+
+          # 提取配置信息
+          SERVER_HOST=$(yq '.server.host' "$TENANT_CONFIG")
+          BACKEND_PORT=$(yq '.server.backend_port' "$TENANT_CONFIG")
+          TENANT_NAME=$(yq '.tenant.name' "$TENANT_CONFIG")
+
+          # 设置输出
+          echo "server_host=$SERVER_HOST" >> $GITHUB_OUTPUT
+          echo "backend_port=$BACKEND_PORT" >> $GITHUB_OUTPUT
+          echo "tenant_name=$TENANT_NAME" >> $GITHUB_OUTPUT
+
+          echo "Server: $SERVER_HOST:$BACKEND_PORT"
+          echo "Tenant: $TENANT_NAME"
+
+      #------------------------------------------------------------------------
       # 设置 Docker Buildx (Setup Docker Buildx)
       #------------------------------------------------------------------------
       - name: 🐳 设置 Docker Buildx (Setup Docker Buildx)
@@ -493,6 +532,8 @@ jobs:
             COMMIT_SHA=${{ github.sha }}
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
             BUILD_TIMESTAMP=${{ github.event.head_commit.timestamp }}
+            VITE_API_URL=http://${{ steps.load-build-config.outputs.server_host }}:${{ steps.load-build-config.outputs.backend_port }}
+            VITE_APP_NAME=${{ steps.load-build-config.outputs.tenant_name }}
           cache-from: type=gha,ref=frontend-${{ steps.frontend-hash.outputs.hash }}
           cache-to: type=gha,ref=frontend-${{ steps.frontend-hash.outputs.hash }},mode=max
           target: production
