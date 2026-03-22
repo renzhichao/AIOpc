@@ -308,62 +308,52 @@ GITHUB_USERNAME="${GITHUB_USERNAME:-}"
 FEISHU_APP_ID_ENV="${FEISHU_APP_ID:-}"
 FEISHU_APP_SECRET_ENV="${FEISHU_APP_SECRET:-}"
 
-ssh_exec "
-    # Export image variables for this SSH session
-    export BACKEND_IMAGE=\"${BACKEND_IMAGE}\"
-    export FRONTEND_IMAGE=\"${FRONTEND_IMAGE}\"
-    export DB_PASSWORD=\"${DB_PASSWORD}\"
-    export REDIS_PASSWORD=\"${REDIS_PASSWORD}\"
-    export JWT_SECRET=\"${JWT_SECRET}\"
-    export FEISHU_ENCRYPT_KEY=\"${FEISHU_ENCRYPT_KEY}\"
-    export FEISHU_APP_ID=\"${FEISHU_APP_ID_ENV}\"
-    export FEISHU_APP_SECRET=\"${FEISHU_APP_SECRET_ENV}\"
-    export FEISHU_OAUTH_REDIRECT_URI='http://113.105.103.165:20180/api/auth/feishu/callback'
-
-    # Debug: Verify variables are set
-    echo '=== Debug: Image Variables ==='
-    echo \"BACKEND_IMAGE=\${BACKEND_IMAGE}\"
-    echo \"FRONTEND_IMAGE=\${FRONTEND_IMAGE}\"
-    echo '====================================='
-
-    echo '=== 登录 GitHub Container Registry ==='
-    if [ -n \"${GITHUB_TOKEN}\" ]; then
-        # Use the GitHub token to login to GHCR
-        if [ -n \"${GITHUB_USERNAME}\" ]; then
-            echo \"${GITHUB_TOKEN}\" | docker login ghcr.io -u \"${GITHUB_USERNAME}\" --password-stdin && echo '✓ GHCR 登录成功'
-        else
-            # In CI, GITHUB_TOKEN is always set, so we can use it directly
-            echo \"${GITHUB_TOKEN}\" | docker login ghcr.io -u \${GITHUB_ACTOR:-github} --password-stdin && echo '✓ GHCR 登录成功'
-        fi
+# 9.1: 登录 GitHub Container Registry
+echo -e "${YELLOW}  9.1: 登录 GitHub Container Registry...${NC}"
+if [[ -n "${GITHUB_TOKEN}" ]]; then
+    if [[ -n "${GITHUB_USERNAME}" ]]; then
+        ssh_exec "echo \"${GITHUB_TOKEN}\" | docker login ghcr.io -u \"${GITHUB_USERNAME}\" --password-stdin" || {
+            echo -e "${RED}✗ GHCR 登录失败${NC}"
+            exit 1
+        }
     else
-        echo '⚠ 未提供 GITHUB_TOKEN，尝试拉取公开镜像...'
+        ssh_exec "echo \"${GITHUB_TOKEN}\" | docker login ghcr.io -u \${GITHUB_ACTOR:-github} --password-stdin" || {
+            echo -e "${RED}✗ GHCR 登录失败${NC}"
+            exit 1
+        }
     fi
+    echo -e "${GREEN}✓ GHCR 登录成功${NC}"
+else
+    echo -e "${YELLOW}⚠ 未提供 GITHUB_TOKEN，尝试拉取公开镜像...${NC}"
+fi
 
-    echo ''
-    echo '=== 拉取应用镜像 ==='
-    echo "拉取后端镜像: ${BACKEND_IMAGE}"
-    docker pull "${BACKEND_IMAGE}" || {
-        echo "⚠ 后端镜像拉取失败: ${BACKEND_IMAGE}"
-        exit 1
-    }
-    echo '✓ 后端镜像拉取完成'
+# 9.2: 拉取后端镜像
+echo -e "${YELLOW}  9.2: 拉取后端镜像 ${BACKEND_IMAGE}...${NC}"
+ssh_exec "docker pull ${BACKEND_IMAGE}" || {
+    echo -e "${RED}✗ 后端镜像拉取失败: ${BACKEND_IMAGE}${NC}"
+    exit 1
+}
+echo -e "${GREEN}✓ 后端镜像拉取完成${NC}"
 
-    echo "拉取前端镜像: ${FRONTEND_IMAGE}"
-    docker pull "${FRONTEND_IMAGE}" || {
-        echo "⚠ 前端镜像拉取失败: ${FRONTEND_IMAGE}"
-        exit 1
-    }
-    echo '✓ 前端镜像拉取完成'
+# 9.3: 拉取前端镜像
+echo -e "${YELLOW}  9.3: 拉取前端镜像 ${FRONTEND_IMAGE}...${NC}"
+ssh_exec "docker pull ${FRONTEND_IMAGE}" || {
+    echo -e "${RED}✗ 前端镜像拉取失败: ${FRONTEND_IMAGE}${NC}"
+    exit 1
+}
+echo -e "${GREEN}✓ 前端镜像拉取完成${NC}"
 
-    echo "拉取Nginx镜像: nginx:alpine"
-    docker pull nginx:alpine || {
-        echo "⚠ Nginx镜像拉取失败"
-        exit 1
-    }
-    echo '✓ Nginx镜像拉取完成'
+# 9.4: 拉取 Nginx 镜像
+echo -e "${YELLOW}  9.4: 拉取 Nginx 镜像...${NC}"
+ssh_exec "docker pull nginx:alpine" || {
+    echo -e "${RED}✗ Nginx 镜像拉取失败${NC}"
+    exit 1
+}
+echo -e "${GREEN}✓ Nginx 镜像拉取完成${NC}"
 
-    echo ''
-    echo '=== 创建 docker-compose .env 文件 ==='
+# 9.5: 创建 docker-compose .env 文件
+echo -e "${YELLOW}  9.5: 创建 docker-compose .env 文件...${NC}"
+ssh_exec "
     cat > /opt/opclaw/platform/.env << 'ENV_EOF'
 DB_PASSWORD=${DB_PASSWORD}
 REDIS_PASSWORD=${REDIS_PASSWORD}
@@ -378,9 +368,15 @@ ENV_EOF
 
     chmod 600 /opt/opclaw/platform/.env
     echo '✓ .env 文件创建完成'
+    cat /opt/opclaw/platform/.env
+" || {
+    echo -e "${RED}✗ .env 文件创建失败${NC}"
+    exit 1
+}
 
-    echo ''
-    echo '=== 更新 docker-compose.yml ==='
+# 9.6: 更新 docker-compose.yml
+echo -e "${YELLOW}  9.6: 更新 docker-compose.yml...${NC}"
+ssh_exec "
     cat > /opt/opclaw/platform/docker-compose.yml << COMPOSE_EOF
 version: '3.8'
 
@@ -391,7 +387,7 @@ services:
     environment:
       POSTGRES_DB: opclaw_ciiber
       POSTGRES_USER: opclaw
-      POSTGRES_PASSWORD: \${DB_PASSWORD}
+      POSTGRES_PASSWORD: \\\${DB_PASSWORD}
     volumes:
       - /opt/opclaw/data/postgres:/var/lib/postgresql/data
     ports:
@@ -408,14 +404,14 @@ services:
   redis:
     image: redis:7-alpine
     container_name: opclaw-redis
-    command: redis-server --requirepass \${REDIS_PASSWORD}
+    command: redis-server --requirepass \\\${REDIS_PASSWORD}
     volumes:
       - /opt/opclaw/data/redis:/data
     ports:
       - \"6379:6379\"
     restart: unless-stopped
     healthcheck:
-      test: [\"CMD\", \"redis-cli\", \"-a\", \"\${REDIS_PASSWORD}\", \"ping\"]
+      test: [\"CMD\", \"redis-cli\", \"-a\", \"\\\$REDIS_PASSWORD\", \"ping\"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -438,16 +434,16 @@ services:
       DB_PORT: 5432
       DB_NAME: opclaw_ciiber
       DB_USERNAME: opclaw
-      DB_PASSWORD: \${DB_PASSWORD}
+      DB_PASSWORD: \\\${DB_PASSWORD}
       DB_SYNC: \"true\"
       REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: \${REDIS_PASSWORD}
-      FEISHU_APP_ID: \${FEISHU_APP_ID}
-      FEISHU_APP_SECRET: \${FEISHU_APP_SECRET}
-      FEISHU_ENCRYPT_KEY: \${FEISHU_ENCRYPT_KEY}
-      FEISHU_REDIRECT_URI: \${FEISHU_OAUTH_REDIRECT_URI}
-      JWT_SECRET: \${JWT_SECRET}
+      REDIS_PASSWORD: \\\${REDIS_PASSWORD}
+      FEISHU_APP_ID: \\\${FEISHU_APP_ID}
+      FEISHU_APP_SECRET: \\\${FEISHU_APP_SECRET}
+      FEISHU_ENCRYPT_KEY: \\\${FEISHU_ENCRYPT_KEY}
+      FEISHU_REDIRECT_URI: \\\${FEISHU_OAUTH_REDIRECT_URI}
+      JWT_SECRET: \\\${JWT_SECRET}
       JWT_EXPIRES_IN: 24h
       LOG_LEVEL: info
     volumes:
@@ -471,7 +467,7 @@ services:
       - backend
     # No port binding - only accessible via nginx
     expose:
-      - "5173"
+      - \"5173\"
     healthcheck:
       test: [\"CMD\", \"wget\", \"--no-verbose\", \"--tries=1\", \"--spider\", \"http://localhost:5173/\"]
       interval: 30s
@@ -505,23 +501,40 @@ networks:
 COMPOSE_EOF
 
     echo '✓ docker-compose.yml 更新完成'
+" || {
+    echo -e "${RED}✗ docker-compose.yml 更新失败${NC}"
+    exit 1
+}
 
-    echo ''
-    echo '=== 启动所有服务 ==='
+# 9.7: 启动所有服务
+echo -e "${YELLOW}  9.7: 启动所有服务...${NC}"
+ssh_exec "
     cd /opt/opclaw/platform
     docker compose up -d
     echo '✓ 所有服务启动完成'
+" || {
+    echo -e "${RED}✗ 服务启动失败${NC}"
+    exit 1
+}
 
-    echo ''
-    echo '=== 等待服务就绪 ==='
-    sleep 15
+# 9.8: 等待服务就绪
+echo -e "${YELLOW}  9.8: 等待服务就绪...${NC}"
+ssh_exec "sleep 15" || {
+    echo -e "${YELLOW}⚠ 等待服务启动时出现警告${NC}"
+}
 
-    echo ''
-    echo '=== 验证服务状态 ==='
+# 9.9: 验证服务状态
+echo -e "${YELLOW}  9.9: 验证服务状态...${NC}"
+ssh_exec "
+    echo '=== Docker 容器状态 ==='
     docker ps --filter 'name=opclaw' --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}'
+" || {
+    echo -e "${YELLOW}⚠ 无法获取服务状态${NC}"
+}
 
-    echo ''
-    echo '=== 验证端口监听 ==='
+# 9.10: 验证端口监听
+echo -e "${YELLOW}  9.10: 验证端口监听...${NC}"
+ssh_exec "
     echo '检查 80 端口（前端）...'
     if netstat -tuln 2>/dev/null | grep ':80 ' > /dev/null || ss -tuln 2>/dev/null | grep ':80 ' > /dev/null; then
         echo '✓ 80 端口正在监听'
@@ -535,13 +548,11 @@ COMPOSE_EOF
     else
         echo '⚠ 3000 端口未监听'
     fi
-
-    echo ''
-    echo '✓ 应用服务部署完成'
 " || {
-    echo -e "${RED}✗ 应用服务部署失败${NC}"
-    exit 1
+    echo -e "${YELLOW}⚠ 端口验证时出现警告${NC}"
 }
+
+echo -e "${GREEN}✓ 应用服务部署完成${NC}"
 echo ""
 
 # 步骤 10: 部署完成摘要
