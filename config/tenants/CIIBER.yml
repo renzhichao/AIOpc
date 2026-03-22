@@ -75,9 +75,9 @@ server:
   # http_port: Frontend HTTP端口，从外网访问前端
   # backend_port: Backend API端口，从外网访问后端API和健康检查
   # metrics_port: 监控指标端口
-  http_port: "${HTTP_PORT:-20180}"  # Frontend HTTP端口 (113.105.103.165:20180 -> frontend)
-  backend_port: "${BACKEND_PORT:-3000}"  # Backend API端口 (113.105.103.165:3000 -> backend)
-  metrics_port: "${METRICS_PORT:-9090}"
+  http_port: "20180"  # Frontend HTTP端口 (113.105.103.165:20180 -> frontend)
+  backend_port: "3000"  # Backend API端口 (113.105.103.165:3000 -> backend)
+  metrics_port: "9090"
 
   # Resource limits (optional, for container deployments)
   resources:
