@@ -369,14 +369,35 @@ jobs:
           # 提取配置信息
           SERVER_HOST=$(yq '.server.host' "$TENANT_CONFIG")
           BACKEND_PORT=$(yq '.server.backend_port' "$TENANT_CONFIG")
+          HTTP_PORT=$(yq '.server.http_port' "$TENANT_CONFIG")
           TENANT_NAME=$(yq '.tenant.name' "$TENANT_CONFIG")
+
+          # 确定前端API URL
+          # 如果http_port != backend_port，说明使用nginx代理，API通过nginx访问
+          # 否则backend_port直接对外暴露，API直接访问backend
+          if [ "$HTTP_PORT" != "$BACKEND_PORT" ]; then
+            # nginx代理架构 (如CIIBER): API通过nginx的http_port访问
+            API_PORT=$HTTP_PORT
+            API_PATH="/api"
+            echo "架构: nginx代理 (API通过nginx $HTTP_PORT端口)"
+          else
+            # 直接暴露架构 (如OmniTech): API直接访问backend_port
+            API_PORT=$BACKEND_PORT
+            API_PATH="/api"
+            echo "架构: 直接暴露 (API直接访问backend $BACKEND_PORT端口)"
+          fi
 
           # 设置输出
           echo "server_host=$SERVER_HOST" >> $GITHUB_OUTPUT
           echo "backend_port=$BACKEND_PORT" >> $GITHUB_OUTPUT
+          echo "http_port=$HTTP_PORT" >> $GITHUB_OUTPUT
           echo "tenant_name=$TENANT_NAME" >> $GITHUB_OUTPUT
+          echo "api_port=$API_PORT" >> $GITHUB_OUTPUT
+          echo "api_path=$API_PATH" >> $GITHUB_OUTPUT
 
-          echo "Server: $SERVER_HOST:$BACKEND_PORT"
+          echo "Server: $SERVER_HOST:$HTTP_PORT"
+          echo "Backend: $SERVER_HOST:$BACKEND_PORT"
+          echo "API URL: http://$SERVER_HOST:$API_PORT$API_PATH"
           echo "Tenant: $TENANT_NAME"
 
       #------------------------------------------------------------------------
@@ -532,7 +553,7 @@ jobs:
             COMMIT_SHA=${{ github.sha }}
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
             BUILD_TIMESTAMP=${{ github.event.head_commit.timestamp }}
-            VITE_API_URL=http://${{ steps.load-build-config.outputs.server_host }}:${{ steps.load-build-config.outputs.backend_port }}
+            VITE_API_URL=http://${{ steps.load-build-config.outputs.server_host }}:${{ steps.load-build-config.outputs.api_port }}${{ steps.load-build-config.outputs.api_path }}
             VITE_APP_NAME=${{ steps.load-build-config.outputs.tenant_name }}
           cache-from: type=gha,ref=frontend-${{ steps.frontend-hash.outputs.hash }}
           cache-to: type=gha,ref=frontend-${{ steps.frontend-hash.outputs.hash }},mode=max
