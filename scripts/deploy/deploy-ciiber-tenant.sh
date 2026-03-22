@@ -170,6 +170,8 @@ DINGTALK_OAUTH_REDIRECT_URI=http://113.105.103.165:20180/api/auth/dingtalk/callb
 
 # Multi-Platform OAuth Configuration
 OAUTH_ENABLED_PLATFORMS=feishu,dingtalk
+# Allow HTTP redirect URIs for CIIBER (uses HTTP protocol, not HTTPS)
+OAUTH_ALLOW_HTTP=true
 
 # Server Configuration
 PORT=3000
@@ -463,6 +465,7 @@ services:
       DINGTALK_ENCRYPT_KEY: \\\${DINGTALK_ENCRYPT_KEY}
       DINGTALK_REDIRECT_URI: \\\${DINGTALK_OAUTH_REDIRECT_URI}
       OAUTH_ENABLED_PLATFORMS: \\\${OAUTH_ENABLED_PLATFORMS}
+      OAUTH_ALLOW_HTTP: \\\${OAUTH_ALLOW_HTTP}
       JWT_SECRET: \\\${JWT_SECRET}
       JWT_EXPIRES_IN: 24h
       LOG_LEVEL: info
