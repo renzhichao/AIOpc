@@ -440,6 +440,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    env_file:
+      - /etc/opclaw/.env.production
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -544,8 +546,7 @@ ssh_exec "
 
     # Start all services with fresh containers
     echo '  → 启动所有服务...'
-    # Use env_file to load environment variables from .env.production
-    docker compose --env-file /etc/opclaw/.env.production up -d
+    docker compose up -d
     echo '✓ 所有服务启动完成'
 " || {
     echo -e "${RED}✗ 服务启动失败${NC}"
