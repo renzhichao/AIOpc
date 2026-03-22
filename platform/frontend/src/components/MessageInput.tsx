@@ -110,7 +110,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
    * Get API URL from environment
    */
   const getApiUrl = (): string => {
-    const apiUrl = import.meta.env.VITE_API_URL || '/api';
+    const apiUrl = import.meta.env.VITE_API_BASE_URL || '/api';
     addDebugLog('info', 'API URL configured', { apiUrl });
     return apiUrl;
   };
