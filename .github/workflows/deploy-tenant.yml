@@ -562,7 +562,7 @@ jobs:
             COMMIT_SHA=${{ github.sha }}
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
             BUILD_TIMESTAMP=${{ github.event.head_commit.timestamp }}
-            VITE_API_URL=http://${{ steps.load-build-config.outputs.server_host }}:${{ steps.load-build-config.outputs.api_port }}${{ steps.load-build-config.outputs.api_path }}
+            VITE_API_BASE_URL=${{ steps.load-build-config.outputs.api_path }}
             VITE_APP_NAME=${{ steps.load-build-config.outputs.tenant_name }}
           cache-from: type=gha,ref=frontend-${{ steps.frontend-hash.outputs.hash }}
           cache-to: type=gha,ref=frontend-${{ steps.frontend-hash.outputs.hash }},mode=max
