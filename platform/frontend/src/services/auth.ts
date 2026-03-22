@@ -36,8 +36,8 @@ export class AuthService {
     }
 
     const result = await response.json();
-    // 后端返回格式: { success: true, data: [...] }
-    return result.data || result;
+    // 后端返回格式: { success: true, data: { platforms: [...] } }
+    return result.data?.platforms || result.data || result;
   }
 
   /**
