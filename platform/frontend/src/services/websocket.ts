@@ -74,7 +74,7 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
     statusHandlers.forEach(handler => {
       try {
         handler(status);
-      } catch {
+      } catch (error) {
         console.error('Error in status handler:', error);
       }
     });
@@ -84,7 +84,7 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
     messageHandlers.forEach(handler => {
       try {
         handler(message);
-      } catch {
+      } catch (error) {
         console.error('Error in message handler:', error);
       }
     });
@@ -109,7 +109,7 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(messageData);
         }
-      } catch {
+      } catch (error) {
         console.error('Failed to send queued message:', error);
       }
     });
@@ -206,7 +206,7 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
           notifyMessage(message);
-        } catch {
+        } catch (error) {
           console.error('[WS-DEBUG] ❌ Failed to parse message:', error);
         }
       };
@@ -230,7 +230,7 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
         scheduleReconnect();
       };
 
-    } catch {
+    } catch (error) {
       const catchMsg = `❌ Failed to create WebSocket: ${error}`;
       console.error('[WS-DEBUG]', catchMsg);
       notifyStatus('error');
@@ -285,7 +285,7 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
 
     try {
       ws.send(messageData);
-    } catch {
+    } catch (error) {
       console.error('Failed to send message:', error);
 
       if (finalConfig.enableMessageQueue) {

@@ -2,6 +2,40 @@
  * 实例服务 - 处理与后端实例 API 的交互
  */
 
+import type {
+  Instance,
+  UnclaimedInstance,
+  InstanceStats,
+  InstanceUsageStats,
+  InstanceHealth,
+} from '../types/instance';
+
+/**
+ * API Response types
+ */
+interface InstanceListResponse {
+  data: Instance[];
+}
+
+interface InstanceDetailResponse {
+  data: Instance;
+}
+
+interface CreateInstanceRequest {
+  template: string;
+  config: {
+    name: string;
+    description?: string;
+  };
+}
+
+interface CreateInstanceResponse {
+  data: Instance;
+}
+
+interface InstanceActionResponse {
+  data: Instance;
+}
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 

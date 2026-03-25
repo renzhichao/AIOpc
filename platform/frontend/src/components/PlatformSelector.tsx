@@ -72,7 +72,7 @@ export default function PlatformSelector({
           setSelectedPlatform(singlePlatform);
           handlePlatformSelect(singlePlatform, false);
         }
-      } catch {
+      } catch (err) {
         const message = err instanceof Error ? err.message : '获取平台列表失败';
         setError(message);
         console.error('获取平台列表失败:', err);

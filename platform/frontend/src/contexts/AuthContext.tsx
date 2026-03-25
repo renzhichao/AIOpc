@@ -142,7 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ...prevState,
         token: access_token,
       }));
-    } catch {
+    } catch (error) {
       logout();
       throw error;
     }
@@ -175,7 +175,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
  */
 // eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
-  // const context = React.useContext(AuthContext);
+  const context = React.useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }

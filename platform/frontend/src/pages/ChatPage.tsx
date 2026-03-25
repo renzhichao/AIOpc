@@ -95,7 +95,7 @@ export default function ChatPage() {
       setError('');
       const instanceData = await instanceService.getInstance(instanceId);
       setInstance(instanceData);
-    } catch {
+    } catch (err) {
       const message = err instanceof Error ? err.message : '加载实例失败';
       setError(message);
       console.error('加载实例失败:', err);
@@ -171,7 +171,7 @@ export default function ChatPage() {
           msg.id === userMessage.id ? { ...msg, status: 'sent' } : msg
         )
       );
-    } catch {
+    } catch (err) {
       console.error('发送消息失败:', err);
       setMessages((prev) =>
         prev.map((msg) =>

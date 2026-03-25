@@ -42,7 +42,7 @@ export default function LoginPage() {
 
         const data = await authService.getAuthorizationUrl(selectedPlatform);
         setQrCodeUrl(data.url);
-      } catch {
+      } catch (err) {
         const message = err instanceof Error ? err.message : '获取二维码失败，请稍后重试';
         setError(message);
         console.error('获取授权 URL 失败:', err);
@@ -76,7 +76,7 @@ export default function LoginPage() {
 
         const data = await authService.getAuthorizationUrl(selectedPlatform);
         setQrCodeUrl(data.url);
-      } catch {
+      } catch (err) {
         const message = err instanceof Error ? err.message : '获取二维码失败，请稍后重试';
         setError(message);
         console.error('获取授权 URL 失败:', err);

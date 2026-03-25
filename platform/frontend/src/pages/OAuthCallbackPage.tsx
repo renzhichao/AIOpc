@@ -57,7 +57,7 @@ export default function OAuthCallbackPage() {
           navigate('/instances?tab=unclaimed', { replace: true });
         }, 500);
       }
-    } catch {
+    } catch (err) {
       console.error('检查实例状态失败:', err);
       setStatus('error');
       setErrorMessage(
@@ -107,7 +107,7 @@ export default function OAuthCallbackPage() {
 
         // 检查实例状态
         await checkInstanceStatus(response.access_token);
-      } catch {
+      } catch (err) {
         console.error('处理回调失败:', err);
         setStatus('error');
         setErrorMessage(

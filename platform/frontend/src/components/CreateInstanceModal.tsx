@@ -107,7 +107,7 @@ export default function CreateInstanceModal({
         },
       });
       resetForm();
-    } catch {
+    } catch (err) {
       const message = err instanceof Error ? err.message : '创建实例失败';
       setError(message);
     }

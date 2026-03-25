@@ -94,7 +94,7 @@ export default function InstanceConfigPage() {
       const configData = await instanceService.getInstanceConfig(id);
       setConfig(configData);
       setOriginalConfig(configData);
-    } catch {
+    } catch (err) {
       const message = err instanceof Error ? err.message : '加载配置失败';
       setError(message);
       console.error('加载配置失败:', err);
@@ -161,7 +161,7 @@ export default function InstanceConfigPage() {
       setTimeout(() => {
         setSuccess(false);
       }, 3000);
-    } catch {
+    } catch (err) {
       const message = err instanceof Error ? err.message : '保存配置失败';
       setError(message);
       console.error('保存配置失败:', err);
@@ -201,7 +201,7 @@ export default function InstanceConfigPage() {
       setTimeout(() => {
         setSuccess(false);
       }, 3000);
-    } catch {
+    } catch (err) {
       const message = err instanceof Error ? err.message : '重置配置失败';
       setError(message);
       console.error('重置配置失败:', err);

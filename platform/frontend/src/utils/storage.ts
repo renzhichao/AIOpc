@@ -22,7 +22,7 @@ export const storage = {
         const expiryTime = Date.now() + expiresIn * 1000;
         localStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toString());
       }
-    } catch {
+    } catch (e) {
       console.warn('[Storage] localStorage not available:', e);
     }
 
@@ -33,7 +33,7 @@ export const storage = {
         const expiryTime = Date.now() + expiresIn * 1000;
         sessionStorage.setItem(TOKEN_EXPIRY_KEY, expiryTime.toString());
       }
-    } catch {
+    } catch (e) {
       console.warn('[Storage] sessionStorage not available:', e);
     }
   },
@@ -70,14 +70,14 @@ export const storage = {
     // Try localStorage first
     try {
       localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-    } catch {
+    } catch (e) {
       console.warn('[Storage] localStorage not available for refresh token:', e);
     }
 
     // Also save to sessionStorage for WebView compatibility
     try {
       sessionStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-    } catch {
+    } catch (e) {
       console.warn('[Storage] sessionStorage not available for refresh token:', e);
     }
   },
@@ -108,14 +108,14 @@ export const storage = {
     // Try localStorage first
     try {
       localStorage.setItem(USER_KEY, userStr);
-    } catch {
+    } catch (e) {
       console.warn('[Storage] localStorage not available for user:', e);
     }
 
     // Also save to sessionStorage for WebView compatibility
     try {
       sessionStorage.setItem(USER_KEY, userStr);
-    } catch {
+    } catch (e) {
       console.warn('[Storage] sessionStorage not available for user:', e);
     }
   },
@@ -136,7 +136,7 @@ export const storage = {
     if (userStr) {
       try {
         return JSON.parse(userStr) as User;
-      } catch {
+      } catch (e) {
         return null;
       }
     }
@@ -154,7 +154,7 @@ export const storage = {
       localStorage.removeItem(REFRESH_TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
       localStorage.removeItem(TOKEN_EXPIRY_KEY);
-    } catch {
+    } catch (e) {
       console.warn('[Storage] localStorage not available for clearing:', e);
     }
 
@@ -164,7 +164,7 @@ export const storage = {
       sessionStorage.removeItem(REFRESH_TOKEN_KEY);
       sessionStorage.removeItem(USER_KEY);
       sessionStorage.removeItem(TOKEN_EXPIRY_KEY);
-    } catch {
+    } catch (e) {
       console.warn('[Storage] sessionStorage not available for clearing:', e);
     }
   },

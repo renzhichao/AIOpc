@@ -160,8 +160,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
     try {
       // Validate token
       if (!token) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const _error = 'No authentication token found';
+        const error = 'No authentication token found';
         addDebugLog('error', error);
         throw new Error(error);
       }
@@ -202,11 +201,13 @@ export const MessageInput: React.FC<MessageInputProps> = ({
         let errorData;
         try {
           errorData = await response.json();
-        } catch { /* ignore */ } {
+        } catch { /* ignore */ }
+
+        if (!errorData) {
           errorData = { error: response.statusText };
         }
 
-        // const errorMessage = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
+        const errorMessage = errorData.error || `HTTP ${response.status}: ${response.statusText}`;
         addDebugLog('error', 'Upload request failed', {
           status: response.status,
           errorData,
@@ -220,8 +221,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
 
       // Validate response structure
       if (!result.success) {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const _error = result.error || 'Upload failed';
+        const error = result.error || 'Upload failed';
         addDebugLog('error', 'Upload unsuccessful', { result });
         throw new Error(error);
       }
@@ -238,9 +238,9 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       });
 
       return result.file as UploadedFile;
-    } catch {
+    } catch (error) {
       const uploadTime = Date.now() - startTime;
-      // const errorMessage = error instanceof Error ? error.message : String(error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
 
       addDebugLog('error', `Upload failed after ${uploadTime}ms`, {
         error: errorMessage,
@@ -291,7 +291,7 @@ export const MessageInput: React.FC<MessageInputProps> = ({
           const uploaded = await uploadFile(file);
           uploadedFiles.push(uploaded);
           addDebugLog('success', `File ${i + 1}/${totalFiles} uploaded successfully`);
-        } catch {
+        } catch (error) {
           // Continue with remaining files even if one fails
           addDebugLog('error', `File ${i + 1}/${totalFiles} failed, continuing with remaining files`, {
             fileName: file.name,
@@ -311,8 +311,8 @@ export const MessageInput: React.FC<MessageInputProps> = ({
       }
 
       setUploadProgress(100);
-    } catch {
-      // const errorMessage = error instanceof Error ? error.message : 'Failed to upload file';
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to upload file';
       addDebugLog('error', 'File selection handler error', {
         error: errorMessage,
       });

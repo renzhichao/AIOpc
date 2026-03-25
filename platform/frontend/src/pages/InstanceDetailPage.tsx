@@ -82,7 +82,7 @@ export default function InstanceDetailPage() {
           chartData,
         });
       }
-    } catch {
+    } catch (err) {
       console.error('加载指标数据失败:', err);
     } finally {
       setMetricsLoading(false);
@@ -108,7 +108,7 @@ export default function InstanceDetailPage() {
       setInstance(instanceData);
       setUsageStats(usageData);
       setHealth(healthData);
-    } catch {
+    } catch (err) {
       const message = err instanceof Error ? err.message : '加载实例详情失败';
       setError(message);
       console.error('加载实例详情失败:', err);
@@ -134,7 +134,7 @@ export default function InstanceDetailPage() {
         const data = await response.json();
         setRenewals(data.data.renewals || []);
       }
-    } catch {
+    } catch (err) {
       console.error('加载续费历史失败:', err);
     }
   }, [id]);
@@ -167,7 +167,7 @@ export default function InstanceDetailPage() {
       setActionLoading(true);
       await instanceService.startInstance(id);
       await loadInstanceDetails();
-    } catch {
+    } catch (err) {
       const message = err instanceof Error ? err.message : '启动实例失败';
       alert(message);
       console.error('启动实例失败:', err);
@@ -185,7 +185,7 @@ export default function InstanceDetailPage() {
       setActionLoading(true);
       await instanceService.stopInstance(id);
       await loadInstanceDetails();
-    } catch {
+    } catch (err) {
       const message = err instanceof Error ? err.message : '停止实例失败';
       alert(message);
       console.error('停止实例失败:', err);
@@ -203,7 +203,7 @@ export default function InstanceDetailPage() {
       setActionLoading(true);
       await instanceService.restartInstance(id);
       await loadInstanceDetails();
-    } catch {
+    } catch (err) {
       const message = err instanceof Error ? err.message : '重启实例失败';
       alert(message);
       console.error('重启实例失败:', err);
@@ -240,7 +240,7 @@ export default function InstanceDetailPage() {
         const errorData = await response.json();
         alert(`续费失败: ${errorData.message || '未知错误'}`);
       }
-    } catch {
+    } catch (err) {
       const message = err instanceof Error ? err.message : '续费失败';
       alert(message);
       console.error('续费失败:', err);

@@ -3,12 +3,12 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useNavigate} from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import InstanceCard from '../components/InstanceCard';
 import UnclaimedInstanceCard from '../components/UnclaimedInstanceCard';
 import CreateInstanceModal from '../components/CreateInstanceModal';
 import { instanceService } from '../services/instance';
-import type { Instance, InstanceTemplate} from '../types/instance';
+import type { Instance, InstanceTemplate, UnclaimedInstance } from '../types/instance';
 
 export default function InstanceListPage() {
   const navigate = useNavigate();
@@ -35,7 +35,7 @@ export default function InstanceListPage() {
       setError('');
       const data = await instanceService.listInstances();
       setInstances(data);
-    } catch {
+    } catch (err) {
       const message = err instanceof Error ? err.message : '加载实例列表失败';
       setError(message);
       console.error('加载实例列表失败:', err);
@@ -53,7 +53,7 @@ export default function InstanceListPage() {
       setError('');
       const data = await instanceService.getUnclaimedInstances();
       setUnclaimedInstances(data);
-    } catch {
+    } catch (err) {
       const message = err instanceof Error ? err.message : '加载可用实例失败';
       setError(message);
       console.error('加载可用实例失败:', err);
@@ -133,7 +133,7 @@ export default function InstanceListPage() {
       setActionLoading(true);
       await instanceService.startInstance(id);
       await loadClaimedInstances();
-    } catch {
+    } catch (err) {
       const message = err instanceof Error ? err.message : '启动实例失败';
       alert(message);
       console.error('启动实例失败:', err);
@@ -150,7 +150,7 @@ export default function InstanceListPage() {
       setActionLoading(true);
       await instanceService.stopInstance(id);
       await loadClaimedInstances();
-    } catch {
+    } catch (err) {
       const message = err instanceof Error ? err.message : '停止实例失败';
       alert(message);
       console.error('停止实例失败:', err);
@@ -167,7 +167,7 @@ export default function InstanceListPage() {
       setActionLoading(true);
       await instanceService.restartInstance(id);
       await loadClaimedInstances();
-    } catch {
+    } catch (err) {
       const message = err instanceof Error ? err.message : '重启实例失败';
       alert(message);
       console.error('重启实例失败:', err);
@@ -184,7 +184,7 @@ export default function InstanceListPage() {
       setActionLoading(true);
       await instanceService.deleteInstance(id);
       await loadClaimedInstances();
-    } catch {
+    } catch (err) {
       const message = err instanceof Error ? err.message : '删除实例失败';
       alert(message);
       console.error('删除实例失败:', err);
@@ -202,7 +202,7 @@ export default function InstanceListPage() {
       await instanceService.claimInstance(instanceId);
       // 刷新未认领实例列表
       await loadUnclaimedInstances();
-    } catch {
+    } catch (err) {
       const message = err instanceof Error ? err.message : '认领实例失败';
       alert(message);
       console.error('认领实例失败:', err);
@@ -232,12 +232,18 @@ export default function InstanceListPage() {
   }) => {
     try {
       setActionLoading(true);
-      await instanceService.createInstance(data);
+      await instanceService.createInstance({
+        template: data.template,
+        config: {
+          name: data.config.name || '',
+          description: data.config.description,
+        },
+      });
       setIsCreateModalOpen(false);
       if (activeTab === 'claimed') {
         await loadClaimedInstances();
       }
-    } catch {
+    } catch (err) {
       throw err;
     } finally {
       setActionLoading(false);

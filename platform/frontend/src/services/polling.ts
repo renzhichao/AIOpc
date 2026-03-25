@@ -63,7 +63,7 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
     statusHandlers.forEach(handler => {
       try {
         handler(status);
-      } catch {
+      } catch (error) {
         console.error('[Polling] Error in status handler:', error);
       }
     });
@@ -73,7 +73,7 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
     messageHandlers.forEach(handler => {
       try {
         handler(message);
-      } catch {
+      } catch (error) {
         console.error('[Polling] Error in message handler:', error);
       }
     });
@@ -106,8 +106,8 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
           notifyMessage(msg);
         });
       }
-    } catch {
-      // const errorMessage = error instanceof Error ? error.message : String(error);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       const errorMsg = `[Polling] ⚠️ Message poll error: ${errorMessage}`;
       console.error(errorMsg);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -181,8 +181,8 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
       } else {
         throw new Error(data.error || 'Failed to get instance status');
       }
-    } catch {
-      // const errorMessage = error instanceof Error ? error.message : String(error);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       const errorMsg = `[Polling] ❌ Poll error: ${errorMessage}`;
       console.error(errorMsg);
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -269,9 +269,8 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
     });
 
     if (!response.ok) {
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const _error = await response.json();
-      throw new Error(error.error || 'Failed to send message');
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to send message');
     }
 
     const result = await response.json();

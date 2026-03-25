@@ -112,7 +112,7 @@ ${debugText}
         document.execCommand('copy');
         setCopySuccess(true);
         setTimeout(() => setCopySuccess(false), 2000);
-      } catch {
+      } catch (e) {
         console.error('Failed to copy:', e);
       }
       document.body.removeChild(textArea);
