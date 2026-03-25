@@ -24,6 +24,7 @@ jest.mock('../config/logger', () => ({
 describe('StateManager', () => {
   let stateManager: StateManager;
   const mockRedis = redis as jest.Mocked<typeof redis>;
+  const mockLogger = logger as jest.Mocked<typeof logger>;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -407,14 +408,13 @@ describe('StateManager', () => {
     it('should not log full state parameter in logs (security)', async () => {
       // Arrange
       mockRedis.setex.mockResolvedValue('OK');
-      logger;
 
       // Act
       await stateManager.store('feishu', 'https://example.com/callback');
 
       // Assert - Verify only first 8 chars are logged
-      const infoCalls = logger.info.mock.calls;
-      const logWithState = infoCalls.find((call: any[]) =>
+      const infoCalls = mockLogger.info.mock.calls as any[][];
+      const logWithState = infoCalls.find((call) =>
         call[1] && typeof call[1] === 'object' && 'state' in call[1]
       );
 
