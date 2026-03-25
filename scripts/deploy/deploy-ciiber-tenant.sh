@@ -325,23 +325,34 @@ GITHUB_USERNAME="${GITHUB_USERNAME:-}"
 FEISHU_APP_ID_ENV="${FEISHU_APP_ID:-}"
 FEISHU_APP_SECRET_ENV="${FEISHU_APP_SECRET:-}"
 
-# 9.1: 登录 GitHub Container Registry
-echo -e "${YELLOW}  9.1: 登录 GitHub Container Registry...${NC}"
-if [[ -n "${GITHUB_TOKEN}" ]]; then
-    if [[ -n "${GITHUB_USERNAME}" ]]; then
-        ssh_exec "echo \"${GITHUB_TOKEN}\" | docker login ghcr.io -u \"${GITHUB_USERNAME}\" --password-stdin" || {
-            echo -e "${RED}✗ GHCR 登录失败${NC}"
-            exit 1
-        }
+# 9.1: 检查镜像仓库并登录 (Check registry and login if needed)
+echo -e "${YELLOW}  9.1: 检查镜像仓库...${NC}"
+
+# Detect registry from image tags (check if using GHCR or Docker Hub)
+if [[ "${BACKEND_IMAGE}" == ghcr.io/* ]] || [[ "${FRONTEND_IMAGE}" == ghcr.io/* ]]; then
+    # Using GHCR - login required
+    echo "使用 GitHub Container Registry (GHCR)"
+    if [[ -n "${GITHUB_TOKEN}" ]]; then
+        if [[ -n "${GITHUB_USERNAME}" ]]; then
+            ssh_exec "echo \"${GITHUB_TOKEN}\" | docker login ghcr.io -u \"${GITHUB_USERNAME}\" --password-stdin" || {
+                echo -e "${RED}✗ GHCR 登录失败${NC}"
+                exit 1
+            }
+        else
+            ssh_exec "echo \"${GITHUB_TOKEN}\" | docker login ghcr.io -u \${GITHUB_ACTOR:-github} --password-stdin" || {
+                echo -e "${RED}✗ GHCR 登录失败${NC}"
+                exit 1
+            }
+        fi
+        echo -e "${GREEN}✓ GHCR 登录成功${NC}"
     else
-        ssh_exec "echo \"${GITHUB_TOKEN}\" | docker login ghcr.io -u \${GITHUB_ACTOR:-github} --password-stdin" || {
-            echo -e "${RED}✗ GHCR 登录失败${NC}"
-            exit 1
-        }
+        echo -e "${RED}✗ 使用 GHCR 但未提供 GITHUB_TOKEN${NC}"
+        exit 1
     fi
-    echo -e "${GREEN}✓ GHCR 登录成功${NC}"
 else
-    echo -e "${YELLOW}⚠ 未提供 GITHUB_TOKEN，尝试拉取公开镜像...${NC}"
+    # Using Docker Hub or other registry - images are public, no login needed
+    echo "使用 Docker Hub 公开镜像 (无需登录)"
+    echo -e "${GREEN}✓ 跳过容器仓库登录 (Docker Hub 镜像为公开)${NC}"
 fi
 
 # 9.2: 拉取后端镜像

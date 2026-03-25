@@ -786,6 +786,10 @@ jobs:
           export GITHUB_TOKEN="${{ secrets.GITHUB_TOKEN }}"
           export GITHUB_USERNAME="${{ github.actor }}"
 
+          # Docker镜像标签 (Docker image tags - 从构建步骤传递)
+          export BACKEND_TAG="${{ env.BACKEND_TAG }}"
+          export FRONTEND_TAG="${{ env.FRONTEND_TAG }}"
+
           # CIIBER 特定环境变量 (CIIBER-specific environment variables)
           if [ "${{ github.event.inputs.tenant }}" = "CIIBER" ]; then
             # Strategy: Use secrets if provided, otherwise read from config file
