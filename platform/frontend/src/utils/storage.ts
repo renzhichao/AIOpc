@@ -137,8 +137,6 @@ export const storage = {
       try {
         return JSON.parse(userStr) as User;
       } catch {
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const _parseError = 'Failed to parse user data';
         return null;
       }
     }

@@ -50,7 +50,7 @@ export default function PlatformSelector({
         setRememberChoice(true);
       }
     }
-  }, [showRememberOption]);  // eslint-disable-line react-hooks/exhaustive-deps
+  }, [showRememberOption]);   
 
   // 获取启用的平台列表
   useEffect(() => {

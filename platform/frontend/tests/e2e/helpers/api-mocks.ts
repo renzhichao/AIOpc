@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
+ 
 import { Page, Route } from '@playwright/test';
 
 /**
@@ -115,7 +115,7 @@ export class ApiMocks {
    */
   async mockInstancesEndpoints() {
     // Store reference to 'this' for use in the handler
-    // eslint-disable-next-line @typescript-eslint/no-this-alias
+     
 
     // Mock the health endpoint separately since it has a different URL structure
     await this.page.route(/api\/health\/instances\/[^/]+$/, async (route) => {

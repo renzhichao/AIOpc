@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unused-vars */
+ 
 import { test, expect } from '@playwright/test';
 import { mockUsers } from './fixtures/test-data';
 

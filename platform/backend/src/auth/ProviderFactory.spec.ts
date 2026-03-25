@@ -14,7 +14,7 @@
 import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { ProviderFactory } from './ProviderFactory';
 import { IOAuthProvider } from './interfaces/IOAuthProvider';
-import { OAuthPlatform, OAuthError, OAuthErrorType } from './interfaces/OAuthTypes';
+import { OAuthPlatform, OAuthError } from './interfaces/OAuthTypes';
 
 /**
  * Mock OAuth Provider for testing
@@ -30,27 +30,27 @@ class MockOAuthProvider implements IOAuthProvider {
     return `https://${this.platform}.example.com/oauth?redirect_uri=${redirectUri}&state=${state}`;
   }
 
-  async exchangeCodeForToken(code: string): Promise<any> {
+  async exchangeCodeForToken(_code: string): Promise<any> {
     return { access_token: 'mock_token', platform: this.platform };
   }
 
-  async getUserInfo(accessToken: string): Promise<any> {
+  async getUserInfo(_accessToken: string): Promise<any> {
     return { user_id: 'mock_user_id', platform: this.platform };
   }
 
-  async refreshAccessToken(refreshToken: string): Promise<string> {
+  async refreshAccessToken(_refreshToken: string): Promise<string> {
     return 'new_mock_token';
   }
 
-  async validateToken(accessToken: string): Promise<boolean> {
+  async validateToken(_accessToken: string): Promise<boolean> {
     return true;
   }
 
   getErrorHandler(): any {
     return {
       parseError: (error: any) => error,
-      getUserMessage: (type: any) => 'Mock error message',
-      isRetryable: (type: any) => false
+      getUserMessage: (_type: any) => 'Mock error message',
+      isRetryable: (_type: any) => false
     };
   }
 }

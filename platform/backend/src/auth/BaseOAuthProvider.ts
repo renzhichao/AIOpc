@@ -153,7 +153,7 @@ export abstract class BaseOAuthProvider {
       return url.toString();
     } catch {
       // If parsing fails, return only protocol and host part if possible
-      const match = uri.match(/^(https?:\/\/[^\/]+)/);
+      const match = uri.match(/^(https?:\/\/[^/]+)/);
       return match ? match[1] : '[invalid uri]';
     }
   }

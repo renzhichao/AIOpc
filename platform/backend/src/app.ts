@@ -63,8 +63,6 @@ import { sanitizeInput, preventSQLInjection } from './middleware/validate';
 import {
   requestId,
   requestLogger,
-  errorLogger,
-  authenticate,
   rateLimit,
 } from './middleware';
 

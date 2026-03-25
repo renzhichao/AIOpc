@@ -8,30 +8,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-interface TableInfo {
-  name: string;
-  columns: ColumnInfo[];
-  foreignKeys: ForeignKeyInfo[];
-  indexes: IndexInfo[];
-}
 
-interface ColumnInfo {
-  name: string;
-  type: string;
-  nullable: boolean;
-  default?: string;
-}
-
-interface ForeignKeyInfo {
-  from: string;
-  to: string;
-  table: string;
-}
-
-interface IndexInfo {
-  name: string;
-  columns: string[];
-}
 
 const migrationPath = path.join(__dirname, '../migrations/1700000000000-InitialSchema.ts');
 
