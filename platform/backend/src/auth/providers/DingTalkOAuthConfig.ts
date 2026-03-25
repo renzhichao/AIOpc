@@ -50,20 +50,20 @@ export interface DingTalkOAuthConfig {
 /**
  * Token Request Body
  *
+ * According to DingTalk OAuth 2.0 API specification:
+ * https://open.dingtalk.com/document/orgapp-server/obtain-user-token
+ *
  * @interface
  */
 export interface DingTalkTokenRequest {
-  /** AppKey (ClientID) */
-  clientId: string;
+  /** Application Key (appId) - required */
+  appId: string;
 
-  /** Authorization code received from OAuth callback */
+  /** Application Secret (appSecret) - required */
+  appSecret: string;
+
+  /** Authorization code received from OAuth callback - required */
   code: string;
-
-  /** Grant type - always "authorization_code" for OAuth 2.0 */
-  grantType: 'authorization_code';
-
-  /** Refresh token (optional, for refresh flow) */
-  refreshToken?: string;
 }
 
 /**

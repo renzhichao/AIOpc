@@ -174,16 +174,17 @@ export class DingTalkOAuthProvider extends BaseOAuthProvider implements IOAuthPr
    */
   async exchangeCodeForToken(code: string): Promise<TokenResponse> {
     try {
-      // Build request body
+      // Build request body according to DingTalk API specification
       const requestBody: DingTalkTokenRequest = {
-        clientId: this.config.appKey,
-        code: code,
-        grantType: 'authorization_code'
+        appId: this.config.appKey,
+        appSecret: this.config.appSecret,
+        code: code
       };
 
       console.info('[DingTalkOAuth] Exchanging code for token', {
         codeLength: code.length,
-        code: code.substring(0, 4) + '***' // Only show first 4 chars
+        code: code.substring(0, 4) + '***', // Only show first 4 chars
+        appId: this.config.appKey.substring(0, 8) + '***'
       });
 
       // Make POST request to DingTalk token endpoint
@@ -344,53 +345,13 @@ export class DingTalkOAuthProvider extends BaseOAuthProvider implements IOAuthPr
    * @throws {OAuthError} With type EXPIRED_TOKEN if refresh token is expired
    */
   async refreshAccessToken(refreshToken: string): Promise<string> {
-    try {
-      console.info('[DingTalkOAuth] Refreshing access token', {
-        tokenLength: refreshToken.length,
-        token: refreshToken.substring(0, 4) + '***' // Only show first 4 chars
-      });
-
-      // Build request body for refresh
-      const requestBody: DingTalkTokenRequest = {
-        clientId: this.config.appKey,
-        code: '', // Not used in refresh flow
-        grantType: 'authorization_code',
-        refreshToken: refreshToken
-      };
-
-      // Make POST request to DingTalk token endpoint
-      const response = await this.axiosInstance.post<any>(
-        this.config.tokenUrl,
-        requestBody
-      );
-
-      // Extract new access token from response
-      const tokenData = response.data as DingTalkTokenResponse;
-
-      if (!tokenData.accessToken) {
-        throw new OAuthError(
-          OAuthErrorType.PLATFORM_ERROR,
-          this.PLATFORM,
-          'Refresh token response missing accessToken'
-        );
-      }
-
-      console.info('[DingTalkOAuth] Token refresh successful', {
-        expiresIn: tokenData.expiresIn
-      });
-
-      return tokenData.accessToken;
-    } catch (error) {
-      // Handle error through error handler
-      const oauthError = this.errorHandler.parseError(error);
-
-      console.error('[DingTalkOAuth] Token refresh failed', {
-        errorType: oauthError.type,
-        message: oauthError.message
-      });
-
-      throw oauthError;
-    }
+    // DingTalk OAuth does not support token refresh
+    // Users need to re-scan QR code to get a new access token
+    throw new OAuthError(
+      OAuthErrorType.PLATFORM_ERROR,
+      this.PLATFORM,
+      'DingTalk does not support token refresh. Please re-authorize using QR code.'
+    );
   }
 
   /**
