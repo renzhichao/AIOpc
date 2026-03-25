@@ -41,7 +41,7 @@ export class UserInstanceController {
   @Get('/instances')
   async getUserInstances(@Req() req: AuthRequest) {
     try {
-      const userId = _req.user!.userId;
+      const userId = req.user!.userId;
 
       const instances = await this.userInstanceService.getUserInstances(userId);
 
@@ -86,7 +86,7 @@ export class UserInstanceController {
     @Req() req: AuthRequest
   ) {
     try {
-      const userId = _req.user!.userId;
+      const userId = req.user!.userId;
 
       await this.userInstanceService.updateLastAccessed(userId, instanceId);
 
@@ -132,7 +132,7 @@ export class UserInstanceController {
     @Req() req: AuthRequest
   ) {
     try {
-      const userId = _req.user!.userId;
+      const userId = req.user!.userId;
 
       const stats = await this.userInstanceService.getInstanceStats(
         userId,
@@ -180,7 +180,7 @@ export class UserInstanceController {
     @Req() req: AuthRequest
   ) {
     try {
-      const userId = _req.user!.userId;
+      const userId = req.user!.userId;
 
       const instance = await this.userInstanceService.renameInstance(
         userId,
@@ -230,7 +230,7 @@ export class UserInstanceController {
   @Get('/instances/recent')
   async getRecentInstances(@Req() req: AuthRequest) {
     try {
-      const userId = _req.user!.userId;
+      const userId = req.user!.userId;
 
       const instances = await this.userInstanceService.getRecentInstances(userId, 5);
 
@@ -269,7 +269,7 @@ export class UserInstanceController {
     @Req() req: AuthRequest
   ) {
     try {
-      const userId = _req.user!.userId;
+      const userId = req.user!.userId;
 
       const instance = await this.userInstanceService.getInstanceWithHealth(
         userId,
@@ -314,9 +314,9 @@ export class UserInstanceController {
    * GET /api/user/summary
    */
   @Get('/summary')
-  async getUserSummary(@Req() _req: AuthRequest) {
+  async getUserSummary(@Req() req: AuthRequest) {
     try {
-      const userId = _req.user!.userId;
+      const userId = req.user!.userId;
 
       const instances = await this.userInstanceService.getUserInstances(userId);
       const recentInstances = await this.userInstanceService.getRecentInstances(userId, 3);

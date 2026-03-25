@@ -45,8 +45,8 @@ export class UserController {
         );
       }
 
-      // Remove sensitive information
-      const { encrypted_access_token, encrypted_refresh_token, ...safeUser } = userProfile;
+      // Remove sensitive information (tokens are not stored in User model)
+      const safeUser = userProfile;
 
       return {
         success: true,
@@ -111,8 +111,8 @@ export class UserController {
 
       const updatedUser = await this.userRepository.update(user.id, updates);
 
-      // Remove sensitive information
-      const { encrypted_access_token, encrypted_refresh_token, ...safeUser } = updatedUser;
+      // Remove sensitive information (tokens are not stored in User model)
+      const safeUser = updatedUser;
 
       return {
         success: true,
@@ -170,8 +170,8 @@ export class UserController {
         );
       }
 
-      // Remove sensitive information
-      const { encrypted_access_token, encrypted_refresh_token, ...safeUser } = user;
+      // Remove sensitive information (tokens are not stored in User model)
+      const safeUser = user;
 
       return {
         success: true,
