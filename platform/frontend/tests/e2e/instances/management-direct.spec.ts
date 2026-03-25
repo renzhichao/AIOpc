@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { test, expect } from '@playwright/test';
 import { InstanceDetailsPage } from '../pages/InstanceDetailsPage';
 import { InstancesPage } from '../pages/InstancesPage';

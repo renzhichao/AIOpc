@@ -71,6 +71,7 @@ export interface Instance {
   remote_version?: string;
   platform_api_key?: string;
   capabilities?: string[];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   remote_metadata?: Record<string, any>;
 
   // 心跳相关

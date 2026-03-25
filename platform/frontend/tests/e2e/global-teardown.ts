@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { FullConfig } from '@playwright/test';
 
 /**

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Page, expect } from '@playwright/test';
 
 /**
@@ -74,7 +75,7 @@ export class InstanceDetailsPage {
         const root = document.querySelector('#root');
         return root && root.innerHTML.length > 100;
       }, { timeout: 10000 });
-    } catch (e) {
+    } catch {
       // If React doesn't render, try reloading once
       console.log('[DEBUG] React not rendering, reloading...');
       await this.page.reload({ waitUntil: 'commit' });

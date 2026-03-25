@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { test as base, Page } from '@playwright/test';
 import { LoginPage } from '../pages/LoginPage';
 import { DashboardPage } from '../pages/DashboardPage';
@@ -18,18 +19,22 @@ export const test = base.extend<{
   authenticatedPage: Page;
 }>({
   loginPage: async ({ page }, use) => {
+  // eslint-disable-next-line react-hooks/rules-of-hooks
     await use(new LoginPage(page));
   },
 
   dashboardPage: async ({ page }, use) => {
+  // eslint-disable-next-line react-hooks/rules-of-hooks
     await use(new DashboardPage(page));
   },
 
   instancesPage: async ({ page }, use) => {
+  // eslint-disable-next-line react-hooks/rules-of-hooks
     await use(new InstancesPage(page));
   },
 
   instanceDetailsPage: async ({ page }, use) => {
+  // eslint-disable-next-line react-hooks/rules-of-hooks
     await use(new InstanceDetailsPage(page));
   },
 
@@ -44,6 +49,7 @@ export const test = base.extend<{
       localStorage.setItem('user_id', 'user-001');
     }, user.accessToken);
 
+  // eslint-disable-next-line react-hooks/rules-of-hooks
     await use(page);
   },
 });

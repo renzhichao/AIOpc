@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /**
  * Platform Selection E2E Tests
  *
@@ -133,7 +134,7 @@ test.describe('Platform Selection Flow', () => {
     await page.waitForSelector('[data-testid="qr-container"]');
 
     // Get initial QR code value
-    const initialQRCode = await page.locator('[data-testid="qr-code"]').getAttribute('value');
+    // const initialQRCode = await page.locator('[data-testid="qr-code"]').getAttribute('value');
 
     // Click refresh button
     await page.click('button:has-text("刷新二维码")');

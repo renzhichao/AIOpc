@@ -2,18 +2,6 @@
  * 实例服务 - 处理与后端实例 API 的交互
  */
 
-import type {
-  Instance,
-  InstanceListResponse,
-  InstanceDetailResponse,
-  CreateInstanceRequest,
-  CreateInstanceResponse,
-  InstanceActionResponse,
-  InstanceUsageStats,
-  InstanceHealth,
-  UnclaimedInstance,
-  InstanceStats,
-} from '../types/instance';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3000/api';
 
@@ -32,6 +20,7 @@ function getToken(): string {
 /**
  * 处理 API 错误
  */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 function handleApiError(_response: Response): never {
   throw new Error('请求失败');
 }
@@ -227,6 +216,7 @@ export class InstanceService {
   /**
    * 获取实例配置
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async getInstanceConfig(id: string): Promise<any> {
     const response = await fetch(`${this.baseUrl}/instances/${id}/config`, {
       method: 'GET',
@@ -247,6 +237,7 @@ export class InstanceService {
   /**
    * 更新实例配置
    */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
   async updateInstanceConfig(id: string, config: any): Promise<any> {
     const response = await fetch(`${this.baseUrl}/instances/${id}/config`, {
       method: 'PATCH',

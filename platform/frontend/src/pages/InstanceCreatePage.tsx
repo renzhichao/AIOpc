@@ -127,7 +127,7 @@ export default function InstanceCreatePage() {
       setTimeout(() => {
         navigate('/instances');
       }, 1500);
-    } catch (err) {
+    } catch {
       const message = err instanceof Error ? err.message : '创建实例失败';
       setError(message);
       console.error('创建实例失败:', err);

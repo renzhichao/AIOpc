@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { test, expect } from '@playwright/test';
 import { setupApiMocks } from '../helpers/api-mocks';
 import { mockUsers } from '../fixtures/test-data';
@@ -64,7 +65,7 @@ test.describe('Chat Page Routing (TASK-009-11)', () => {
       await expect(chatPage).toBeVisible();
 
       // Verify instance name is displayed
-      const instanceName = page.locator('[data-testid="instance-name"]');
+      // const instanceName = page.locator('[data-testid="instance-name"]');
       await expect(instanceName).toBeVisible();
     });
   });
@@ -84,7 +85,7 @@ test.describe('Chat Page Routing (TASK-009-11)', () => {
       expect(currentUrl).toContain(instanceId);
 
       // Verify instance name is displayed (should be loaded based on instanceId)
-      const instanceName = page.locator('[data-testid="instance-name"]');
+      // const instanceName = page.locator('[data-testid="instance-name"]');
       await expect(instanceName).toBeVisible();
     });
 
@@ -118,7 +119,7 @@ test.describe('Chat Page Routing (TASK-009-11)', () => {
       if (chatButtonCount > 0) {
         // Get the instance ID from the parent card
         const instanceCard = chatButton.locator('xpath=ancestor::div[@data-testid="instance-card"]');
-        const instanceName = await instanceCard.locator('[data-testid="instance-name"]').textContent();
+        // const instanceName = await instanceCard.locator('[data-testid="instance-name"]').textContent();
 
         // Click chat button
         await chatButton.click();

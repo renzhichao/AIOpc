@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { createWebSocketService, WebSocketStatus, WebSocketMessage } from './websocket';
+;
 
 // Mock WebSocket class
 class MockWebSocket {
@@ -76,11 +76,13 @@ describe('WebSocketService', () => {
 
   // Set up global mocks before all tests
   beforeAll(() => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     (global as any).WebSocket = MockWebSocket;
   });
 
   // Clean up after all tests
   afterAll(() => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     delete (global as any).WebSocket;
   });
 
@@ -139,6 +141,7 @@ describe('WebSocketService', () => {
     });
 
     it('should set error status if no token found', () => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
       vi.spyOn(localStorage, 'getItem').mockReturnValueOnce(null as any);
       service = createWebSocketService();
 

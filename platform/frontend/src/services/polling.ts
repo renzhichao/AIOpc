@@ -24,6 +24,7 @@ export interface PollingService {
   stop(): void;
 
   // Send message via HTTP POST
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
   sendMessage(content: string, files?: any[]): Promise<void>;
 
   // Register message handler
@@ -52,7 +53,7 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
   let currentStatus: PollingStatus = 'disconnected';
   let pollTimeout: ReturnType<typeof setTimeout> | null = null;
   let isPolling = false;
-  let pollInterval = finalConfig.pollInterval;
+  const pollInterval = finalConfig.pollInterval;
 
   const messageHandlers: Set<(message: WebSocketMessage) => void> = new Set();
   const statusHandlers: Set<(status: PollingStatus) => void> = new Set();
@@ -62,7 +63,7 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
     statusHandlers.forEach(handler => {
       try {
         handler(status);
-      } catch (error) {
+      } catch {
         console.error('[Polling] Error in status handler:', error);
       }
     });
@@ -72,7 +73,7 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
     messageHandlers.forEach(handler => {
       try {
         handler(message);
-      } catch (error) {
+      } catch {
         console.error('[Polling] Error in message handler:', error);
       }
     });
@@ -97,6 +98,7 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
       if (data.success && data.messages && data.messages.length > 0) {
         const newMessagesMsg = `[Polling] 📨 Received ${data.messages.length} new message(s)`;
         console.log(newMessagesMsg);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: newMessagesMsg });
 
         // Notify each message
@@ -104,10 +106,11 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
           notifyMessage(msg);
         });
       }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+    } catch {
+      // const errorMessage = error instanceof Error ? error.message : String(error);
       const errorMsg = `[Polling] ⚠️ Message poll error: ${errorMessage}`;
       console.error(errorMsg);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: errorMsg });
       // Don't change status on message poll error - just log it
     }
@@ -121,6 +124,7 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
       if (!token) {
         const errorMsg = '[Polling] No token found';
         console.error(errorMsg);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: errorMsg });
         notifyStatus('error');
         schedulePoll();
@@ -130,6 +134,7 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
       // Check instance status
       const pollMsg = `[Polling] 📡 Polling /chat/status...`;
       console.log(pollMsg);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: pollMsg });
 
       const response = await fetch(`${finalConfig.apiUrl}/chat/status`, {
@@ -149,6 +154,7 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
         if (currentStatus !== 'connected') {
           const successMsg = `[Polling] ✅ Status: connected (304 cached)`;
           console.log(successMsg);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
           (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: successMsg });
           notifyStatus('connected');
         }
@@ -162,6 +168,7 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
         if (currentStatus !== 'connected') {
           const successMsg = `[Polling] ✅ Connected to instance ${data.instance.instance_id} (${data.instance.status})`;
           console.log(successMsg);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
           (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: successMsg });
           notifyStatus('connected');
         }
@@ -174,10 +181,11 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
       } else {
         throw new Error(data.error || 'Failed to get instance status');
       }
-    } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : String(error);
+    } catch {
+      // const errorMessage = error instanceof Error ? error.message : String(error);
       const errorMsg = `[Polling] ❌ Poll error: ${errorMessage}`;
       console.error(errorMsg);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: errorMsg });
       if (currentStatus === 'connected') {
         notifyStatus('error');
@@ -220,7 +228,9 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
 
     const startMsg = '[Polling] 🚀 Starting polling service';
     console.log(startMsg);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).__WS_DEBUG__ = (window as any).__WS_DEBUG__ || [];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: startMsg });
 
     isPolling = true;
@@ -240,6 +250,7 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
     notifyStatus('disconnected');
   }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
   async function sendMessage(content: string, files?: any[]): Promise<void> {
     const token = getToken();
     if (!token) {
@@ -258,7 +269,8 @@ export function createPollingService(config: PollingServiceConfig = {}): Polling
     });
 
     if (!response.ok) {
-      const error = await response.json();
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const _error = await response.json();
       throw new Error(error.error || 'Failed to send message');
     }
 

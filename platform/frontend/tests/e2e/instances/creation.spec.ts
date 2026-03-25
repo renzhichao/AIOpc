@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { test, expect } from '../../fixtures';
 import { InstancesPage } from '../../pages/InstancesPage';
 import { InstanceDetailsPage } from '../../pages/InstanceDetailsPage';

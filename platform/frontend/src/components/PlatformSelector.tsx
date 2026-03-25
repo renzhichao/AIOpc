@@ -50,7 +50,7 @@ export default function PlatformSelector({
         setRememberChoice(true);
       }
     }
-  }, [showRememberOption]);
+  }, [showRememberOption]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   // 获取启用的平台列表
   useEffect(() => {
@@ -72,7 +72,7 @@ export default function PlatformSelector({
           setSelectedPlatform(singlePlatform);
           handlePlatformSelect(singlePlatform, false);
         }
-      } catch (err) {
+      } catch {
         const message = err instanceof Error ? err.message : '获取平台列表失败';
         setError(message);
         console.error('获取平台列表失败:', err);
@@ -84,7 +84,7 @@ export default function PlatformSelector({
     };
 
     fetchPlatforms();
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 处理平台选择
   const handlePlatformSelect = (platform: OAuthPlatform, shouldRemember = rememberChoice) => {

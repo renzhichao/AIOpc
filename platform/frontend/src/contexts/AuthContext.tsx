@@ -33,7 +33,7 @@ function getInitialAuthState(): AuthState {
   if (!token) {
     try {
       token = localStorage.getItem('auth_token') || localStorage.getItem('access_token');
-    } catch (e) {
+    } catch { /* ignore */ } {
       // localStorage might not be available
       token = null;
     }
@@ -44,7 +44,7 @@ function getInitialAuthState(): AuthState {
       if (userStr) {
         user = JSON.parse(userStr);
       }
-    } catch (e) {
+    } catch { /* ignore */ } {
       user = null;
     }
   }
@@ -142,7 +142,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ...prevState,
         token: access_token,
       }));
-    } catch (error) {
+    } catch {
       logout();
       throw error;
     }
@@ -173,8 +173,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
  * 认证 Context Hook
  * 用于在组件中访问认证状态和方法
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useAuth() {
-  const context = React.useContext(AuthContext);
+  // const context = React.useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
   }

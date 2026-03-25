@@ -44,6 +44,7 @@ export default function InstanceDetailPage() {
   const [metricsPeriod, setMetricsPeriod] = useState<MetricsPeriod>('30m');
   const [showAdvancedMetrics, setShowAdvancedMetrics] = useState(false);
   const [metricsData, setMetricsData] = useState<{
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     usageStats: any;
     chartData: LineChartData[];
   } | null>(null);
@@ -69,6 +70,7 @@ export default function InstanceDetailPage() {
         const stats = result.data;
 
         // Transform hourly data for chart
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
         const chartData: LineChartData[] = (stats.hourly_data || []).map((item: any) => ({
           timestamp: item.timestamp,
           'CPU 使用率 (%)': item.cpu_usage,
@@ -80,7 +82,7 @@ export default function InstanceDetailPage() {
           chartData,
         });
       }
-    } catch (err) {
+    } catch {
       console.error('加载指标数据失败:', err);
     } finally {
       setMetricsLoading(false);
@@ -106,7 +108,7 @@ export default function InstanceDetailPage() {
       setInstance(instanceData);
       setUsageStats(usageData);
       setHealth(healthData);
-    } catch (err) {
+    } catch {
       const message = err instanceof Error ? err.message : '加载实例详情失败';
       setError(message);
       console.error('加载实例详情失败:', err);
@@ -132,7 +134,7 @@ export default function InstanceDetailPage() {
         const data = await response.json();
         setRenewals(data.data.renewals || []);
       }
-    } catch (err) {
+    } catch {
       console.error('加载续费历史失败:', err);
     }
   }, [id]);
@@ -147,14 +149,14 @@ export default function InstanceDetailPage() {
     // 设置定时刷新（每 5 秒）
     const interval = setInterval(loadInstanceDetails, 5000);
     return () => clearInterval(interval);
-  }, [loadInstanceDetails]);
+  }, [loadInstanceDetails]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * 当时间范围改变时重新加载指标
    */
   useEffect(() => {
     loadMetrics();
-  }, [metricsPeriod, loadMetrics]);
+  }, [metricsPeriod, loadMetrics]);  
 
   /**
    * 启动实例
@@ -165,7 +167,7 @@ export default function InstanceDetailPage() {
       setActionLoading(true);
       await instanceService.startInstance(id);
       await loadInstanceDetails();
-    } catch (err) {
+    } catch {
       const message = err instanceof Error ? err.message : '启动实例失败';
       alert(message);
       console.error('启动实例失败:', err);
@@ -183,7 +185,7 @@ export default function InstanceDetailPage() {
       setActionLoading(true);
       await instanceService.stopInstance(id);
       await loadInstanceDetails();
-    } catch (err) {
+    } catch {
       const message = err instanceof Error ? err.message : '停止实例失败';
       alert(message);
       console.error('停止实例失败:', err);
@@ -201,7 +203,7 @@ export default function InstanceDetailPage() {
       setActionLoading(true);
       await instanceService.restartInstance(id);
       await loadInstanceDetails();
-    } catch (err) {
+    } catch {
       const message = err instanceof Error ? err.message : '重启实例失败';
       alert(message);
       console.error('重启实例失败:', err);
@@ -238,7 +240,7 @@ export default function InstanceDetailPage() {
         const errorData = await response.json();
         alert(`续费失败: ${errorData.message || '未知错误'}`);
       }
-    } catch (err) {
+    } catch {
       const message = err instanceof Error ? err.message : '续费失败';
       alert(message);
       console.error('续费失败:', err);

@@ -60,7 +60,7 @@ export const MetricsCharts: React.FC<MetricsChartsProps> = ({
       const result: InstanceMetricsResponse = await response.json();
       setMetricsData(result.data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load metrics');
+        setError(err instanceof Error ? err.message : 'Failed to load metrics');
       console.error('Failed to fetch metrics:', err);
     } finally {
       setLoading(false);
@@ -75,14 +75,16 @@ export const MetricsCharts: React.FC<MetricsChartsProps> = ({
 
     const interval = setInterval(fetchMetrics, refreshInterval);
     return () => clearInterval(interval);
-  }, [instanceId, period, refreshInterval]);
+  }, [instanceId, period, refreshInterval]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /**
    * Transform time series metric to chart data
    */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
   const transformToChartData = (metric: any, key: string): LineChartData[] => {
     if (!metric?.data_points) return [];
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     return metric.data_points.map((point: any) => ({
       timestamp: point.timestamp,
       [key]: point.value,

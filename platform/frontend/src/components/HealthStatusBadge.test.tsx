@@ -6,7 +6,6 @@ import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { HealthStatusBadge } from './HealthStatusBadge';
-import type { HealthStatus } from '../types/instance';
 
 describe('HealthStatusBadge Component', () => {
   describe('Rendering', () => {

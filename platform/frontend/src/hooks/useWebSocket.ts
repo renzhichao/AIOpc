@@ -10,6 +10,7 @@ import { createWebSocketService, type WebSocketStatus, type WebSocketMessage } f
 export interface UseWebSocketReturn {
   status: WebSocketStatus;
   messages: WebSocketMessage[];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
   sendMessage: (content: string, files?: any[]) => void;
   onMessage: (handler: (message: WebSocketMessage) => void) => () => void;
   onStatusChange: (handler: (status: WebSocketStatus) => void) => () => void;
@@ -53,6 +54,7 @@ export function useWebSocket(): UseWebSocketReturn {
     };
   }, []);
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
   const sendMessage = useCallback((content: string, files?: any[]) => {
     serviceRef.current?.sendMessage(content, files);
   }, []);

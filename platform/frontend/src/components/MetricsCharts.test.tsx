@@ -23,6 +23,7 @@ describe('MetricsCharts Component', () => {
   });
 
   it('should render loading state initially', () => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     (global.fetch as any).mockResolvedValue({
       ok: true,
       json: async () => ({
@@ -98,6 +99,7 @@ describe('MetricsCharts Component', () => {
       },
     };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     (global.fetch as any).mockResolvedValue({
       ok: true,
       json: async () => mockData,
@@ -147,6 +149,7 @@ describe('MetricsCharts Component', () => {
       },
     };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     (global.fetch as any).mockResolvedValue({
       ok: true,
       json: async () => mockData,
@@ -202,6 +205,7 @@ describe('MetricsCharts Component', () => {
       },
     };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     (global.fetch as any).mockResolvedValue({
       ok: true,
       json: async () => mockData,
@@ -262,6 +266,7 @@ describe('MetricsCharts Component', () => {
       },
     };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     (global.fetch as any).mockResolvedValue({
       ok: true,
       json: async () => mockData,
@@ -280,6 +285,7 @@ describe('MetricsCharts Component', () => {
   });
 
   it('should handle API errors gracefully', async () => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     (global.fetch as any).mockRejectedValue(new Error('Network error'));
 
     render(<MetricsCharts instanceId={mockInstanceId} />);
@@ -291,6 +297,7 @@ describe('MetricsCharts Component', () => {
 
   it('should refetch data at specified interval', async () => {
     let fetchCount = 0;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     (global.fetch as any).mockImplementation(() => {
       fetchCount++;
       return Promise.resolve({

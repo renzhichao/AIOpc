@@ -4,10 +4,10 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { InstanceService } from './instance';
-import type { UnclaimedInstance, InstanceStats } from '../types/instance';
 
 // Mock fetch
 const mockFetch = vi.fn();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 (global as any).fetch = mockFetch;
 
 describe('InstanceService', () => {

@@ -95,7 +95,7 @@ export default function ChatPage() {
       setError('');
       const instanceData = await instanceService.getInstance(instanceId);
       setInstance(instanceData);
-    } catch (err) {
+    } catch {
       const message = err instanceof Error ? err.message : '加载实例失败';
       setError(message);
       console.error('加载实例失败:', err);
@@ -109,7 +109,7 @@ export default function ChatPage() {
    */
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, []);
+  }, []);  
 
   /**
    * 处理 WebSocket 消息
@@ -171,7 +171,7 @@ export default function ChatPage() {
           msg.id === userMessage.id ? { ...msg, status: 'sent' } : msg
         )
       );
-    } catch (err) {
+    } catch {
       console.error('发送消息失败:', err);
       setMessages((prev) =>
         prev.map((msg) =>

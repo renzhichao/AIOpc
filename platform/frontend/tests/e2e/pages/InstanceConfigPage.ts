@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Page, expect } from '@playwright/test';
 
 /**
@@ -67,7 +68,7 @@ export class InstanceConfigPage {
 
     // LLM config
     this.apiKeyInput = this.page.locator('input[type="password"]').or(this.page.locator('input[placeholder*="sk-"]'));
-    this.apiBaseInput = this.page.locator('input[placeholder*="api"]').or(this.page.locator('input[placeholder*="https"]');
+    this.apiBaseInput = this.page.locator('input[placeholder*="api"]').or(this.page.locator('input[placeholder*="https"]'));
     this.modelInput = this.page.locator('input[placeholder*="model"]');
     this.temperatureInput = this.page.locator('input[type="number"][step="0.1"]');
     this.maxTokensInput = this.page.locator('input[max="32000"]');

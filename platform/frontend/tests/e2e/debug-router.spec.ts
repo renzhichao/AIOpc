@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { test, expect } from '@playwright/test';
 import { setupApiMocks } from './helpers/api-mocks';
 import { mockUsers } from './fixtures/test-data';
@@ -36,6 +37,7 @@ test.describe('Debug React Router Navigation', () => {
   });
 
   test('debug: inspect DOM after navigation', async ({ page }) => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     const debugLog: any[] = [];
 
     debugLog.push('[DEBUG] Starting navigation debug test...');
@@ -100,6 +102,7 @@ test.describe('Debug React Router Navigation', () => {
     // Write to file
     await page.evaluate((logs) => {
       console.log('=== DEBUG OUTPUT START ===');
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
       logs.forEach((log: any) => console.log(log));
       console.log('=== DEBUG OUTPUT END ===');
     }, debugLog);

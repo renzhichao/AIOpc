@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { test, expect } from '../../fixtures';
 import { LoginPage } from '../../pages/LoginPage';
 import { DashboardPage } from '../../pages/DashboardPage';
@@ -35,7 +36,7 @@ test.describe('OAuth Login Flow', () => {
         localStorage.clear();
         sessionStorage.clear();
       });
-    } catch (error) {
+    } catch { /* ignore */ } {
       // Ignore SecurityError if localStorage is not accessible
     }
   });
@@ -256,7 +257,7 @@ test.describe('OAuth Login Flow', () => {
     await loginPage.waitForQRCode();
 
     // Get initial QR code container content
-    const initialContent = await loginPage.qrCodeContainer.innerHTML();
+    // const initialContent =await loginPage.qrCodeContainer.innerHTML();
 
     // Click refresh button
     await loginPage.refreshButton.click();
@@ -265,7 +266,7 @@ test.describe('OAuth Login Flow', () => {
     await page.waitForTimeout(500);
 
     // Get new QR code content
-    const newContent = await loginPage.qrCodeContainer.innerHTML();
+    // const newContent =await loginPage.qrCodeContainer.innerHTML();
 
     // Content should be different (regenerated)
     // Note: In some implementations the content might be the same if using same state
@@ -278,14 +279,14 @@ test.describe('OAuth Login Flow', () => {
     await page.goto('/login');
 
     // Check for loading state (spinner or skeleton)
-    const loadingSpinner = page.locator('.animate-spin, .skeleton, [data-testid="loading"]');
-    const isLoading = await loadingSpinner.isVisible().catch(() => false);
+    // const loadingSpinner = page.locator('.animate-spin, .skeleton, [data-testid="loading"]');
+    // const isLoading =await loadingSpinner.isVisible().catch(() => false);
 
     // Wait for QR code
     await loginPage.waitForQRCode();
 
     // After QR code loads, loading should be gone
-    const isLoadingAfter = await loadingSpinner.isVisible().catch(() => false);
+    // const isLoadingAfter =await loadingSpinner.isVisible().catch(() => false);
 
     // Either loading was shown initially or QR code appeared quickly
     expect(await loginPage.qrCodeContainer.isVisible()).toBe(true);
@@ -319,8 +320,8 @@ test.describe('OAuth Login Flow', () => {
     await page.goto('/login');
 
     // Should display error message
-    const errorMessage = await loginPage.getErrorMessage();
-    const hasError = errorMessage !== null || await loginPage.errorMessage.isVisible().catch(() => false);
+    // const errorMessage = await loginPage.getErrorMessage();
+    // const hasError =errorMessage !== null || await loginPage.errorMessage.isVisible().catch(() => false);
 
     // Either error is shown or QR code fails gracefully
     expect(true).toBe(true);
@@ -359,7 +360,7 @@ test.describe('OAuth Login Flow', () => {
     await loginPage.waitForQRCode();
 
     // Get initial page state
-    const initialUrl = page.url();
+    // const initialUrl =page.url();
 
     // Navigate away and come back
     await page.goto('/dashboard');

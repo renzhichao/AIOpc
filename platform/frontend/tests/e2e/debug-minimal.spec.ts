@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { test, expect } from '@playwright/test';
 import { mockUsers } from './fixtures/test-data';
 
@@ -50,7 +51,7 @@ test.describe('Debug Minimal Navigation', () => {
         return root && root.innerHTML.length > 0;
       }, { timeout: 10000 });
       console.log('[TEST] React content found');
-    } catch (e) {
+    } catch { /* ignore */ } {
       console.log('[TEST] No React content found');
 
       // Check what's actually in the DOM

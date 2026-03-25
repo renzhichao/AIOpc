@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { Page, Route } from '@playwright/test';
 
 /**
@@ -14,6 +15,7 @@ export class ApiMocks {
   private emptyStateMode = false;
 
   // Store created instances dynamically
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
   private createdInstances: any[] = [
     {
       id: 'instance-001',
@@ -113,10 +115,10 @@ export class ApiMocks {
    */
   async mockInstancesEndpoints() {
     // Store reference to 'this' for use in the handler
-    const self = this;
+    // eslint-disable-next-line @typescript-eslint/no-this-alias
 
     // Mock the health endpoint separately since it has a different URL structure
-    await this.page.route(/\/api\/health\/instances\/[^\/]+$/, async (route) => {
+    await this.page.route(/api\/health\/instances\/[^/]+$/, async (route) => {
       const url = route.request().url();
       const pathname = new URL(url).pathname;
       const instanceId = pathname.split('/').pop();
@@ -150,7 +152,7 @@ export class ApiMocks {
       console.log('🎯 Mock instances endpoint:', pathname, 'Method:', method);
 
       // Extract instance ID from URL if present
-      const instanceIdMatch = pathname.match(/^\/api\/instances\/([^\/]+)/);
+      const instanceIdMatch = pathname.match(/^\/api\/instances\/([^/]+)/);
       const instanceId = instanceIdMatch ? instanceIdMatch[1] : null;
 
       // ===== ROUTING LOGIC =====
@@ -194,7 +196,7 @@ export class ApiMocks {
             });
             return;
           }
-        } catch (e) {
+        } catch { /* ignore */ } {
           // If we can't parse the body, continue with normal flow
         }
 
@@ -202,7 +204,7 @@ export class ApiMocks {
         let requestBody = {};
         try {
           requestBody = route.request().postDataJSON() || {};
-        } catch (e) {
+        } catch { /* ignore */ } {
           // If we can't parse the body, use defaults
         }
 
@@ -406,7 +408,7 @@ export class ApiMocks {
 
     // Register the handler with a single catch-all pattern
     // This pattern matches all requests starting with /api/instances
-    await this.page.route(/\/api\/instances/, handleInstanceRequest);
+    await this.page.route(/\/api\/instances\//, handleInstanceRequest);
   }
 
   /**

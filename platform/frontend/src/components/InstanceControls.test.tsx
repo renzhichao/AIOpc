@@ -7,7 +7,6 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import '@testing-library/jest-dom';
 import { InstanceControls } from './InstanceControls';
-import type { InstanceStatus } from '../types/instance';
 
 describe('InstanceControls Component', () => {
   const mockHandlers = {

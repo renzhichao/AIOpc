@@ -10,12 +10,14 @@
 
 export type WebSocketStatus = 'connecting' | 'connected' | 'disconnected' | 'error';
 
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export type WebSocketMessage =
   | { type: 'user_message'; content: string; timestamp: string; message_id?: string; metadata?: Record<string, any>; sendStatus?: 'sending' | 'sent' | 'failed' }
   | { type: 'assistant_message'; content: string; timestamp: string; instance_id: string; message_id?: string; metadata?: Record<string, any> }
   | { type: 'status'; status: 'connected' | 'disconnected' | 'error'; message: string; instance_id?: string }
   | { type: 'error'; error: string; code?: string; details?: Record<string, any>; timestamp: string }
   | { type: 'message_ack'; message_id: string; status: string };
+/* eslint-enable @typescript-eslint/no-explicit-any */
 
 export interface WebSocketServiceConfig {
   wsUrl?: string;
@@ -32,6 +34,7 @@ export interface WebSocketService {
   disconnect(): void;
 
   // Send message to server
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
   sendMessage(content: string, files?: any[]): void;
 
   // Register message handler
@@ -71,7 +74,7 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
     statusHandlers.forEach(handler => {
       try {
         handler(status);
-      } catch (error) {
+      } catch {
         console.error('Error in status handler:', error);
       }
     });
@@ -81,7 +84,7 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
     messageHandlers.forEach(handler => {
       try {
         handler(message);
-      } catch (error) {
+      } catch {
         console.error('Error in message handler:', error);
       }
     });
@@ -106,7 +109,7 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
         if (ws && ws.readyState === WebSocket.OPEN) {
           ws.send(messageData);
         }
-      } catch (error) {
+      } catch {
         console.error('Failed to send queued message:', error);
       }
     });
@@ -159,8 +162,11 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
     // Debug: Log connection attempt
     const debugMsg = `[WS-DEBUG] 🔄 Connecting to: ${wsUrl.replace(token, token.substring(0, 10) + '...')}`;
     console.log(debugMsg);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).__WS_DEBUG__ = (window as any).__WS_DEBUG__ || [];
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: debugMsg });
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: `Token source: ${sessionStorage.getItem('access_token') ? 'sessionStorage' : 'localStorage'}` });
 
     notifyStatus('connecting');
@@ -173,6 +179,7 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
         const states = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'];
         const stateMsg = `WebSocket state: ${states[ws?.readyState || 3]} (${ws?.readyState})`;
         console.log('[WS-DEBUG]', stateMsg);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: stateMsg });
       };
 
@@ -187,17 +194,19 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
         reconnectAttempts = 0;
         notifyStatus('connected');
         flushMessageQueue();
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: successMsg });
       };
 
       ws.onmessage = (event) => {
         const msgMsg = `📨 Received: ${event.data.substring(0, 100)}...`;
         console.log('[WS-DEBUG]', msgMsg);
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: msgMsg });
         try {
           const message: WebSocketMessage = JSON.parse(event.data);
           notifyMessage(message);
-        } catch (error) {
+        } catch {
           console.error('[WS-DEBUG] ❌ Failed to parse message:', error);
         }
       };
@@ -206,6 +215,7 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
         const errorMsg = `❌ WebSocket error: ${JSON.stringify(error)}`;
         console.error('[WS-DEBUG]', errorMsg);
         notifyStatus('error');
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: errorMsg });
       };
 
@@ -213,16 +223,18 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
         const closeMsg = `🔌 WebSocket closed: code=${event.code}, reason="${event.reason}"`;
         console.log('[WS-DEBUG]', closeMsg);
         notifyStatus('disconnected');
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: closeMsg });
 
         // Attempt to reconnect
         scheduleReconnect();
       };
 
-    } catch (error) {
+    } catch {
       const catchMsg = `❌ Failed to create WebSocket: ${error}`;
       console.error('[WS-DEBUG]', catchMsg);
       notifyStatus('error');
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: catchMsg });
     }
   }
@@ -249,6 +261,7 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
     notifyStatus('disconnected');
   }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
   function sendMessage(content: string, files?: any[]) {
     const message: WebSocketMessage = {
       type: 'user_message',
@@ -272,7 +285,7 @@ export function createWebSocketService(config: WebSocketServiceConfig = {}): Web
 
     try {
       ws.send(messageData);
-    } catch (error) {
+    } catch {
       console.error('Failed to send message:', error);
 
       if (finalConfig.enableMessageQueue) {

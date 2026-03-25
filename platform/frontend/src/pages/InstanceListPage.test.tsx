@@ -6,11 +6,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { MemoryRouter, useSearchParams } from 'react-router-dom';
+import { MemoryRouter} from 'react-router-dom';
 import InstanceListPage from './InstanceListPage';
 import { AuthProvider } from '../contexts/AuthContext';
 import { instanceService } from '../services/instance';
-import type { Instance, UnclaimedInstance } from '../types/instance';
+import type { Instance} from '../types/instance';
 
 // Mock instanceService
 vi.mock('../services/instance', () => ({

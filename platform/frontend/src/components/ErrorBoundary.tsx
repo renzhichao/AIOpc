@@ -37,6 +37,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     };
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   static getDerivedStateFromError(_error: Error): Partial<ErrorBoundaryState> {
     // Update state so the next render will show the fallback UI
     // Note: Error is logged in componentDidCatch instead
@@ -49,6 +50,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     console.error('[ErrorBoundary] Error info:', errorInfo);
 
     // Store error info for debugging
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).__LAST_ERROR__ = {
       error: error.toString(),
       stack: error.stack,
@@ -57,7 +59,9 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     };
 
     // Also store in upload debug logs if available
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     if ((window as any).__UPLOAD_DEBUG__) {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__UPLOAD_DEBUG__.push({
         time: new Date().toISOString(),
         level: 'error',

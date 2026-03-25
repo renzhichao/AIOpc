@@ -38,6 +38,35 @@ export default function OAuthCallbackPage() {
   };
 
   /**
+   * 检查实例状态并重定向
+   */
+  const checkInstanceStatus = async (token: string) => {
+    try {
+      const response = await authService.getClaimQRCode(token);
+
+      if (response.already_has_instance) {
+        // 用户已有实例，直接跳转到聊天页面
+        setStatus('success');
+        setTimeout(() => {
+          navigate(response.redirect_to || '/chat', { replace: true });
+        }, 500);
+      } else {
+        // 用户没有可用实例，跳转到实例列表页面（显示可用实例）
+        setStatus('success');
+        setTimeout(() => {
+          navigate('/instances?tab=unclaimed', { replace: true });
+        }, 500);
+      }
+    } catch {
+      console.error('检查实例状态失败:', err);
+      setStatus('error');
+      setErrorMessage(
+        err instanceof Error ? err.message : '检查实例状态失败'
+      );
+    }
+  };
+
+  /**
    * 处理 OAuth 回调
    */
   useEffect(() => {
@@ -78,7 +107,7 @@ export default function OAuthCallbackPage() {
 
         // 检查实例状态
         await checkInstanceStatus(response.access_token);
-      } catch (err) {
+      } catch {
         console.error('处理回调失败:', err);
         setStatus('error');
         setErrorMessage(
@@ -88,36 +117,8 @@ export default function OAuthCallbackPage() {
     };
 
     handleCallback();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams, navigate, login, location.pathname]);
-
-  /**
-   * 检查实例状态并重定向
-   */
-  const checkInstanceStatus = async (token: string) => {
-    try {
-      const response = await authService.getClaimQRCode(token);
-
-      if (response.already_has_instance) {
-        // 用户已有实例，直接跳转到聊天页面
-        setStatus('success');
-        setTimeout(() => {
-          navigate(response.redirect_to || '/chat', { replace: true });
-        }, 500);
-      } else {
-        // 用户没有可用实例，跳转到实例列表页面（显示可用实例）
-        setStatus('success');
-        setTimeout(() => {
-          navigate('/instances?tab=unclaimed', { replace: true });
-        }, 500);
-      }
-    } catch (err) {
-      console.error('检查实例状态失败:', err);
-      setStatus('error');
-      setErrorMessage(
-        err instanceof Error ? err.message : '检查实例状态失败'
-      );
-    }
-  };
 
   /**
    * 返回登录页

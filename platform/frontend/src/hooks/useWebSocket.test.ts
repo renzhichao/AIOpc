@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { renderHook, act, waitFor } from '@testing-library/react';
+import { renderHook, act } from '@testing-library/react';
 import { useWebSocket } from './useWebSocket';
 import * as websocketService from '../services/websocket';
 
@@ -55,6 +55,7 @@ describe('useWebSocket', () => {
     };
 
     // Mock createWebSocketService to return our mock service
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
     vi.mocked(websocketService.createWebSocketService).mockReturnValue(mockService as any);
   });
 
@@ -179,7 +180,7 @@ describe('useWebSocket', () => {
   });
 
   it('should report connection status correctly', () => {
-    const { result, rerender } = renderHook(() => useWebSocket());
+    const { result } = renderHook(() => useWebSocket());
 
     expect(result.current.isConnected).toBe(false);
 

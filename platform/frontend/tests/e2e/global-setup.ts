@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import { FullConfig } from '@playwright/test';
 
 /**
@@ -27,7 +28,7 @@ async function globalSetup(config: FullConfig) {
       } else {
         console.warn(`⚠️  ${service.name} is responding but not healthy`);
       }
-    } catch (error) {
+    } catch {
       console.error(`❌ ${service.name} is not available:`, error);
       throw new Error(`Required service ${service.name} is not running at ${service.url}`);
     }

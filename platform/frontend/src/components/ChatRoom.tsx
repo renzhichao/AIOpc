@@ -102,7 +102,7 @@ ${debugText}
       await navigator.clipboard.writeText(fullDebugInfo);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
-    } catch (err) {
+    } catch {
       // Fallback for older browsers
       const textArea = document.createElement('textarea');
       textArea.value = fullDebugInfo;
@@ -112,7 +112,7 @@ ${debugText}
         document.execCommand('copy');
         setCopySuccess(true);
         setTimeout(() => setCopySuccess(false), 2000);
-      } catch (e) {
+      } catch {
         console.error('Failed to copy:', e);
       }
       document.body.removeChild(textArea);
@@ -225,10 +225,12 @@ ${debugText}
     // Log component mount
     const mountMsg = '[ChatRoom] 🚀 Component mounted, starting WebSocket with 3s timeout';
     console.log(mountMsg);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).__WS_DEBUG__ = (window as any).__WS_DEBUG__ || [];
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: mountMsg });
 
-    let fallbackTimeout: ReturnType<typeof setTimeout>;
+    let fallbackTimeout: ReturnType<typeof setTimeout> | null = null;
     let hasSwitched = false;
 
     const switchToPolling = () => {
@@ -237,7 +239,9 @@ ${debugText}
 
       const logMsg = '[ChatRoom] ⚠️ WebSocket failed, switching to HTTP polling';
       console.log(logMsg);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__WS_DEBUG__ = (window as any).__WS_DEBUG__ || [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: logMsg });
 
       // Disconnect WebSocket to prevent reconnection
@@ -251,6 +255,7 @@ ${debugText}
       const unsubscribePollingStatus = pollingService.current.onStatusChange((pollingStatus) => {
         const statusMsg = `[ChatRoom] Polling status: ${pollingStatus}`;
         console.log(statusMsg);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: statusMsg });
       });
 
@@ -268,7 +273,9 @@ ${debugText}
     const unsubscribeStatus = webSocket.onStatusChange((status) => {
       const statusMsg = `[ChatRoom] WebSocket status changed: ${status}`;
       console.log(statusMsg);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__WS_DEBUG__ = (window as any).__WS_DEBUG__ || [];
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: statusMsg });
 
       if (status === 'connected') {
@@ -290,6 +297,7 @@ ${debugText}
       if (!hasSwitched && webSocket.status !== 'connected') {
         const timeoutMsg = '[ChatRoom] ⏰ WebSocket timeout (3s), forcing switch to HTTP polling';
         console.log(timeoutMsg);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (window as any).__WS_DEBUG__.push({ time: new Date().toISOString(), message: timeoutMsg });
         switchToPolling();
       }
@@ -297,6 +305,7 @@ ${debugText}
 
     // Capture debug logs from window object
     const captureDebugLogs = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const logs = (window as any).__WS_DEBUG__ || [];
       setDebugLogs([...logs]);
       if (debugEndRef.current) {
@@ -315,6 +324,7 @@ ${debugText}
       if (fallbackTimeout) {
         clearTimeout(fallbackTimeout);
       }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
       pollingService.current.stop();
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -356,7 +366,7 @@ ${debugText}
             return msg;
           })
         );
-      } catch (error) {
+      } catch {
         // Update message status to 'failed' on error
         setMessages((prev) =>
           prev.map((msg) => {

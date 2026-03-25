@@ -32,7 +32,7 @@ export default function DashboardPage() {
 
         setStats(statsData);
         setUnclaimedCount(unclaimedData.length);
-      } catch (err) {
+      } catch {
         console.error('Failed to fetch dashboard data:', err);
         setError('加载失败，请稍后重试');
       } finally {

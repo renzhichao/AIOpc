@@ -47,16 +47,13 @@ interface LineChartProps {
   showLegend?: boolean;
 }
 
-export const LineChart: React.FC<LineChartProps> = ({
-  data,
-  series,
-  height = 300,
-  xAxisDataKey = 'timestamp',
-  showGrid = true,
-  showTooltip = true,
-  showLegend = true,
-}) => {
-  // Format timestamp for display
+// Custom tooltip component (defined outside render to avoid recreating on each render)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const CustomTooltip = ({ active, payload }: any) => {
+  if (!active || !payload || !payload.length) {
+    return null;
+  }
+
   const formatTimestamp = (timestamp: string): string => {
     const date = new Date(timestamp);
     const now = new Date();
@@ -85,26 +82,30 @@ export const LineChart: React.FC<LineChartProps> = ({
     }
   };
 
-  // Custom tooltip
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (!active || !payload || !payload.length) {
-      return null;
-    }
-
-    return (
-      <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
-        <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
-          {formatTimestamp(payload[0].payload.timestamp)}
+  return (
+    <div className="bg-white dark:bg-gray-800 p-3 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700">
+      <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mb-2">
+        {formatTimestamp(payload[0].payload.timestamp)}
+      </p>
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+      {payload.map((entry: any, index: number) => (
+        <p key={index} className="text-sm" style={{ color: entry.color }}>
+          {entry.name}: {typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value}
         </p>
-        {payload.map((entry: any, index: number) => (
-          <p key={index} className="text-sm" style={{ color: entry.color }}>
-            {entry.name}: {typeof entry.value === 'number' ? entry.value.toFixed(2) : entry.value}
-          </p>
-        ))}
-      </div>
-    );
-  };
+      ))}
+    </div>
+  );
+};
 
+export const LineChart: React.FC<LineChartProps> = ({
+  data,
+  series,
+  height = 300,
+  xAxisDataKey = 'timestamp',
+  showGrid = true,
+  showTooltip = true,
+  showLegend = true,
+}) => {
   return (
     <div className="w-full">
       <ResponsiveContainer width="100%" height={height}>
@@ -126,7 +127,30 @@ export const LineChart: React.FC<LineChartProps> = ({
           )}
           <XAxis
             dataKey={xAxisDataKey}
-            tickFormatter={formatTimestamp}
+            tickFormatter={(value) => {
+              const date = new Date(value);
+              const now = new Date();
+              const hours = Math.abs(now.getTime() - date.getTime()) / 36e5;
+
+              if (hours < 1) {
+                return date.toLocaleTimeString('zh-CN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                });
+              } else if (hours < 24) {
+                return date.toLocaleTimeString('zh-CN', {
+                  hour: '2-digit',
+                  minute: '2-digit',
+                });
+              } else {
+                return date.toLocaleDateString('zh-CN', {
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                });
+              }
+            }}
             tick={{ fill: '#6b7280', fontSize: 12 }}
             stroke="#9ca3af"
           />
