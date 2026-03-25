@@ -163,16 +163,23 @@ export class OAuthService {
     // Get provider for platform
     const provider = this.getProvider(targetPlatform);
 
-    // Generate state if not provided
+    // Generate state parameter
     const state = options.state || this.generateState();
 
     // Get redirect URI from options or environment
     let redirectUri = options.redirect_uri || this.getRedirectUri(targetPlatform);
 
-    // Use platform-specific callback path instead of query parameter
-    // This is necessary because DingTalk overrides the query string during redirect
+    // Adjust redirect_uri to match the exact path registered in OAuth provider's app
+    // DingTalk app is registered with /api/auth/dingtalk/callback
+    // Feishu can use /oauth/callback/feishu
     const url = new URL(redirectUri);
-    url.pathname = `/oauth/callback/${targetPlatform}`; // /oauth/callback/feishu or /oauth/callback/dingtalk
+    if (targetPlatform === OAuthPlatform.DINGTALK) {
+      // Use the exact path registered in DingTalk app configuration
+      url.pathname = '/api/auth/dingtalk/callback';
+    } else if (targetPlatform === OAuthPlatform.FEISHU) {
+      // Feishu supports path-based routing
+      url.pathname = '/oauth/callback/feishu';
+    }
     redirectUri = url.toString();
 
     // Generate authorization URL
@@ -208,18 +215,18 @@ export class OAuthService {
    *
    * Defaults to Feishu platform for backward compatibility.
    *
-   * @param platform - OAuth platform (defaults to 'feishu')
    * @param authCode - Authorization code from OAuth callback
+   * @param platform - OAuth platform (defaults to 'feishu')
    * @returns OAuth Token response with user info
    * @throws {Error} If token exchange fails or user creation fails
    *
    * @example
    * ```typescript
    * // Feishu callback (backward compatible)
-   * const result = await oauthService.handleCallback(undefined, 'auth_code_here');
+   * const result = await oauthService.handleCallback('auth_code_here');
    *
    * // DingTalk callback
-   * const result = await oauthService.handleCallback('dingtalk', 'auth_code_here');
+   * const result = await oauthService.handleCallback('auth_code_here', 'dingtalk');
    * ```
    */
   async handleCallback(
