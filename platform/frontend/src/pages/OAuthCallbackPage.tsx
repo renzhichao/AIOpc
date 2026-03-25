@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { authService } from '../services/auth';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -13,11 +13,29 @@ type CallbackStatus = 'loading' | 'success' | 'error';
 export default function OAuthCallbackPage() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { login } = useAuth();
 
   // Callback state
   const [status, setStatus] = useState<CallbackStatus>('loading');
   const [errorMessage, setErrorMessage] = useState<string>('');
+
+  /**
+   * 从URL路径中提取平台标识
+   * 例如：/oauth/callback/dingtalk -> dingtalk
+   */
+  const extractPlatformFromPath = (): string | null => {
+    const pathParts = location.pathname.split('/');
+    // /oauth/callback/dingtalk -> ['oauth', 'callback', 'dingtalk']
+    if (pathParts.length >= 3 && pathParts[1] === 'oauth' && pathParts[2] === 'callback') {
+      const platform = pathParts[3];
+      // 验证是否是有效的平台
+      if (platform === 'feishu' || platform === 'dingtalk') {
+        return platform;
+      }
+    }
+    return null;
+  };
 
   /**
    * 处理 OAuth 回调
@@ -27,7 +45,8 @@ export default function OAuthCallbackPage() {
       const code = searchParams.get('code');
       const state = searchParams.get('state');
       const error = searchParams.get('error');
-      const platform = searchParams.get('platform'); // Get platform from URL params
+      // 从URL路径中提取平台，而不是从查询参数
+      const platform = extractPlatformFromPath();
 
       // 处理错误情况
       if (error) {
@@ -69,7 +88,7 @@ export default function OAuthCallbackPage() {
     };
 
     handleCallback();
-  }, [searchParams, navigate, login]);
+  }, [searchParams, navigate, login, location.pathname]);
 
   /**
    * 检查实例状态并重定向

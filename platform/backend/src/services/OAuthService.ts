@@ -169,10 +169,10 @@ export class OAuthService {
     // Get redirect URI from options or environment
     let redirectUri = options.redirect_uri || this.getRedirectUri(targetPlatform);
 
-    // Append platform parameter to redirect URI for callback handling
-    // This allows the callback handler to identify which platform was used
+    // Use platform-specific callback path instead of query parameter
+    // This is necessary because DingTalk overrides the query string during redirect
     const url = new URL(redirectUri);
-    url.searchParams.set('platform', targetPlatform);
+    url.pathname = `/oauth/callback/${targetPlatform}`; // /oauth/callback/feishu or /oauth/callback/dingtalk
     redirectUri = url.toString();
 
     // Generate authorization URL
@@ -192,7 +192,8 @@ export class OAuthService {
 
     LogSanitizer.log('info', `Generated ${targetPlatform} authorization URL`, {
       platform: targetPlatform,
-      state
+      state,
+      redirectUri: this.sanitizeUrl(redirectUri)
     });
 
     return authUrl;
@@ -680,5 +681,21 @@ export class OAuthService {
   private generateState(): string {
     return Math.random().toString(36).substring(2, 15) +
            Math.random().toString(36).substring(2, 15);
+  }
+
+  /**
+   * Sanitize URL for safe logging (hide sensitive parts)
+   * @param url - URL to sanitize
+   * @returns Sanitized URL string
+   * @private
+   */
+  private sanitizeUrl(url: string): string {
+    try {
+      const parsed = new URL(url);
+      // Return only protocol, host and pathname
+      return `${parsed.protocol}//${parsed.host}${parsed.pathname}`;
+    } catch {
+      return url; // Return as-is if parsing fails
+    }
   }
 }
