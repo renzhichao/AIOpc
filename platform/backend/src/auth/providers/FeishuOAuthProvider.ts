@@ -718,7 +718,7 @@ export class FeishuOAuthProvider extends BaseOAuthProvider implements IOAuthProv
       return urlObj.toString();
     } catch {
       // If parsing fails, return only protocol and host if possible
-      const match = url.match(/^(https?:\/\/[^\/]+)/);
+      const match = url.match(/^(https?:\/\/[^/]+)/);
       return match ? match[1] : '[sanitized url]';
     }
   }

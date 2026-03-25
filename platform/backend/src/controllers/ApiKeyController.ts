@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Body, Param, QueryParam } from 'routing-controllers';
+import { Controller, Get, Post, Delete, Param, QueryParam } from 'routing-controllers';
 import { Service } from 'typedi';
 import { ApiKeyService } from '../services/ApiKeyService';
 import { logger } from '../config/logger';

@@ -21,7 +21,7 @@ const checks = [
     name: 'Constructor does not call getDocker()',
     file: ORCHESTRATOR_FILE,
     test: (content) => {
-      const constructorMatch = content.match(/private constructor\(\)\s*{[\s\S]*?^    }/m);
+      const constructorMatch = content.match(/private constructor\(\)\s*{[\s\S]*?^ {4}}/m);
       if (!constructorMatch) return false;
       const constructorBody = constructorMatch[0];
       // Should NOT have getDocker() call
@@ -48,7 +48,7 @@ const checks = [
     name: 'initializeDocker sets Docker after connect',
     file: ORCHESTRATOR_FILE,
     test: (content) => {
-      const initMatch = content.match(/private async initializeDocker[\s\S]*?^  }/m);
+      const initMatch = content.match(/private async initializeDocker[\s\S]*?^ {2}}/m);
       if (!initMatch) return false;
       const initBody = initMatch[0];
       // Should call connect() BEFORE getDocker()

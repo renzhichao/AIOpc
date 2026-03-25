@@ -300,7 +300,7 @@ describe('DockerService Integration Tests', () => {
       const containerId = await dockerService.createContainer(testInstanceId, testConfig);
 
       // Verify container exists
-      let status = await dockerService.getContainerStatus(testInstanceId);
+      const status = await dockerService.getContainerStatus(testInstanceId);
       expect(status.id).toBe(containerId);
 
       // Remove the container

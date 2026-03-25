@@ -344,7 +344,7 @@ export class DingTalkOAuthProvider extends BaseOAuthProvider implements IOAuthPr
    * @throws {OAuthError} With type PLATFORM_ERROR if refresh fails
    * @throws {OAuthError} With type EXPIRED_TOKEN if refresh token is expired
    */
-  async refreshAccessToken(refreshToken: string): Promise<string> {
+  async refreshAccessToken(_refreshToken: string): Promise<string> {
     // DingTalk OAuth does not support token refresh
     // Users need to re-scan QR code to get a new access token
     throw new OAuthError(
@@ -482,7 +482,7 @@ export class DingTalkOAuthProvider extends BaseOAuthProvider implements IOAuthPr
       return urlObj.toString();
     } catch {
       // If parsing fails, return only protocol and host if possible
-      const match = url.match(/^(https?:\/\/[^\/]+)/);
+      const match = url.match(/^(https?:\/\/[^/]+)/);
       return match ? match[1] : '[sanitized url]';
     }
   }

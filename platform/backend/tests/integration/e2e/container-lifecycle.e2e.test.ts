@@ -209,7 +209,7 @@ describe('Container Lifecycle E2E Tests', () => {
       });
 
       // Verify initial state
-      let status = await dockerService.getContainerStatus(instance.instance_id);
+      const status = await dockerService.getContainerStatus(instance.instance_id);
       expect(status.state).toBe('running');
       console.log('✓ Container state: running');
 

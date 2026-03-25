@@ -1,5 +1,6 @@
 import { StateManager } from './StateManager';
 import { redis } from '../config/redis';
+import { logger } from '../config/logger';
 
 // Mock Redis module
 jest.mock('../config/redis', () => ({
@@ -67,7 +68,7 @@ describe('StateManager', () => {
       mockRedis.setex.mockResolvedValue('OK');
 
       // Act
-      const state = await stateManager.store(platform, redirectUri);
+      await stateManager.store(platform, redirectUri);
 
       // Assert
       const setexCall = mockRedis.setex.mock.calls[0];
@@ -88,7 +89,7 @@ describe('StateManager', () => {
       );
 
       // Verify error was logged
-      const { logger } = require('../config/logger');
+      logger;
       expect(logger.error).toHaveBeenCalledWith(
         'Failed to store OAuth state',
         expect.objectContaining({
@@ -152,7 +153,7 @@ describe('StateManager', () => {
       expect(result.redirectUri).toBeUndefined();
 
       // Verify warning was logged
-      const { logger } = require('../config/logger');
+      logger;
       expect(logger.warn).toHaveBeenCalledWith(
         'OAuth state not found or expired',
         expect.any(Object)
@@ -177,7 +178,7 @@ describe('StateManager', () => {
       expect(result.error).toBe('State parameter has expired');
 
       // Verify warning was logged with age info
-      const { logger } = require('../config/logger');
+      logger;
       expect(logger.warn).toHaveBeenCalledWith(
         'OAuth state expired',
         expect.objectContaining({
@@ -202,7 +203,7 @@ describe('StateManager', () => {
       expect(result.error).toBe('Failed to validate state parameter');
 
       // Verify error was logged
-      const { logger } = require('../config/logger');
+      logger;
       expect(logger.error).toHaveBeenCalledWith(
         'Failed to validate OAuth state',
         expect.any(Object)
@@ -222,7 +223,7 @@ describe('StateManager', () => {
       expect(result.error).toBe('Failed to validate state parameter');
 
       // Verify error was logged
-      const { logger } = require('../config/logger');
+      logger;
       expect(logger.error).toHaveBeenCalled();
     });
 
@@ -282,7 +283,7 @@ describe('StateManager', () => {
       expect(mockRedis.del).toHaveBeenCalledWith(expect.stringContaining(state));
 
       // Verify info log
-      const { logger } = require('../config/logger');
+      logger;
       expect(logger.info).toHaveBeenCalledWith(
         'OAuth state deleted manually',
         expect.any(Object)
@@ -315,7 +316,7 @@ describe('StateManager', () => {
       expect(mockRedis.del).toHaveBeenCalled();
 
       // Verify error was logged
-      const { logger } = require('../config/logger');
+      logger;
       expect(logger.error).toHaveBeenCalled();
     });
   });
@@ -358,7 +359,7 @@ describe('StateManager', () => {
       expect(ttl).toBe(-1);
 
       // Verify error was logged
-      const { logger } = require('../config/logger');
+      logger;
       expect(logger.error).toHaveBeenCalled();
     });
   });
@@ -372,7 +373,7 @@ describe('StateManager', () => {
       expect(result).toBe(0);
 
       // Verify info log
-      const { logger } = require('../config/logger');
+      logger;
       expect(logger.info).toHaveBeenCalledWith(
         'OAuth state cleanup requested (handled by Redis TTL automatically)'
       );
@@ -406,7 +407,7 @@ describe('StateManager', () => {
     it('should not log full state parameter in logs (security)', async () => {
       // Arrange
       mockRedis.setex.mockResolvedValue('OK');
-      const { logger } = require('../config/logger');
+      logger;
 
       // Act
       await stateManager.store('feishu', 'https://example.com/callback');

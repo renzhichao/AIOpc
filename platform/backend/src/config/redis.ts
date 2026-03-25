@@ -10,7 +10,6 @@ import Redis from 'ioredis';
  * - Error logging
  */
 
-const isProduction = process.env.NODE_ENV === 'production';
 
 // Redis connection configuration
 const redisConfig = {

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+import { describe, it, expect, beforeEach, afterEach } from '@jest/globals';
 import { BaseOAuthProvider } from './BaseOAuthProvider';
 
 /**
@@ -13,7 +13,7 @@ class TestOAuthProvider extends BaseOAuthProvider {
     // Test implementation
   }
 
-  async exchangeCodeForUserInfo(code: string): Promise<any> {
+  async exchangeCodeForUserInfo(_code: string): Promise<any> {
     return { user_id: 'test' };
   }
 
