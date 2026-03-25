@@ -39,6 +39,7 @@ logger.info('TypeDI container initialized for TypeORM');
 import { AppDataSource } from './config/database';
 import { redis } from './config/redis';
 import { OAuthController } from './controllers/OAuthController';
+import { AuthController } from './controllers/AuthController';
 import { MockOAuthController } from './controllers/MockOAuthController';
 import { InstanceController } from './controllers/InstanceController';
 import { UserController } from './controllers/UserController';
