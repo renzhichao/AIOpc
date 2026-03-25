@@ -13,7 +13,7 @@
  */
 
 import { Service } from 'typedi';
-import { JsonController, Post, Get, Delete, Body, Req, Param, UseBefore } from 'routing-controllers';
+import { JsonController, Post, Get, Delete, Req, Param, UseBefore } from 'routing-controllers';
 import { AuthMiddleware, AuthRequest } from '../middleware/AuthMiddleware';
 import { FileStorageService, FileMetadata } from '../services/FileStorageService';
 import { logger } from '../config/logger';
@@ -105,7 +105,7 @@ export class FileUploadController {
         };
       }
 
-      const { originalname, mimetype, buffer, size } = req.file;
+      const { originalname, mimetype, buffer } = req.file;
 
       logger.info('File upload requested', {
         userId,
@@ -391,12 +391,6 @@ export class FileUploadController {
   @Get('/files')
   async listFiles(@Req() req: AuthRequest): Promise<FilesResponse> {
     try {
-      const userId = req.user!.userId;
-      const stats = this.fileStorage.getStats();
-      const userFiles = Array.from(stats.filesByUser.entries())
-        .filter(([uid]) => uid === userId)
-        .map(([, count]) => count);
-
       // Note: This would require tracking files by user in FileStorageService
       // For now, return empty array
       // TODO: Implement proper user file listing

@@ -1,9 +1,9 @@
-import { Controller, Get, Post, Put, Delete, Body, Param, Req } from 'routing-controllers';
+import { Controller, Get, Put, Delete, Body, Param, Req } from 'routing-controllers';
 import { Service } from 'typedi';
 import { UserRepository } from '../repositories/UserRepository';
 import { InstanceRepository } from '../repositories/InstanceRepository';
 import { logger } from '../config/logger';
-import { AppError, ErrorCodes } from '../utils/errors';
+import { AppError } from '../utils/errors';
 
 /**
  * User Controller
@@ -29,8 +29,8 @@ export class UserController {
 
       if (!user || !user.id) {
         throw new AppError(
-          ErrorCodes.UNAUTHORIZED.statusCode,
-          ErrorCodes.UNAUTHORIZED.code,
+          401,
+          'UNAUTHORIZED',
           'User not authenticated'
         );
       }
@@ -39,14 +39,14 @@ export class UserController {
 
       if (!userProfile) {
         throw new AppError(
-          ErrorCodes.NOT_FOUND.statusCode,
-          ErrorCodes.NOT_FOUND.code,
+          404,
+          'NOT_FOUND',
           'User not found'
         );
       }
 
       // Remove sensitive information
-      const { encrypted_access_token, encrypted_refresh_token, ...safeUser } = userProfile as any;
+      const { encrypted_access_token, encrypted_refresh_token, ...safeUser } = userProfile;
 
       return {
         success: true,
@@ -60,8 +60,8 @@ export class UserController {
       }
 
       throw new AppError(
-        ErrorCodes.INTERNAL_ERROR.statusCode,
-        ErrorCodes.INTERNAL_ERROR.code,
+        500,
+        'INTERNAL_ERROR',
         'Failed to get user profile'
       );
     }
@@ -85,8 +85,8 @@ export class UserController {
 
       if (!user || !user.id) {
         throw new AppError(
-          ErrorCodes.UNAUTHORIZED.statusCode,
-          ErrorCodes.UNAUTHORIZED.code,
+          401,
+          'UNAUTHORIZED',
           'User not authenticated'
         );
       }
@@ -103,8 +103,8 @@ export class UserController {
 
       if (Object.keys(updates).length === 0) {
         throw new AppError(
-          ErrorCodes.VALIDATION_ERROR.statusCode,
-          ErrorCodes.VALIDATION_ERROR.code,
+          400,
+          'VALIDATION_ERROR',
           'No valid fields to update'
         );
       }
@@ -112,7 +112,7 @@ export class UserController {
       const updatedUser = await this.userRepository.update(user.id, updates);
 
       // Remove sensitive information
-      const { encrypted_access_token, encrypted_refresh_token, ...safeUser } = updatedUser as any;
+      const { encrypted_access_token, encrypted_refresh_token, ...safeUser } = updatedUser;
 
       return {
         success: true,
@@ -127,8 +127,8 @@ export class UserController {
       }
 
       throw new AppError(
-        ErrorCodes.INTERNAL_ERROR.statusCode,
-        ErrorCodes.INTERNAL_ERROR.code,
+        500,
+        'INTERNAL_ERROR',
         'Failed to update profile'
       );
     }
@@ -145,8 +145,8 @@ export class UserController {
 
       if (!currentUser || !currentUser.id) {
         throw new AppError(
-          ErrorCodes.UNAUTHORIZED.statusCode,
-          ErrorCodes.UNAUTHORIZED.code,
+          401,
+          'UNAUTHORIZED',
           'User not authenticated'
         );
       }
@@ -154,8 +154,8 @@ export class UserController {
       // Check if user is admin or requesting own profile
       if (currentUser.id !== id && currentUser.role !== 'admin') {
         throw new AppError(
-          ErrorCodes.FORBIDDEN.statusCode,
-          ErrorCodes.FORBIDDEN.code,
+          403,
+          'FORBIDDEN',
           'Access denied'
         );
       }
@@ -164,14 +164,14 @@ export class UserController {
 
       if (!user) {
         throw new AppError(
-          ErrorCodes.NOT_FOUND.statusCode,
-          ErrorCodes.NOT_FOUND.code,
+          404,
+          'NOT_FOUND',
           'User not found'
         );
       }
 
       // Remove sensitive information
-      const { encrypted_access_token, encrypted_refresh_token, ...safeUser } = user as any;
+      const { encrypted_access_token, encrypted_refresh_token, ...safeUser } = user;
 
       return {
         success: true,
@@ -185,8 +185,8 @@ export class UserController {
       }
 
       throw new AppError(
-        ErrorCodes.INTERNAL_ERROR.statusCode,
-        ErrorCodes.INTERNAL_ERROR.code,
+        500,
+        'INTERNAL_ERROR',
         'Failed to get user'
       );
     }
@@ -203,8 +203,8 @@ export class UserController {
 
       if (!user || !user.id) {
         throw new AppError(
-          ErrorCodes.UNAUTHORIZED.statusCode,
-          ErrorCodes.UNAUTHORIZED.code,
+          401,
+          'UNAUTHORIZED',
           'User not authenticated'
         );
       }
@@ -223,8 +223,8 @@ export class UserController {
       }
 
       throw new AppError(
-        ErrorCodes.INTERNAL_ERROR.statusCode,
-        ErrorCodes.INTERNAL_ERROR.code,
+        500,
+        'INTERNAL_ERROR',
         'Failed to delete account'
       );
     }
@@ -241,8 +241,8 @@ export class UserController {
 
       if (!user || !user.id) {
         throw new AppError(
-          ErrorCodes.UNAUTHORIZED.statusCode,
-          ErrorCodes.UNAUTHORIZED.code,
+          401,
+          'UNAUTHORIZED',
           'User not authenticated'
         );
       }
@@ -261,8 +261,8 @@ export class UserController {
       }
 
       throw new AppError(
-        ErrorCodes.INTERNAL_ERROR.statusCode,
-        ErrorCodes.INTERNAL_ERROR.code,
+        500,
+        'INTERNAL_ERROR',
         'Failed to get user instances'
       );
     }

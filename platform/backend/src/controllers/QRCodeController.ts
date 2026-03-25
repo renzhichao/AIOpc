@@ -3,7 +3,6 @@ import { Service } from 'typedi';
 import { AuthRequest, AuthMiddleware } from '../middleware/AuthMiddleware';
 import { QRCodeService } from '../services/QRCodeService';
 import { logger } from '../config/logger';
-import { AppError, ErrorCodes } from '../utils/errors';
 
 /**
  * QR Code Controller
@@ -256,7 +255,7 @@ export class QRCodeController {
       }
 
       // Generate QR code image (using qrcode library)
-      const QRCode = require('qrcode');
+      const QRCode = await import('qrcode');
       const imageDataURL = await QRCode.toDataURL(qrCode.scan_url);
 
       logger.info('Generated QR code image', { id });

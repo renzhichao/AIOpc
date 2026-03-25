@@ -6,7 +6,6 @@ import { logger } from '../config/logger';
 import {
   FeishuWebhookRequest,
   FeishuWebhookResponse,
-  FeishuWebhookEncryptedRequest,
 } from '../types/feishu-webhook.types';
 import { Request } from 'express';
 

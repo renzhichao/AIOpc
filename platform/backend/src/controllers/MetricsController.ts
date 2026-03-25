@@ -9,9 +9,9 @@
  * - GET /instances/:id/metrics - Get time series metrics
  */
 
-import { Controller, Get, Param, QueryParam, Req, HttpCode } from 'routing-controllers';
+import { Controller, Get, Param, QueryParam, HttpCode } from 'routing-controllers';
 import { Service } from 'typedi';
-import { MetricsService, UsageStats, HealthStatus, MetricsTimeSeries } from '../services/MetricsService';
+import { MetricsService } from '../services/MetricsService';
 import { AppError } from '../utils/errors/AppError';
 import { logger } from '../config/logger';
 

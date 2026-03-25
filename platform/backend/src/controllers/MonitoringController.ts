@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, QueryParam, Req } from 'routing-controllers';
+import { Controller, Get, Param, QueryParam, Req } from 'routing-controllers';
 import { Service } from 'typedi';
 import { InstanceService } from '../services/InstanceService';
 import { DockerService } from '../services/DockerService';

@@ -8,7 +8,7 @@
  * - View health history
  */
 
-import { Controller, Get, Post, Route, Tags, Path, Body, Query, Middlewares, Response } from 'tsoa';
+import { Controller, Get, Post, Route, Tags, Path, Body, Query, Response } from 'tsoa';
 import { HealthCheckService } from '../services/HealthCheckService';
 import {
   ExtendedHealthStatus,

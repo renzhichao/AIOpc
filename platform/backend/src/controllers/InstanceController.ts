@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Delete, Put, Patch, Body, Param, QueryParam, Req } from 'routing-controllers';
+import { Controller, Get, Post, Delete, Patch, Body, Param, QueryParam, Req } from 'routing-controllers';
 import { Service } from 'typedi';
 import { InstanceService } from '../services/InstanceService';
 import { QRCodeService } from '../services/QRCodeService';

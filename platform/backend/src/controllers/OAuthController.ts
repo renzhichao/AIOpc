@@ -1,10 +1,9 @@
-import { Controller, Post, Get, Body, QueryParam, Req, Res, HttpError, Param } from 'routing-controllers';
+import { Controller, Post, Get, Body, QueryParam, Param } from 'routing-controllers';
 import { Service } from 'typedi';
-import { OAuthService, OAuthPlatformInfo } from '../services/OAuthService';
-import { logger } from '../config/logger';
-import { AppError, ErrorCodes } from '../utils/errors';
+import { OAuthService } from '../services/OAuthService';
 import { LogSanitizer } from '../utils/LogSanitizer';
 import { OAuthPlatform } from '../auth/interfaces/OAuthTypes';
+import { AppError } from '../utils/errors/AppError';
 
 /**
  * OAuth 2.0 Controller

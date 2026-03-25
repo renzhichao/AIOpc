@@ -11,7 +11,7 @@
  * - GET /api/instances/:instanceId/verify - Verify instance registration
  */
 
-import { Controller, Post, Delete, Get, Body, Param, Req, Header } from 'routing-controllers';
+import { Controller, Post, Delete, Get, Body, Param, Req } from 'routing-controllers';
 import { Service } from 'typedi';
 import { RemoteInstanceService } from '../services/RemoteInstanceService';
 import { logger } from '../config/logger';
