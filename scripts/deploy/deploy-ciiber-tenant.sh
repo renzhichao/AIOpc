@@ -54,6 +54,9 @@ REDIS_PASSWORD="${REDIS_PASSWORD:-8wqP09459CRNAahiGHCn}"
 JWT_SECRET="${JWT_SECRET:-StoSs7OeYmRwmxuBe8Lh50mRRGiYolDcTPY6HRvoPhD7rdaj8vHW1rE4Vp9VWQ4}"
 FEISHU_ENCRYPT_KEY="${FEISHU_ENCRYPT_KEY:-DoZ9NxC523OFphRtNnPdHDjk3OUHtsNZ}"
 
+# CIIBER端口配置
+HTTP_PORT="${HTTP_PORT:-20180}"  # Frontend HTTP端口（公网访问端口）
+
 # ⚠️ TEMPORARY: Enable DB_SYNC for quick migration validation
 # TODO: Remove this after proper migration implementation
 DB_SYNC="${DB_SYNC:-true}"
@@ -521,7 +524,7 @@ services:
       - frontend
       - backend
     ports:
-      - \"80:80\"
+      - \"${HTTP_PORT}:80\"
     volumes:
       - /opt/opclaw/platform/nginx.conf:/etc/nginx/nginx.conf:ro
     healthcheck:
