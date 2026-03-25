@@ -249,6 +249,7 @@ class Application {
       routePrefix: '/api',
       controllers: [
         OAuthController,
+        AuthController,
         MockOAuthController,
         InstanceController,
         UserController,
