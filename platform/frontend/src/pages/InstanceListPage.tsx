@@ -243,8 +243,6 @@ export default function InstanceListPage() {
       if (activeTab === 'claimed') {
         await loadClaimedInstances();
       }
-    } catch (err) {
-      throw err;
     } finally {
       setActionLoading(false);
     }
