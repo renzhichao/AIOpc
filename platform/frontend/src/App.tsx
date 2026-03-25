@@ -36,8 +36,8 @@ function App() {
           {/* 登录页 */}
           <Route path="/login" element={<LoginPage />} />
 
-          {/* OAuth 回调页 */}
-          <Route path="/oauth/callback" element={<OAuthCallbackPage />} />
+          {/* OAuth 回调页 - 支持平台特定路径 /oauth/callback/{platform} */}
+          <Route path="/oauth/callback/:platform?" element={<OAuthCallbackPage />} />
 
           {/* 受保护的路由 */}
           <Route
