@@ -27,6 +27,7 @@ export default function OAuthCallbackPage() {
       const code = searchParams.get('code');
       const state = searchParams.get('state');
       const error = searchParams.get('error');
+      const platform = searchParams.get('platform'); // Get platform from URL params
 
       // 处理错误情况
       if (error) {
@@ -50,8 +51,8 @@ export default function OAuthCallbackPage() {
       try {
         setStatus('loading');
 
-        // 调用后端 API 处理回调
-        const response = await authService.handleCallback(code, state);
+        // 调用后端 API 处理回调（传递platform参数）
+        const response = await authService.handleCallback(code, state, platform || undefined);
 
         // 更新认证状态
         login(response.access_token, response.user);

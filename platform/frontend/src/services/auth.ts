@@ -68,7 +68,7 @@ export class AuthService {
   /**
    * 处理 OAuth 回调
    */
-  async handleCallback(code: string, state: string): Promise<LoginResponse> {
+  async handleCallback(code: string, state: string, platform?: string): Promise<LoginResponse> {
     const response = await fetch(`${this.baseUrl}/oauth/callback`, {
       method: 'POST',
       headers: {
@@ -77,6 +77,7 @@ export class AuthService {
       body: JSON.stringify({
         code,
         state,
+        platform, // Include platform parameter
         redirect_uri: `${window.location.origin}/oauth/callback`,
       }),
     });

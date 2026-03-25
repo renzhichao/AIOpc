@@ -167,7 +167,13 @@ export class OAuthService {
     const state = options.state || this.generateState();
 
     // Get redirect URI from options or environment
-    const redirectUri = options.redirect_uri || this.getRedirectUri(targetPlatform);
+    let redirectUri = options.redirect_uri || this.getRedirectUri(targetPlatform);
+
+    // Append platform parameter to redirect URI for callback handling
+    // This allows the callback handler to identify which platform was used
+    const url = new URL(redirectUri);
+    url.searchParams.set('platform', targetPlatform);
+    redirectUri = url.toString();
 
     // Generate authorization URL
     const authUrl = await provider.getAuthorizationUrl(redirectUri, state);

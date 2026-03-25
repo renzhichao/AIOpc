@@ -300,6 +300,7 @@ export class OAuthController {
   @Post('/callback')
   async handleCallback(@Body() body: any) {
     const authCode = body.code;
+    const platform = body.platform; // Get platform from request body
 
     // Validate required fields
     if (!authCode) {
@@ -311,7 +312,8 @@ export class OAuthController {
     }
 
     try {
-      const tokens = await this.oauthService.handleCallback(authCode, undefined);
+      // Pass platform to oauthService, default to FEISHU if not provided
+      const tokens = await this.oauthService.handleCallback(authCode, platform);
 
       return {
         success: true,
