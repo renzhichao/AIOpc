@@ -338,4 +338,29 @@ describe('OAuthService - Auto-Claim Integration (TASK-001)', () => {
     // Assert: Error should be logged
     expect(logger.error).toHaveBeenCalled();
   });
+
+  /**
+   * TEST 7: OAuth configuration validation - missing Feishu credentials
+   *
+   * Expected: When FEISHU_APP_ID and FEISHU_APP_SECRET are not set,
+   * the service should fail to initialize with a clear error message.
+   * This test prevents Bug #33 regression where missing env vars caused 500 errors.
+   */
+  it('should throw error when Feishu OAuth credentials are missing', () => {
+    // Arrange: Remove Feishu environment variables
+    const originalAppId = process.env.FEISHU_APP_ID;
+    const originalAppSecret = process.env.FEISHU_APP_SECRET;
+
+    delete process.env.FEISHU_APP_ID;
+    delete process.env.FEISHU_APP_SECRET;
+
+    // Act & Assert: Creating OAuthService should throw error
+    expect(() => {
+      new OAuthService(userRepository, instanceRepository);
+    }).toThrow();
+
+    // Restore environment variables
+    if (originalAppId) process.env.FEISHU_APP_ID = originalAppId;
+    if (originalAppSecret) process.env.FEISHU_APP_SECRET = originalAppSecret;
+  });
 });

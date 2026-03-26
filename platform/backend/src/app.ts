@@ -17,9 +17,14 @@ if (NODE_ENV === 'production') {
 }
 
 // 尝试加载环境文件（如果存在）
+// 注意：不会覆盖已存在的环境变量（用于本地开发）
 dotenv.config({ path: envPath });
-// 同时也尝试加载默认的.env文件
-dotenv.config();
+// 同时也尝试加载默认的.env文件（用于本地开发）
+// 在Docker环境中，环境变量由docker-compose传递，不应该被.env文件覆盖
+// 使用 override: false 确保不会覆盖已设置的环境变量
+if (NODE_ENV !== 'production') {
+  dotenv.config({ override: false });
+}
 
 import express from 'express';
 import cors from 'cors';
@@ -211,6 +216,49 @@ class Application {
     this.app.use(requestLogger);
   }
 
+  /**
+   * Validate OAuth configuration on startup
+   * Fails fast if required OAuth credentials are missing
+   * This prevents the application from starting in a broken state
+   */
+  private validateOAuthConfig() {
+    const requiredOAuthVars = [
+      'FEISHU_APP_ID',
+      'FEISHU_APP_SECRET',
+      'JWT_SECRET'
+    ];
+
+    const missingVars: string[] = [];
+
+    for (const varName of requiredOAuthVars) {
+      if (!process.env[varName] || process.env[varName].trim() === '') {
+        missingVars.push(varName);
+      }
+    }
+
+    if (missingVars.length > 0) {
+      const errorMsg = `Missing required OAuth configuration: ${missingVars.join(', ')}. Application cannot start.`;
+
+      logger.error('OAuth configuration validation failed', {
+        missing: missingVars,
+        environment: process.env.NODE_ENV || 'unknown'
+      });
+
+      // In production, fail fast to prevent broken deployment
+      if (process.env.NODE_ENV === 'production') {
+        throw new Error(errorMsg);
+      }
+
+      // In development, warn but continue
+      logger.warn(`Starting without OAuth configuration. OAuth functionality will not work: ${errorMsg}`);
+    } else {
+      logger.info('OAuth configuration validated successfully', {
+        feishu_app_id: process.env.FEISHU_APP_ID?.substring(0, 8) + '...',
+        jwt_secret_configured: !!process.env.JWT_SECRET
+      });
+    }
+  }
+
   private initializeErrorHandlers() {
     // Error handling middleware (must be after routes)
     this.app.use(notFoundHandler);
@@ -241,6 +289,9 @@ class Application {
 
   private initializeControllers() {
     logger.info('Initializing routing-controllers...');
+
+    // Validate OAuth configuration before starting controllers
+    this.validateOAuthConfig();
 
     // Configure routing-controllers with class-based controller registration
     useExpressServer(this.app, {
